@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from 'react';
-import { CheckCircle2, Megaphone, PauseCircle, SkipForward, Undo2, UserPlus, Users } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Megaphone, PauseCircle, SkipForward, Undo2, UserPlus, Users } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useEventoEnVivo } from '../../lib/tiempoReal';
 import { Aviso, BotonAccion, IndicadorEnVivo, claseCampo, useAccion } from './comunes';
+import DispensarTurno from './DispensarTurno';
 
 const PRIORIDADES = {
   ninguna: 'Sin prioridad',
@@ -34,6 +35,7 @@ function EtiquetaPrioridad({ prioridad }) {
 export default function FilaFarmacia() {
   const [datos, setDatos] = useState({ turno_actual: null, presentes: 0, fila: [] });
   const [cargando, setCargando] = useState(true);
+  const [dispensando, setDispensando] = useState(null); // id del turno con la entrega abierta
 
   const cargar = useCallback(async () => {
     try {
@@ -60,6 +62,8 @@ export default function FilaFarmacia() {
     ejecutar(() => api(`/fila/${turno.id}/${accion}`, { metodo: 'POST' }), `Turno ${turno.numero}: ${texto}`);
 
   const llamado = datos.fila.find((t) => t.estado === 'llamado');
+  // La entrega solo sigue abierta mientras ese mismo turno esté en ventanilla
+  const entregaAbierta = llamado && dispensando === llamado.id;
   const presentes = datos.fila.filter((t) => t.estado === 'presente');
   const enPausa = datos.fila.filter((t) => t.estado === 'en_pausa');
   const porLlegar = datos.fila.filter((t) => t.estado === 'reservado' || t.estado === 'en_camino');
@@ -96,9 +100,15 @@ export default function FilaFarmacia() {
                   <EtiquetaPrioridad prioridad={llamado.prioridad} />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <BotonAccion color="verde" icono={CheckCircle2} ocupado={ocupado}
+                  {llamado.formula && !entregaAbierta && (
+                    <BotonAccion color="verde" icono={ClipboardList} ocupado={ocupado}
+                      onClick={() => setDispensando(llamado.id)}>
+                      Dispensar
+                    </BotonAccion>
+                  )}
+                  <BotonAccion color={llamado.formula ? 'gris' : 'verde'} icono={CheckCircle2} ocupado={ocupado}
                     onClick={() => accionTurno(llamado, 'atender', 'atendido')}>
-                    Marcar atendido
+                    {llamado.formula ? 'Atendido sin entrega' : 'Marcar atendido'}
                   </BotonAccion>
                   <BotonAccion color="ambar" icono={PauseCircle} ocupado={ocupado}
                     onClick={() => accionTurno(llamado, 'pausar', 'en pausa')}>
@@ -109,6 +119,15 @@ export default function FilaFarmacia() {
                     Saltar
                   </BotonAccion>
                 </div>
+                {entregaAbierta && (
+                  <DispensarTurno
+                    key={llamado.id}
+                    turno={llamado}
+                    ocupado={ocupado}
+                    ejecutar={ejecutar}
+                    alCerrar={() => setDispensando(null)}
+                  />
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-between gap-4 flex-wrap">
