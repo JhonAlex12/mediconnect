@@ -51,7 +51,9 @@ export async function api(ruta, { metodo = 'GET', cuerpo, token = leerToken() } 
 
   if (!respuesta.ok) {
     if (respuesta.status === 401 && token && ruta !== '/auth/login') alVencerSesion?.();
-    throw new ErrorApi(datos.mensaje || 'Ocurrió un error inesperado', respuesta.status);
+    const mensaje = datos.mensaje || 'Ocurrió un error inesperado';
+    const detalles = Array.isArray(datos.detalles) && datos.detalles.length ? `: ${datos.detalles.join('; ')}` : '';
+    throw new ErrorApi(mensaje + detalles, respuesta.status);
   }
   return datos;
 }

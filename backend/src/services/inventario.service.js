@@ -93,7 +93,7 @@ export async function verInventario() {
       ? `${m.nombre} ${m.presentacion}: agotado`
       : `${m.nombre} ${m.presentacion}: bajo el mínimo (${m.stock_actual} de ${m.stock_minimo})`));
 
-  return { medicamentos, alertas };
+  return { medicamentos, alertas, modo_demo: process.env.MODO_DEMO === 'true' };
 }
 
 // ============================================================

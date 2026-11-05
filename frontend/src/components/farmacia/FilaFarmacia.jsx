@@ -1,11 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
-import {
-  AlertCircle, CheckCircle2, Megaphone, PauseCircle, SkipForward, Undo2,
-  UserPlus, Users, Wifi, WifiOff,
-} from 'lucide-react';
+import React, { useCallback, useState } from 'react';
+import { CheckCircle2, Megaphone, PauseCircle, SkipForward, Undo2, UserPlus, Users } from 'lucide-react';
 import { api } from '../../lib/api';
-import { useSesion } from '../../lib/sesion';
+import { useEventoEnVivo } from '../../lib/tiempoReal';
+import { Aviso, BotonAccion, IndicadorEnVivo, claseCampo, useAccion } from './comunes';
 
 const PRIORIDADES = {
   ninguna: 'Sin prioridad',
@@ -34,37 +31,13 @@ function EtiquetaPrioridad({ prioridad }) {
   );
 }
 
-function BotonAccion({ onClick, ocupado, color, icono: Icono, children }) {
-  const colores = {
-    verde: 'bg-emerald-600 hover:bg-emerald-700 text-white',
-    ambar: 'bg-amber-500 hover:bg-amber-600 text-slate-950',
-    gris: 'bg-slate-200 hover:bg-slate-300 text-slate-800',
-  };
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={ocupado}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${colores[color]}`}
-    >
-      <Icono className="w-4 h-4" />
-      {children}
-    </button>
-  );
-}
-
 export default function FilaFarmacia() {
-  const { token } = useSesion();
   const [datos, setDatos] = useState({ turno_actual: null, presentes: 0, fila: [] });
   const [cargando, setCargando] = useState(true);
-  const [conectado, setConectado] = useState(false);
-  const [ocupado, setOcupado] = useState(false);
-  const [aviso, setAviso] = useState(null); // { tipo: 'error' | 'exito', texto }
 
   const cargar = useCallback(async () => {
     try {
-      const d = await api('/fila');
-      setDatos(d);
+      setDatos(await api('/fila'));
     } catch (err) {
       setAviso({ tipo: 'error', texto: err.message });
     } finally {
@@ -72,40 +45,10 @@ export default function FilaFarmacia() {
     }
   }, []);
 
+  const { ocupado, aviso, setAviso, ejecutar } = useAccion(cargar);
+
   // Tiempo real: el backend avisa "fila_actualizada" y el panel vuelve a pedir la fila
-  useEffect(() => {
-    cargar();
-    const socket = io({ auth: { token } });
-    socket.on('connect', () => {
-      setConectado(true);
-      cargar(); // ponerse al día tras una reconexión
-    });
-    socket.on('disconnect', () => setConectado(false));
-    socket.on('connect_error', () => setConectado(false));
-    socket.on('fila_actualizada', cargar);
-    return () => socket.disconnect();
-  }, [token, cargar]);
-
-  // Los avisos de éxito desaparecen solos
-  useEffect(() => {
-    if (aviso?.tipo !== 'exito') return;
-    const t = setTimeout(() => setAviso(null), 4000);
-    return () => clearTimeout(t);
-  }, [aviso]);
-
-  const ejecutar = async (accion, textoExito) => {
-    setOcupado(true);
-    setAviso(null);
-    try {
-      const r = await accion();
-      setAviso({ tipo: 'exito', texto: typeof textoExito === 'function' ? textoExito(r) : textoExito });
-      await cargar();
-    } catch (err) {
-      setAviso({ tipo: 'error', texto: err.message });
-    } finally {
-      setOcupado(false);
-    }
-  };
+  useEventoEnVivo('fila_actualizada', cargar);
 
   const llamarSiguiente = () =>
     ejecutar(
@@ -126,33 +69,10 @@ export default function FilaFarmacia() {
       {/* Estado de la conexión en tiempo real */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h2 className="text-2xl font-bold text-slate-800">Fila de hoy</h2>
-        <span
-          className={`flex items-center gap-1.5 text-sm font-semibold px-3 py-1 rounded-full ${
-            conectado ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-          }`}
-        >
-          {conectado ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-          {conectado ? 'En vivo' : 'Sin conexión en vivo'}
-        </span>
+        <IndicadorEnVivo />
       </div>
 
-      {aviso && (
-        <div
-          role={aviso.tipo === 'error' ? 'alert' : 'status'}
-          className={`border-l-4 p-3 rounded-r-lg flex items-start gap-2 ${
-            aviso.tipo === 'error'
-              ? 'bg-red-50 border-red-600 text-red-800'
-              : 'bg-emerald-50 border-emerald-600 text-emerald-900'
-          }`}
-        >
-          {aviso.tipo === 'error' ? (
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          ) : (
-            <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-          )}
-          <p>{aviso.texto}</p>
-        </div>
-      )}
+      <Aviso aviso={aviso} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Columna principal: ventanilla + fila */}
@@ -325,9 +245,6 @@ function RegistrarFisico({ ocupado, ejecutar }) {
       (r) => `Turno ${r.turno.numero} registrado`
     );
   };
-
-  const claseCampo =
-    'w-full border border-slate-400 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-slate-600';
 
   return (
     <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
