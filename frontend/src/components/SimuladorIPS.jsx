@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle2, AlertCircle, Send, FileText, Copy } from 'lucide-react';
 
 export default function SimuladorIPS({ onIrAPaciente }) {
-  const hoyStr = new Date().toISOString().split('T')[0];
-  const enQuinceDiasStr = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  // Fechas locales (toISOString usa UTC: de noche en Colombia daría el día siguiente)
+  const fechaLocal = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const hoyStr = fechaLocal(new Date());
+  const enQuinceDiasStr = fechaLocal(new Date(Date.now() + 15 * 24 * 60 * 60 * 1000));
 
   const [catalogo, setCatalogo] = useState([]);
   const [siguienteCodigo, setSiguienteCodigo] = useState('F-2026-0004');
@@ -29,11 +32,14 @@ export default function SimuladorIPS({ onIrAPaciente }) {
   const cargarDatos = async () => {
     try {
       const [resMeds, resFormulas] = await Promise.all([
-        fetch('/api/medicamentos'),
-        fetch('/api/ips/formulas')
+        fetch('/api/simulador/medicamentos'),
+        fetch('/api/simulador/formulas')
       ]);
-      const dataMeds = await resMeds.json();
+      const dataMeds = (await resMeds.json()).medicamentos ?? [];
       const dataFormulas = await resFormulas.json();
+      if (!resMeds.ok || !resFormulas.ok) {
+        setError('El simulador no está disponible: el backend debe correr con MODO_DEMO=true.');
+      }
 
       setCatalogo(dataMeds);
       if (dataFormulas.siguiente_codigo) {
@@ -124,12 +130,12 @@ export default function SimuladorIPS({ onIrAPaciente }) {
     setEnviando(true);
 
     try {
-      const respuesta = await fetch('/api/ips/formulas', {
+      const respuesta = await fetch('/api/simulador/formulas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          documento_paciente: documento,
-          nombre_paciente: nombre,
+          documento,
+          nombre,
           fecha_emision: fechaEmision,
           fecha_limite: fechaLimite,
           medicamentos: items.map((i) => ({
@@ -141,13 +147,14 @@ export default function SimuladorIPS({ onIrAPaciente }) {
 
       const data = await respuesta.json();
       if (!respuesta.ok || !data.ok) {
-        setError(data.error || 'Error al guardar y enviar la fórmula.');
+        const detalles = Array.isArray(data.detalles) && data.detalles.length ? `: ${data.detalles.join('; ')}` : '';
+        setError((data.mensaje || 'Error al guardar y enviar la fórmula.') + detalles);
       } else {
         setExito({
-          codigo: data.codigo,
+          codigo: data.formula.codigo,
           documento: documento,
           nombre: nombre,
-          mensaje: data.mensaje
+          mensaje: `Fórmula ${data.formula.codigo} registrada con ${data.formula.medicamentos} medicamento(s).`
         });
         setSiguienteCodigo(data.siguiente_codigo);
         await cargarDatos();
@@ -166,7 +173,7 @@ export default function SimuladorIPS({ onIrAPaciente }) {
         <div className="bg-neutral-600 text-white px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-bold tracking-wide">Simulador de IPS - Doctor</h2>
           <span className="text-xs bg-neutral-700 px-3 py-1 rounded-full text-neutral-200">
-            Endpoint: POST /api/ips/formulas
+            Endpoint: POST /api/simulador/formulas
           </span>
         </div>
 

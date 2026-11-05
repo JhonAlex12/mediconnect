@@ -6,6 +6,7 @@ import formulasRoutes from './routes/formulas.routes.js';
 import { pool } from './db/pool.js';
 import turnosRoutes from './routes/turnos.routes.js';
 import ipsRoutes from './routes/ips.routes.js';
+import simuladorRoutes from './routes/simulador.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import inventarioRoutes from './routes/inventario.routes.js';
 import dispensacionRoutes from './routes/dispensacion.routes.js';
@@ -48,6 +49,7 @@ app.get('/api/salud', async (req, res) => {
 
 // Entrada de fórmulas desde la IPS
 app.use('/api/ips', ipsRoutes);
+app.use('/api/simulador', simuladorRoutes); // solo con MODO_DEMO=true
 
 // Manejador de errores: convierte los errores en respuestas ordenadas
 app.use((error, req, res, next) => {
