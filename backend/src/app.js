@@ -5,6 +5,8 @@ import formulasRoutes from './routes/formulas.routes.js';
 import { pool } from './db/pool.js';
 import turnosRoutes from './routes/turnos.routes.js';
 import ipsRoutes from './routes/ips.routes.js';
+import authRoutes from './routes/auth.routes.js';
+import filaRoutes from './routes/fila.routes.js';
 import { ErrorNegocio } from './services/formulas.service.js';
 
 const app = express();
@@ -14,6 +16,8 @@ app.use(cors());          // permite peticiones desde el frontend
 app.use(express.json()); 
 app.use('/api/formulas', formulasRoutes); // entiende cuerpos de petición en JSON
 app.use('/api/turnos', turnosRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/fila', filaRoutes);
 // Ruta de prueba: confirma que el servidor y la base de datos responden
 app.get('/api/salud', async (req, res) => {
   try {

@@ -154,3 +154,16 @@ CREATE INDEX IF NOT EXISTS idx_turnos_fecha_estado ON turnos (fecha, estado);
 CREATE INDEX IF NOT EXISTS idx_reservas_medicamento ON reservas (medicamento_id) WHERE liberada = FALSE;
 CREATE INDEX IF NOT EXISTS idx_notificaciones_paciente ON notificaciones (paciente_id, leida);
 CREATE INDEX IF NOT EXISTS idx_formula_items_formula ON formula_items (formula_id);
+
+-- ============================================================
+-- Paso 10: fila de la farmacia
+-- ============================================================
+
+-- Nombre de quien toma un turno físico sin fórmula vinculada (RN-17)
+ALTER TABLE turnos ADD COLUMN IF NOT EXISTS nombre_visitante VARCHAR(120);
+
+-- Lugar en la fila: permite reubicar y saltar sin cambiar la hora real de toma
+ALTER TABLE turnos ADD COLUMN IF NOT EXISTS orden TIMESTAMPTZ;
+UPDATE turnos SET orden = hora_toma WHERE orden IS NULL;
+ALTER TABLE turnos ALTER COLUMN orden SET DEFAULT now();
+ALTER TABLE turnos ALTER COLUMN orden SET NOT NULL;
