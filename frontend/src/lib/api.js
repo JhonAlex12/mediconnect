@@ -50,7 +50,8 @@ export async function api(ruta, { metodo = 'GET', cuerpo, token = leerToken() } 
   const datos = await respuesta.json().catch(() => ({}));
 
   if (!respuesta.ok) {
-    if (respuesta.status === 401 && token && ruta !== '/auth/login') alVencerSesion?.();
+    // Solo cierra la sesión del empleado si falló SU token (no el de un turno de paciente)
+    if (respuesta.status === 401 && token && token === leerToken()) alVencerSesion?.();
     const mensaje = datos.mensaje || 'Ocurrió un error inesperado';
     const detalles = Array.isArray(datos.detalles) && datos.detalles.length ? `: ${datos.detalles.join('; ')}` : '';
     throw new ErrorApi(mensaje + detalles, respuesta.status);

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Stethoscope, Smartphone, Building2, MonitorPlay } from 'lucide-react';
 import SimuladorIPS from './components/SimuladorIPS';
 import PanelFarmacia from './components/farmacia/PanelFarmacia';
+import VistaPaciente from './components/paciente/VistaPaciente';
+import PantallaPublica from './components/pantalla/PantallaPublica';
 import { SesionProvider } from './lib/sesion';
 
 export default function App() {
@@ -97,24 +99,15 @@ export default function App() {
           </SesionProvider>
         )}
 
-        {(moduloActivo === 'paciente' || moduloActivo === 'pantalla') && (
-          <div className="max-w-xl mx-auto bg-white rounded-xl shadow border border-slate-300 p-8 text-center space-y-3">
-            <h2 className="text-xl font-bold text-slate-800">
-              Módulo en construcción para el siguiente paso
-            </h2>
-            <p className="text-slate-600">
-              Seleccionaste la pestaña <strong>{moduloActivo}</strong>. Una vez probemos el{' '}
-              <strong>Paso 2 (Simulador de IPS - Doctor)</strong>, activaremos esta vista en el{' '}
-              <strong>Paso 3</strong>.
-            </p>
-            {datosFormulaPaciente.codigo && (
-              <p className="text-sm bg-slate-100 p-3 rounded-lg font-mono text-slate-700">
-                Fórmula lista para consultar: {datosFormulaPaciente.codigo} | Doc:{' '}
-                {datosFormulaPaciente.documento}
-              </p>
-            )}
-          </div>
+        {moduloActivo === 'paciente' && (
+          <VistaPaciente
+            key={`${datosFormulaPaciente.codigo}|${datosFormulaPaciente.documento}`}
+            codigoInicial={datosFormulaPaciente.codigo}
+            documentoInicial={datosFormulaPaciente.documento}
+          />
         )}
+
+        {moduloActivo === 'pantalla' && <PantallaPublica />}
       </main>
     </div>
   );
