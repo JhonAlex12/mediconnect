@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { BarChart3, ListOrdered, LogOut, Package, UserCircle2, Users } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 import { TiempoRealProvider } from '../../lib/tiempoReal';
+import Encabezado, { useTitulo } from '../Encabezado';
 import LoginEmpleado from './LoginEmpleado';
 import FilaFarmacia from './FilaFarmacia';
 import InventarioFarmacia from './InventarioFarmacia';
@@ -10,88 +12,105 @@ import UsuariosFarmacia from './UsuariosFarmacia';
 
 const ROLES = { auxiliar: 'Auxiliar', administrador: 'Administrador' };
 
+// Cada sección es una página: /farmacia/fila, /farmacia/inventario...
 const SECCIONES = [
-  { id: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia },
-  { id: 'inventario', texto: 'Inventario', icono: Package, componente: InventarioFarmacia },
+  { ruta: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia },
+  { ruta: 'inventario', texto: 'Inventario', icono: Package, componente: InventarioFarmacia },
   // Reportes y usuarios: solo administradores (el backend también lo exige)
-  { id: 'reportes', texto: 'Reportes', icono: BarChart3, componente: ReportesFarmacia, soloAdmin: true },
-  { id: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
+  { ruta: 'reportes', texto: 'Reportes', icono: BarChart3, componente: ReportesFarmacia, soloAdmin: true },
+  { ruta: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
 ];
 
-const CLAVE_SECCION = 'mediconect_seccion_farmacia';
-
-function leerSeccion() {
-  try {
-    return localStorage.getItem(CLAVE_SECCION) ?? 'fila';
-  } catch {
-    return 'fila';
-  }
+function Seccion({ titulo, componente: Componente }) {
+  useTitulo(`${titulo} · Farmacia`);
+  return <Componente />;
 }
 
 export default function PanelFarmacia() {
   const { usuario, verificando, cerrarSesion } = useSesion();
-  const [seccion, setSeccion] = useState(leerSeccion);
+  useTitulo('Farmacia');
 
   if (verificando) {
-    return <p className="text-center text-slate-500 py-12">Verificando la sesión…</p>;
+    return (
+      <Pagina>
+        <p className="text-center text-slate-500 py-12">Verificando la sesión…</p>
+      </Pagina>
+    );
   }
-  if (!usuario) return <LoginEmpleado />;
-
-  const cambiarSeccion = (id) => {
-    setSeccion(id);
-    try {
-      localStorage.setItem(CLAVE_SECCION, id);
-    } catch {
-      // Sin almacenamiento: se recuerda solo mientras la página esté abierta
-    }
-  };
+  if (!usuario) {
+    return (
+      <Pagina>
+        <LoginEmpleado />
+      </Pagina>
+    );
+  }
 
   const permitidas = SECCIONES.filter((s) => !s.soloAdmin || usuario.rol === 'administrador');
-  // Si la sección recordada no existe o no le corresponde a este rol, se abre la fila
-  const actual = permitidas.find((s) => s.id === seccion) ?? permitidas[0];
-  const Activa = actual.componente;
 
   return (
     <TiempoRealProvider>
-      <div className="space-y-6">
-        <div className="bg-white rounded-xl border border-slate-300 px-5 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <UserCircle2 className="w-8 h-8 text-slate-500" />
-            <div>
-              <p className="font-bold text-slate-800">{usuario.nombre}</p>
-              <p className="text-sm text-slate-500">{ROLES[usuario.rol] ?? usuario.rol}</p>
+      <Pagina
+        derecha={
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <UserCircle2 className="w-7 h-7 text-slate-400" />
+              <div className="leading-tight">
+                <p className="font-semibold text-sm">{usuario.nombre}</p>
+                <p className="text-xs text-slate-400">{ROLES[usuario.rol] ?? usuario.rol}</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={cerrarSesion}
+              className="flex items-center gap-2 text-sm font-semibold bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg transition cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              Salir
+            </button>
           </div>
-
-          <nav className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg" aria-label="Secciones de la farmacia">
-            {permitidas.map(({ id, texto, icono: Icono }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => cambiarSeccion(id)}
-                aria-current={actual.id === id ? 'page' : undefined}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-semibold transition cursor-pointer ${
-                  actual.id === id ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Icono className="w-4 h-4" />
-                {texto}
-              </button>
-            ))}
+        }
+        menu={
+          <nav className="bg-white border-b border-slate-300" aria-label="Secciones de la farmacia">
+            <div className="max-w-7xl mx-auto px-4 flex gap-1 overflow-x-auto">
+              {permitidas.map(({ ruta, texto, icono: Icono }) => (
+                <NavLink
+                  key={ruta}
+                  to={ruta}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition ${
+                      isActive
+                        ? 'border-emerald-600 text-slate-900'
+                        : 'border-transparent text-slate-600 hover:text-slate-900'
+                    }`
+                  }
+                >
+                  <Icono className="w-4 h-4" />
+                  {texto}
+                </NavLink>
+              ))}
+            </div>
           </nav>
-
-          <button
-            type="button"
-            onClick={cerrarSesion}
-            className="flex items-center gap-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-lg transition cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar sesión
-          </button>
-        </div>
-
-        <Activa />
-      </div>
+        }
+      >
+        <Routes>
+          <Route index element={<Navigate to="fila" replace />} />
+          {permitidas.map((s) => (
+            <Route key={s.ruta} path={s.ruta} element={<Seccion titulo={s.texto} componente={s.componente} />} />
+          ))}
+          {/* Sección inexistente o sin permiso: a la fila */}
+          <Route path="*" element={<Navigate to="fila" replace />} />
+        </Routes>
+      </Pagina>
     </TiempoRealProvider>
+  );
+}
+
+function Pagina({ derecha, menu, children }) {
+  return (
+    <div className="min-h-screen bg-slate-100 flex flex-col">
+      <Encabezado seccion="Panel de la farmacia">{derecha}</Encabezado>
+      {menu}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">{children}</main>
+    </div>
   );
 }

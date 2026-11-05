@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
+import { useTitulo } from '../Encabezado';
 
 // Pantalla de la sala de espera: solo números de turno, nunca nombres
 export default function PantallaPublica() {
+  useTitulo('Pantalla de la sala');
   const [estado, setEstado] = useState({ llamando: null, proximos: [], en_pausa: [] });
   const [conectado, setConectado] = useState(false);
   const [ahora, setAhora] = useState(() => new Date());
@@ -69,7 +71,7 @@ export default function PantallaPublica() {
   };
 
   return (
-    <div ref={contenedor} className="bg-slate-950 text-white rounded-2xl overflow-hidden min-h-[36rem] flex flex-col">
+    <div ref={contenedor} className="bg-slate-950 text-white min-h-screen flex flex-col">
       <header className="flex items-center justify-between gap-4 px-8 py-4 border-b border-slate-800">
         <div>
           <p className="text-2xl font-black">Farmacia</p>

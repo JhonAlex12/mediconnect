@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Aviso, claseCampo } from '../farmacia/comunes';
+import Encabezado, { useTitulo } from '../Encabezado';
 
 // El turno del paciente vive en su teléfono: se guarda su token aparte del de los empleados
 const CLAVE_TURNO = 'mediconect_token_turno';
@@ -47,19 +48,20 @@ const fechaLarga = (iso) => {
 };
 const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }) : '—');
 
-function Telefono({ children }) {
+// Página pensada primero para el celular: una sola columna angosta
+function PaginaPaciente({ children }) {
   return (
-    <div className="max-w-md mx-auto bg-white rounded-[2rem] shadow-xl border-8 border-slate-800 overflow-hidden">
-      <div className="bg-emerald-600 text-white px-5 py-3">
-        <p className="font-bold">Mediconect</p>
-        <p className="text-xs text-emerald-100">Tu turno en la farmacia</p>
-      </div>
-      <div className="p-5 space-y-5 min-h-[32rem]">{children}</div>
+    <div className="min-h-screen bg-slate-100 flex flex-col">
+      <Encabezado seccion="Tu turno en la farmacia" ancho="max-w-lg" />
+      <main className="flex-1 w-full max-w-lg mx-auto px-4 py-6">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-5">{children}</div>
+      </main>
     </div>
   );
 }
 
 export default function VistaPaciente({ codigoInicial = '', documentoInicial = '' }) {
+  useTitulo('Mi turno');
   const [token, setToken] = useState(leerTurno);
   const [aviso, setAviso] = useState(null);
 
@@ -75,14 +77,14 @@ export default function VistaPaciente({ codigoInicial = '', documentoInicial = '
   };
 
   return (
-    <Telefono>
+    <PaginaPaciente>
       <Aviso aviso={aviso} />
       {token ? (
         <MiTurno token={token} alSalir={salir} />
       ) : (
         <ConsultaYTurno codigoInicial={codigoInicial} documentoInicial={documentoInicial} alTomarTurno={entrar} />
       )}
-    </Telefono>
+    </PaginaPaciente>
   );
 }
 
