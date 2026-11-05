@@ -1,15 +1,14 @@
 import 'dotenv/config';
 import http from 'node:http';
-import { Server } from 'socket.io';
 import app from './app.js';
+import { iniciarSockets } from './sockets/index.js';
+import { iniciarTareas } from './jobs/mantenimiento.job.js';
 
 // Express y Socket.IO comparten el mismo servidor HTTP
 const servidor = http.createServer(app);
-const io = new Server(servidor, { cors: { origin: '*' } });
 
-io.on('connection', (socket) => {
-  console.log('Cliente conectado:', socket.id);
-});
+iniciarSockets(servidor);
+iniciarTareas();
 
 const puerto = process.env.PORT || 3000;
 servidor.listen(puerto, () => {

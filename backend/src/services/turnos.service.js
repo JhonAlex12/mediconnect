@@ -178,11 +178,12 @@ export async function tomarTurno({ codigo, documento, confirmar, prioridad = 'ni
 // CONSULTAR MI TURNO: estado, posición y tiempo estimado (RF-12)
 // ============================================================
 export async function obtenerMiTurno(turnoId) {
+  // LEFT JOIN: los turnos físicos pueden no tener fórmula vinculada
   const { rows: [t] } = await pool.query(
     `SELECT t.id, t.numero, t.estado, t.prioridad, t.fecha, t.hora_toma,
             t.hora_vencimiento, t.retraso_usado, f.codigo AS formula, f.fecha_limite
        FROM turnos t
-       JOIN formulas f ON f.id = t.formula_id
+       LEFT JOIN formulas f ON f.id = t.formula_id
       WHERE t.id = $1`,
     [turnoId]
   );
@@ -212,6 +213,7 @@ export async function obtenerMiTurno(turnoId) {
   }
 
   return {
+    id: t.id,
     numero: t.numero,
     estado: t.estado,
     prioridad: t.prioridad,
@@ -304,4 +306,33 @@ export async function accionPaciente(turnoId, accion) {
   }
 
   return obtenerMiTurno(turnoId);
+}
+
+// ============================================================
+// NOTIFICACIONES DEL PACIENTE (CU-04)
+// ============================================================
+
+// Devuelve las últimas 50 notificaciones del paciente dueño del turno
+export async function listarNotificaciones(turnoId) {
+  const { rows } = await pool.query(
+    `SELECT n.id, n.tipo, n.mensaje, n.leida, n.fecha
+       FROM notificaciones n
+       JOIN turnos t ON t.paciente_id = n.paciente_id
+      WHERE t.id = $1
+      ORDER BY n.fecha DESC
+      LIMIT 50`,
+    [turnoId]
+  );
+  return rows;
+}
+
+// Marca como leídas todas las notificaciones pendientes de ese paciente
+export async function marcarLeidas(turnoId) {
+  await pool.query(
+    `UPDATE notificaciones n
+        SET leida = TRUE
+       FROM turnos t
+      WHERE t.id = $1 AND n.paciente_id = t.paciente_id AND n.leida = FALSE`,
+    [turnoId]
+  );
 }

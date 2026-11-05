@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { exigirTokenPaciente } from '../middleware/tokenPaciente.js';
-import { tomar, miTurno, accion } from '../controllers/turnos.controller.js';
+import { tomar, miTurno, accion, notificaciones, leidas } from '../controllers/turnos.controller.js';
 
 const router = Router();
 
-// Mismo freno que la consulta: evita probar combinaciones de código y documento
 const limitador = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
@@ -16,6 +15,8 @@ const limitador = rateLimit({
 
 router.post('/', limitador, tomar);
 router.get('/mio', exigirTokenPaciente, miTurno);
+router.get('/mio/notificaciones', exigirTokenPaciente, notificaciones);
+router.post('/mio/notificaciones/leidas', exigirTokenPaciente, leidas);
 router.post('/mio/:accion', exigirTokenPaciente, accion);
 
 export default router;

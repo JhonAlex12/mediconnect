@@ -24,3 +24,11 @@ export const ESTADOS_ACTIVOS = ['reservado', 'en_camino', 'presente', 'llamado',
 
 // Prioridades permitidas (RN-05)
 export const PRIORIDADES = ['ninguna', 'adulto_mayor', 'embarazada', 'discapacidad'];
+// Minutos de espera a un turno llamado antes de pausarlo solo (RN-07: 3 a 5)
+export const MINUTOS_GRACIA = 4;
+
+// Minutos en pausa tras los cuales el turno vence (RN-09: 30 a 60)
+export const MINUTOS_VENCE_PAUSA = 30;
+
+// Cada cuánto corren las tareas automáticas (cron con segundos: cada 30 s)
+export const CRON_MANTENIMIENTO = '*/30 * * * * *';
