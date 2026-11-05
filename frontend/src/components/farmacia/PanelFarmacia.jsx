@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
-import { ListOrdered, LogOut, Package, UserCircle2 } from 'lucide-react';
+import { BarChart3, ListOrdered, LogOut, Package, UserCircle2, Users } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 import { TiempoRealProvider } from '../../lib/tiempoReal';
 import LoginEmpleado from './LoginEmpleado';
 import FilaFarmacia from './FilaFarmacia';
 import InventarioFarmacia from './InventarioFarmacia';
+import ReportesFarmacia from './ReportesFarmacia';
+import UsuariosFarmacia from './UsuariosFarmacia';
 
 const ROLES = { auxiliar: 'Auxiliar', administrador: 'Administrador' };
 
 const SECCIONES = [
   { id: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia },
   { id: 'inventario', texto: 'Inventario', icono: Package, componente: InventarioFarmacia },
+  // Reportes y usuarios: solo administradores (el backend también lo exige)
+  { id: 'reportes', texto: 'Reportes', icono: BarChart3, componente: ReportesFarmacia, soloAdmin: true },
+  { id: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
 ];
 
 const CLAVE_SECCION = 'mediconect_seccion_farmacia';
 
 function leerSeccion() {
   try {
-    const guardada = localStorage.getItem(CLAVE_SECCION);
-    return SECCIONES.some((s) => s.id === guardada) ? guardada : 'fila';
+    return localStorage.getItem(CLAVE_SECCION) ?? 'fila';
   } catch {
     return 'fila';
   }
@@ -42,7 +46,10 @@ export default function PanelFarmacia() {
     }
   };
 
-  const Activa = SECCIONES.find((s) => s.id === seccion).componente;
+  const permitidas = SECCIONES.filter((s) => !s.soloAdmin || usuario.rol === 'administrador');
+  // Si la sección recordada no existe o no le corresponde a este rol, se abre la fila
+  const actual = permitidas.find((s) => s.id === seccion) ?? permitidas[0];
+  const Activa = actual.componente;
 
   return (
     <TiempoRealProvider>
@@ -56,15 +63,15 @@ export default function PanelFarmacia() {
             </div>
           </div>
 
-          <nav className="flex gap-1 bg-slate-100 p-1 rounded-lg" aria-label="Secciones de la farmacia">
-            {SECCIONES.map(({ id, texto, icono: Icono }) => (
+          <nav className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg" aria-label="Secciones de la farmacia">
+            {permitidas.map(({ id, texto, icono: Icono }) => (
               <button
                 key={id}
                 type="button"
                 onClick={() => cambiarSeccion(id)}
-                aria-current={seccion === id ? 'page' : undefined}
+                aria-current={actual.id === id ? 'page' : undefined}
                 className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-semibold transition cursor-pointer ${
-                  seccion === id ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:text-slate-900'
+                  actual.id === id ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 <Icono className="w-4 h-4" />
