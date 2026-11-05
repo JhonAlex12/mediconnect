@@ -17,3 +17,8 @@ export async function publicarCambios(turnoIds = []) {
     console.error('Error al publicar en tiempo real:', error.message);
   }
 }
+
+// Avisa al panel que el inventario cambió (el panel vuelve a pedirlo con su sesión)
+export function publicarInventario() {
+  emitir('farmacia', 'inventario_actualizado', {});
+}

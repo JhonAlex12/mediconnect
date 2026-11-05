@@ -7,6 +7,8 @@ import { pool } from './db/pool.js';
 import turnosRoutes from './routes/turnos.routes.js';
 import ipsRoutes from './routes/ips.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import inventarioRoutes from './routes/inventario.routes.js';
+import dispensacionRoutes from './routes/dispensacion.routes.js';
 import filaRoutes from './routes/fila.routes.js';
 import { ErrorNegocio } from './services/formulas.service.js';
 
@@ -19,6 +21,8 @@ app.use('/api/formulas', formulasRoutes); // entiende cuerpos de petición en JS
 app.use('/api/turnos', turnosRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/fila', filaRoutes);
+app.use('/api/inventario', inventarioRoutes);
+app.use('/api/dispensacion', dispensacionRoutes);
 // Estado inicial de la pantalla pública (sin login; luego se actualiza por Socket.IO)
 app.get('/api/pantalla', async (req, res, next) => {
   try {
