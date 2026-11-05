@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* RNF-01: Facilidad de uso - letra base de al menos 16 px para adultos mayores */
+html {
+  font-size: 16px;
+}
