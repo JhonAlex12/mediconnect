@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Stethoscope, Smartphone, Building2, MonitorPlay } from 'lucide-react';
 import SimuladorIPS from './components/SimuladorIPS';
+import PanelFarmacia from './components/farmacia/PanelFarmacia';
+import { SesionProvider } from './lib/sesion';
 
 export default function App() {
   const [moduloActivo, setModuloActivo] = useState('ips');
@@ -89,7 +91,13 @@ export default function App() {
           <SimuladorIPS onIrAPaciente={irAPacienteConFormula} />
         )}
 
-        {moduloActivo !== 'ips' && (
+        {moduloActivo === 'farmacia' && (
+          <SesionProvider>
+            <PanelFarmacia />
+          </SesionProvider>
+        )}
+
+        {(moduloActivo === 'paciente' || moduloActivo === 'pantalla') && (
           <div className="max-w-xl mx-auto bg-white rounded-xl shadow border border-slate-300 p-8 text-center space-y-3">
             <h2 className="text-xl font-bold text-slate-800">
               Módulo en construcción para el siguiente paso
