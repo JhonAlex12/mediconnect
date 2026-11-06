@@ -173,7 +173,7 @@ export default function FormulaMedica({ onIrAPaciente }) {
         <div className="bg-indigo-900 text-white px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-xl font-bold tracking-wide">Nueva fórmula médica</h2>
           <span className="text-xs bg-indigo-800 px-3 py-1 rounded-full text-indigo-100">
-            Se envía a la farmacia por Mediconect
+            Se envía a la farmacia por Mediconnect
           </span>
         </div>
 
@@ -209,7 +209,7 @@ export default function FormulaMedica({ onIrAPaciente }) {
                   onClick={() => onIrAPaciente(exito.codigo, exito.documento)}
                   className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold px-4 py-2 rounded-lg shrink-0 transition cursor-pointer"
                 >
-                  Ver como paciente en Mediconect ↗
+                  Ver como paciente en Mediconnect ↗
                 </button>
               )}
             </div>
@@ -447,7 +447,7 @@ export default function FormulaMedica({ onIrAPaciente }) {
                         onClick={() => onIrAPaciente(f.codigo, f.paciente_documento)}
                         className="text-xs bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded font-semibold cursor-pointer"
                       >
-                        Ver en Mediconect ↗
+                        Ver en Mediconnect ↗
                       </button>
                     )}
                   </td>

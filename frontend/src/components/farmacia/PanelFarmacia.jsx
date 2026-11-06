@@ -79,7 +79,7 @@ export default function PanelFarmacia() {
                   className={({ isActive }) =>
                     `flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 whitespace-nowrap transition ${
                       isActive
-                        ? 'border-emerald-600 text-slate-900'
+                        ? 'border-marca-verde text-slate-900'
                         : 'border-transparent text-slate-600 hover:text-slate-900'
                     }`
                   }

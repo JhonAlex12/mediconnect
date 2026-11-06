@@ -73,21 +73,21 @@ export default function Inicio() {
   return (
     <SitioPublico>
       {/* Banner principal */}
-      <section className="bg-gradient-to-br from-blue-950 via-blue-900 to-blue-700 text-white overflow-hidden">
+      <section className="bg-gradient-to-br from-marca-noche via-marca-azul-oscuro to-marca-azul text-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 py-14 lg:py-20 grid lg:grid-cols-2 gap-10 items-center">
           <div className="space-y-6">
-            <span className="inline-block bg-emerald-500/20 text-emerald-300 text-sm font-semibold px-3 py-1 rounded-full">
+            <span className="inline-block bg-marca-verde/20 text-marca-verde text-sm font-semibold px-3 py-1 rounded-full">
               Farmacia conectada a tu IPS
             </span>
             <h1 className="text-4xl sm:text-5xl font-black leading-tight">
-              Reclama tus medicamentos <span className="text-emerald-400">sin hacer fila</span>
+              Reclama tus medicamentos <span className="text-marca-verde">sin hacer fila</span>
             </h1>
             <p className="text-lg text-blue-100 max-w-xl">
               Consulta qué hay disponible, pide tu turno desde el celular y llega justo cuando te van a atender.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/paciente"
-                className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-lg px-6 py-3 rounded-full shadow-lg transition">
+                className="inline-flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold text-lg px-6 py-3 rounded-full shadow-lg transition">
                 Pide tu turno
                 <ChevronRight className="w-5 h-5" />
               </Link>
@@ -101,10 +101,10 @@ export default function Inicio() {
           {/* Ilustración: así se ve tu turno */}
           <div className="hidden lg:flex justify-center" aria-hidden="true">
             <div className="relative">
-              <div className="absolute -inset-6 bg-emerald-400/20 rounded-[3rem] blur-2xl" />
-              <div className="relative w-72 bg-white text-slate-900 rounded-[2rem] shadow-2xl p-5 space-y-4 border-8 border-blue-950/40">
+              <div className="absolute -inset-6 bg-marca-verde/20 rounded-[3rem] blur-2xl" />
+              <div className="relative w-72 bg-white text-slate-900 rounded-[2rem] shadow-2xl p-5 space-y-4 border-8 border-marca-noche/40">
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tu turno</p>
-                <div className="bg-blue-950 text-white rounded-2xl p-5 text-center">
+                <div className="bg-marca-noche text-white rounded-2xl p-5 text-center">
                   <p className="text-5xl font-black">V-014</p>
                   <p className="text-sm text-blue-200 mt-1">Estás en la fila</p>
                 </div>
@@ -118,8 +118,8 @@ export default function Inicio() {
                     <p className="font-bold">V-011</p>
                   </div>
                 </div>
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-sm flex gap-2">
-                  <Bell className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="bg-marca-verde-claro border border-marca-verde rounded-xl p-3 text-sm flex gap-2">
+                  <Bell className="w-4 h-4 text-marca-verde-oscuro shrink-0 mt-0.5" />
                   Losartán ya está disponible.
                 </div>
               </div>
@@ -137,11 +137,11 @@ export default function Inicio() {
             { icono: Accessibility, titulo: 'Atención preferencial', a: '/#preguntas' },
           ].map(({ icono: Icono, titulo, a }) => (
             <Link key={titulo} to={a}
-              className="group bg-white rounded-2xl shadow-lg border border-slate-200 p-5 flex items-center gap-4 hover:border-emerald-500 transition">
-              <span className="w-12 h-12 rounded-xl bg-blue-50 text-blue-900 flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition">
+              className="group bg-white rounded-2xl shadow-lg border border-slate-200 p-5 flex items-center gap-4 hover:border-marca-verde transition">
+              <span className="w-12 h-12 rounded-xl bg-blue-50 text-marca-azul-oscuro flex items-center justify-center group-hover:bg-marca-verde group-hover:text-white transition">
                 <Icono className="w-6 h-6" />
               </span>
-              <span className="font-bold text-blue-950">{titulo}</span>
+              <span className="font-bold text-marca-noche">{titulo}</span>
               <ChevronRight className="w-5 h-5 text-slate-400 ml-auto" />
             </Link>
           ))}
@@ -151,16 +151,16 @@ export default function Inicio() {
       {/* Servicios */}
       <section id="servicios" className="max-w-7xl mx-auto px-4 py-16 scroll-mt-24">
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-emerald-600 font-bold uppercase tracking-wide text-sm">Servicios</p>
-          <h2 className="text-3xl font-black text-blue-950 mt-1">Todo lo de tu fórmula, en un solo lugar</h2>
+          <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Servicios</p>
+          <h2 className="text-3xl font-black text-marca-noche mt-1">Todo lo de tu fórmula, en un solo lugar</h2>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {SERVICIOS.map(({ icono: Icono, titulo, texto }) => (
             <article key={titulo} className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
-              <span className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-4">
+              <span className="w-12 h-12 rounded-xl bg-marca-verde-claro text-marca-verde-oscuro flex items-center justify-center mb-4">
                 <Icono className="w-6 h-6" />
               </span>
-              <h3 className="font-bold text-lg text-blue-950">{titulo}</h3>
+              <h3 className="font-bold text-lg text-marca-noche">{titulo}</h3>
               <p className="text-slate-600 mt-2">{texto}</p>
             </article>
           ))}
@@ -171,22 +171,22 @@ export default function Inicio() {
       <section id="como-funciona" className="bg-blue-50 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 py-16">
           <div className="text-center max-w-2xl mx-auto mb-10">
-            <p className="text-emerald-600 font-bold uppercase tracking-wide text-sm">Cómo funciona</p>
-            <h2 className="text-3xl font-black text-blue-950 mt-1">De la consulta médica a tus manos en 4 pasos</h2>
+            <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Cómo funciona</p>
+            <h2 className="text-3xl font-black text-marca-noche mt-1">De la consulta médica a tus manos en 4 pasos</h2>
           </div>
           <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {PASOS.map(({ icono: Icono, titulo, texto }, i) => (
               <li key={titulo} className="bg-white rounded-2xl p-6 shadow-sm relative">
                 <span className="absolute top-5 right-5 text-4xl font-black text-blue-100">{i + 1}</span>
-                <Icono className="w-8 h-8 text-blue-900 mb-4" />
-                <h3 className="font-bold text-lg text-blue-950">{titulo}</h3>
+                <Icono className="w-8 h-8 text-marca-azul-oscuro mb-4" />
+                <h3 className="font-bold text-lg text-marca-noche">{titulo}</h3>
                 <p className="text-slate-600 mt-2">{texto}</p>
               </li>
             ))}
           </ol>
           <div className="text-center mt-10">
             <Link to="/paciente"
-              className="inline-flex items-center gap-2 bg-blue-900 hover:bg-blue-950 text-white font-bold text-lg px-6 py-3 rounded-full transition">
+              className="inline-flex items-center gap-2 bg-marca-azul-oscuro hover:bg-marca-noche text-white font-bold text-lg px-6 py-3 rounded-full transition">
               Empezar ahora
               <ChevronRight className="w-5 h-5" />
             </Link>
@@ -197,13 +197,13 @@ export default function Inicio() {
       {/* Preguntas frecuentes */}
       <section id="preguntas" className="max-w-3xl mx-auto px-4 py-16 scroll-mt-24">
         <div className="text-center mb-8">
-          <p className="text-emerald-600 font-bold uppercase tracking-wide text-sm">Preguntas frecuentes</p>
-          <h2 className="text-3xl font-black text-blue-950 mt-1">¿Tienes dudas?</h2>
+          <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Preguntas frecuentes</p>
+          <h2 className="text-3xl font-black text-marca-noche mt-1">¿Tienes dudas?</h2>
         </div>
         <div className="space-y-3">
           {PREGUNTAS.map(({ p, r }) => (
             <details key={p} className="group bg-white border border-slate-200 rounded-xl open:shadow-sm">
-              <summary className="cursor-pointer list-none flex items-center justify-between gap-4 px-5 py-4 font-bold text-blue-950">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-4 px-5 py-4 font-bold text-marca-noche">
                 {p}
                 <ChevronRight className="w-5 h-5 text-slate-400 transition group-open:rotate-90" />
               </summary>

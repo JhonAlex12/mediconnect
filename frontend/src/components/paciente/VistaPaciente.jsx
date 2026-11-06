@@ -154,7 +154,7 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
             inputMode="numeric" className={claseCampo} />
         </div>
         <button type="submit" disabled={ocupado}
-          className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition cursor-pointer">
+          className="w-full flex items-center justify-center gap-2 bg-marca-azul hover:bg-marca-azul-oscuro disabled:opacity-50 text-white font-bold py-3 rounded-xl transition cursor-pointer">
           <Search className="w-5 h-5" />
           Consultar
         </button>
@@ -216,7 +216,7 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
                     Volver
                   </button>
                   <button type="button" onClick={() => pedirTurno(true)} disabled={ocupado}
-                    className="py-2.5 rounded-xl font-bold bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white cursor-pointer">
+                    className="py-2.5 rounded-xl font-bold bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-50 text-white cursor-pointer">
                     Pedir de todos modos
                   </button>
                 </div>
@@ -232,7 +232,7 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
                   </select>
                 </div>
                 <button type="button" onClick={() => pedirTurno(false)} disabled={ocupado}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-lg py-3 rounded-xl transition cursor-pointer">
+                  className="w-full bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-50 text-white font-bold text-lg py-3 rounded-xl transition cursor-pointer">
                   Pedir turno virtual
                 </button>
               </div>
@@ -446,7 +446,7 @@ function Dato({ icono: Icono, etiqueta, valor }) {
 
 function BotonGrande({ color, icono: Icono, children, ...props }) {
   const colores = {
-    verde: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+    verde: 'bg-marca-verde hover:bg-marca-verde-oscuro text-white',
     ambar: 'bg-amber-400 hover:bg-amber-500 text-slate-950',
     oscuro: 'bg-slate-800 hover:bg-slate-900 text-white',
   };

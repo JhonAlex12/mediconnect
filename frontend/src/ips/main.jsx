@@ -4,11 +4,11 @@ import { ClipboardPlus, ShieldCheck } from 'lucide-react';
 import FormulaMedica from './FormulaMedica';
 import '../index.css';
 
-// Sistema de la IPS (simulado). Es una aplicación aparte de Mediconect:
+// Sistema de la IPS (simulado). Es una aplicación aparte de Mediconnect:
 // el médico emite la fórmula aquí y la información viaja a la farmacia.
 function SistemaIps() {
-  // Abre Mediconect, en otra pestaña, con la fórmula lista para consultar
-  const verEnMediconect = (codigo, documento) =>
+  // Abre Mediconnect, en otra pestaña, con la fórmula lista para consultar
+  const verEnMediconnect = (codigo, documento) =>
     window.open(`/paciente?${new URLSearchParams({ codigo, documento })}`, '_blank', 'noopener');
 
   return (
@@ -35,7 +35,7 @@ function SistemaIps() {
       </header>
 
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8">
-        <FormulaMedica onIrAPaciente={verEnMediconect} />
+        <FormulaMedica onIrAPaciente={verEnMediconnect} />
       </main>
 
       <footer className="text-center text-xs text-slate-500 py-4">

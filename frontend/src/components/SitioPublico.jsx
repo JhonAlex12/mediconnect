@@ -17,7 +17,7 @@ export default function SitioPublico({ children }) {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Franja superior */}
-      <div className="bg-blue-950 text-blue-100 text-sm">
+      <div className="bg-marca-noche text-blue-100 text-sm">
         <div className="max-w-7xl mx-auto px-4 py-1.5 flex items-center justify-between gap-4">
           <p className="truncate">Tu fórmula de la IPS, directo a la farmacia</p>
           <Link to="/farmacia" className="flex items-center gap-1.5 hover:text-white shrink-0">
@@ -35,7 +35,7 @@ export default function SitioPublico({ children }) {
           <nav className="hidden lg:flex items-center gap-1" aria-label="Menú principal">
             {MENU.map(({ a, texto }) => (
               <a key={a} href={a}
-                className="px-3 py-2 rounded-lg text-slate-700 font-semibold hover:text-blue-900 hover:bg-blue-50 transition">
+                className="px-3 py-2 rounded-lg text-slate-700 font-semibold hover:text-marca-azul-oscuro hover:bg-blue-50 transition">
                 {texto}
               </a>
             ))}
@@ -43,13 +43,13 @@ export default function SitioPublico({ children }) {
 
           <div className="flex items-center gap-2">
             <NavLink to="/paciente"
-              className="hidden sm:inline-flex items-center gap-1 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-5 py-2.5 rounded-full shadow-sm transition">
+              className="hidden sm:inline-flex items-center gap-1 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold px-5 py-2.5 rounded-full shadow-sm transition">
               Pide tu turno
               <ChevronRight className="w-4 h-4" />
             </NavLink>
             <button type="button" onClick={() => setAbierto((v) => !v)}
               aria-expanded={abierto} aria-label={abierto ? 'Cerrar menú' : 'Abrir menú'}
-              className="lg:hidden p-2 rounded-lg text-blue-950 hover:bg-slate-100 cursor-pointer">
+              className="lg:hidden p-2 rounded-lg text-marca-noche hover:bg-slate-100 cursor-pointer">
               {abierto ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
@@ -64,7 +64,7 @@ export default function SitioPublico({ children }) {
               </a>
             ))}
             <Link to="/paciente" onClick={() => setAbierto(false)}
-              className="block text-center bg-emerald-500 text-white font-bold px-5 py-3 rounded-full mt-2">
+              className="block text-center bg-marca-verde text-white font-bold px-5 py-3 rounded-full mt-2">
               Pide tu turno
             </Link>
           </nav>
@@ -74,7 +74,7 @@ export default function SitioPublico({ children }) {
       <main className="flex-1">{children}</main>
 
       {/* Pie de página */}
-      <footer className="bg-blue-950 text-blue-100">
+      <footer className="bg-marca-noche text-blue-100">
         <div className="max-w-7xl mx-auto px-4 py-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-3">
             <Logo claro />
@@ -99,9 +99,9 @@ export default function SitioPublico({ children }) {
             </ul>
           </div>
         </div>
-        <div className="border-t border-blue-900">
+        <div className="border-t border-marca-azul-oscuro">
           <p className="max-w-7xl mx-auto px-4 py-4 text-xs text-blue-300">
-            © {new Date().getFullYear()} Mediconect. Tus datos de salud se usan solo para gestionar tu fórmula y tu turno.
+            © {new Date().getFullYear()} Mediconnect. Tus datos de salud se usan solo para gestionar tu fórmula y tu turno.
           </p>
         </div>
       </footer>
@@ -112,7 +112,7 @@ export default function SitioPublico({ children }) {
 // Franja de título de cada página interna del sitio (con miga de pan)
 export function TituloPagina({ titulo, descripcion }) {
   return (
-    <section className="bg-gradient-to-r from-blue-950 to-blue-800 text-white">
+    <section className="bg-gradient-to-r from-marca-noche to-marca-azul text-white">
       <div className="max-w-7xl mx-auto px-4 py-8">
         <p className="text-sm text-blue-200 mb-1">
           <Link to="/" className="hover:text-white">Inicio</Link> <span aria-hidden="true">›</span> {titulo}

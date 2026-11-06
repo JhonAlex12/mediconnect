@@ -29,7 +29,7 @@ export default function LoginEmpleado() {
 
   return (
     <div className="max-w-md mx-auto bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
-      <div className="bg-slate-800 text-white px-6 py-4 flex items-center gap-3">
+      <div className="bg-marca-azul text-white px-6 py-4 flex items-center gap-3">
         <Lock className="w-5 h-5" />
         <h2 className="text-xl font-bold">Ingreso de empleados</h2>
       </div>
@@ -81,7 +81,7 @@ export default function LoginEmpleado() {
         <button
           type="submit"
           disabled={enviando}
-          className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-lg transition cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-60 text-white font-bold py-3 rounded-lg transition cursor-pointer"
         >
           <LogIn className="w-5 h-5" />
           {enviando ? 'Ingresando…' : 'Ingresar'}

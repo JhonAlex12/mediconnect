@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Colores de la marca, tomados del logo de Mediconnect */
+@theme {
+  --color-marca-azul: #2257c5;
+  --color-marca-azul-oscuro: #163f99;
+  --color-marca-noche: #0d2259;
+  --color-marca-verde: #14ada2;
+  --color-marca-verde-oscuro: #0e8a81;
+  --color-marca-verde-claro: #e0f5f3;
+}
+
 /* RNF-01: Facilidad de uso - letra base de al menos 16 px para adultos mayores */
 html {
   font-size: 16px;
