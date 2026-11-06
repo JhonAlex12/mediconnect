@@ -1,7 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BarChart3, Download, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { api } from '../../lib/api';
-import { Aviso, BotonAccion, claseCampo } from './comunes';
+import { Aviso } from './comunes';
+import {
+  Boton, Campo, Cargando, Cuerpo, Encabezado, Entrada, EstadoVacio, Fila, Panel, Segmentado, Tabla, Td, Th,
+  TituloPantalla,
+} from '../ui';
 
 // "2026-11-05" → "5 nov 2026" (sin pasar por zonas horarias)
 const fechaCorta = (iso) => {
@@ -122,97 +126,76 @@ export default function ReportesFarmacia() {
   const vigente = resultado?.tipo === tipo ? resultado : null;
 
   return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-        <BarChart3 className="w-6 h-6 text-slate-600" />
-        Reportes
-      </h2>
+    <div>
+      <TituloPantalla titulo="Reportes" descripcion={def.descripcion} />
 
-      <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-lg w-fit" role="tablist" aria-label="Tipo de reporte">
-        {Object.entries(REPORTES).map(([id, r]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tipo === id}
-            onClick={() => cambiarTipo(id)}
-            className={`px-4 py-1.5 rounded-md text-sm font-semibold transition cursor-pointer ${
-              tipo === id ? 'bg-white shadow text-slate-900' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            {r.titulo}
-          </button>
-        ))}
-      </div>
+      <div className="space-y-5">
+        <Segmentado
+          etiqueta="Tipo de reporte"
+          valor={tipo}
+          onChange={cambiarTipo}
+          opciones={Object.entries(REPORTES).map(([id, r]) => ({ valor: id, texto: r.titulo }))}
+        />
 
-      <form onSubmit={enviar} className="bg-white rounded-xl border border-slate-300 p-5 flex flex-wrap items-end gap-4">
-        <div>
-          <label htmlFor="rep-desde" className="block text-sm font-bold text-slate-800 mb-1">Desde</label>
-          <input id="rep-desde" type="date" value={desde} max={hasta || undefined}
-            onChange={(e) => setDesde(e.target.value)} className={claseCampo} />
-        </div>
-        <div>
-          <label htmlFor="rep-hasta" className="block text-sm font-bold text-slate-800 mb-1">Hasta</label>
-          <input id="rep-hasta" type="date" value={hasta} min={desde || undefined}
-            onChange={(e) => setHasta(e.target.value)} className={claseCampo} />
-        </div>
-        <BotonAccion type="submit" color="oscuro" icono={RefreshCw} ocupado={cargando}>
-          Consultar
-        </BotonAccion>
-        {vigente && !vigente.sin_datos && (
-          <BotonAccion color="gris" icono={Download} onClick={() => descargarCsv(tipo, vigente)}>
-            Descargar CSV
-          </BotonAccion>
-        )}
-      </form>
+        <form onSubmit={enviar} className="flex flex-wrap items-end gap-3">
+          <Campo id="rep-desde" etiqueta="Desde">
+            <Entrada type="date" value={desde} max={hasta || undefined} onChange={(e) => setDesde(e.target.value)}
+              className="cifras" />
+          </Campo>
+          <Campo id="rep-hasta" etiqueta="Hasta">
+            <Entrada type="date" value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)}
+              className="cifras" />
+          </Campo>
+          <Boton type="submit" variante="primario" icono={RefreshCw} cargando={cargando}>
+            Consultar
+          </Boton>
+          {vigente && !vigente.sin_datos && (
+            <Boton variante="secundario" icono={Download} onClick={() => descargarCsv(tipo, vigente)}>
+              Descargar CSV
+            </Boton>
+          )}
+        </form>
 
-      <Aviso aviso={aviso} />
+        <Aviso aviso={aviso} />
 
-      <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200">
-          <h3 className="font-bold text-slate-800">{def.titulo}</h3>
-          <p className="text-sm text-slate-500">
-            {def.descripcion}
-            {vigente && ` Del ${fechaCorta(vigente.desde)} al ${fechaCorta(vigente.hasta)}.`}
-          </p>
-        </div>
-
-        {cargando || !vigente ? (
-          <p className="p-6 text-slate-500">{cargando ? 'Generando el reporte…' : 'Sin consultar.'}</p>
-        ) : vigente.sin_datos ? (
-          <p className="p-6 text-slate-500">No hay datos en este rango de fechas.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 text-sm text-slate-600">
-                <tr>
-                  {def.columnas.map((c) => (
-                    <th key={c.clave} className={`px-5 py-2 font-semibold ${c.numero ? 'text-right' : ''}`}>{c.texto}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {vigente.datos.map((fila, i) => (
-                  <tr key={i}>
-                    {def.columnas.map((c) => (
-                      <td key={c.clave} className={`px-5 py-2.5 ${c.numero ? 'text-right tabular-nums' : 'text-slate-900'}`}>
-                        {textoCelda(c, fila)}
-                      </td>
-                    ))}
-                  </tr>
+        <Panel
+          titulo={def.titulo}
+          descripcion={vigente ? `Del ${fechaCorta(vigente.desde)} al ${fechaCorta(vigente.hasta)}` : undefined}
+          sinRelleno
+        >
+          {cargando || !vigente ? (
+            cargando ? <Cargando texto="Generando el reporte…" /> : <EstadoVacio titulo="Sin consultar" />
+          ) : vigente.sin_datos ? (
+            <EstadoVacio titulo="No hay datos en este rango de fechas">Prueba con un rango más amplio.</EstadoVacio>
+          ) : (
+            <Tabla etiqueta={`Reporte de ${def.titulo.toLowerCase()}`}>
+              <Encabezado>
+                {def.columnas.map((c) => (
+                  <Th key={c.clave} numero={c.numero}>{c.texto}</Th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              </Encabezado>
+              <Cuerpo>
+                {vigente.datos.map((fila, i) => (
+                  <Fila key={i}>
+                    {def.columnas.map((c) => (
+                      <Td key={c.clave} numero={c.numero} className={c.numero ? '' : 'text-tinta'}>
+                        {textoCelda(c, fila)}
+                      </Td>
+                    ))}
+                  </Fila>
+                ))}
+              </Cuerpo>
+            </Tabla>
+          )}
 
-        {vigente?.tipo === 'faltas' && (
-          <p className="px-5 py-3 border-t border-slate-200 text-sm text-slate-700">
-            Pacientes con faltas seguidas que deberán confirmar su próximo turno:{' '}
-            <strong>{vigente.pacientes_con_faltas_seguidas}</strong>
-          </p>
-        )}
-      </section>
+          {vigente?.tipo === 'faltas' && (
+            <p className="px-4 py-3 border-t border-borde text-sm text-tinta-suave">
+              Pacientes con faltas seguidas que deberán confirmar su próximo turno:{' '}
+              <strong className="text-tinta cifras">{vigente.pacientes_con_faltas_seguidas}</strong>
+            </p>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }
