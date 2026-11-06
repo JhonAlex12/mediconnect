@@ -42,7 +42,7 @@ function BotonSlide({ to, children, variante = 'verde' }) {
 // para que el logo y el mensaje siempre queden a la vista.
 function SlideBanner() {
   return (
-    <picture className="block h-full bg-marca-hielo">
+    <picture className="block h-full bg-marca-hielo lg:bg-transparent">
       <source media="(max-width: 700px)" srcSet="/img/banner-familia-900.webp" />
       <img
         src="/img/banner-familia-1600.webp"
@@ -165,7 +165,7 @@ export default function Carrusel() {
   return (
     // El fondo ocupa todo el ancho; el carrusel mantiene proporción 2:1 y se achica
     // si la pantalla es baja, para que la imagen nunca quede cortada
-    <div className="bg-marca-hielo">
+    <div className="bg-[linear-gradient(to_right,#ffffff_0%,#ffffff_45%,#cdefea_100%)]">
     <section
       className="relative mx-auto w-full lg:w-[min(1440px,100%,calc((100svh-7.5rem)*2))]"
       aria-roledescription="carrusel"
@@ -210,7 +210,7 @@ export default function Carrusel() {
         <ChevronRight className="w-6 h-6" />
       </button>
 
-      <div className="absolute bottom-4 inset-x-0 z-20 flex justify-center gap-2">
+      <div className="absolute bottom-4 inset-x-0 lg:right-auto lg:left-[6.5%] z-20 flex justify-center gap-2">
         {SLIDES.map(({ id, nombre }, i) => (
           <button
             key={id}
