@@ -5,6 +5,7 @@ import {
   Search, Smartphone, Ticket,
 } from 'lucide-react';
 import SitioPublico from '../components/SitioPublico';
+import Carrusel from '../components/Carrusel';
 import { useTitulo } from '../components/Encabezado';
 
 const SERVICIOS = [
@@ -72,64 +73,10 @@ export default function Inicio() {
 
   return (
     <SitioPublico>
-      {/* Banner principal */}
-      <section className="bg-gradient-to-br from-marca-noche via-marca-azul-oscuro to-marca-azul text-white overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 py-14 lg:py-20 grid lg:grid-cols-2 gap-10 items-center">
-          <div className="space-y-6">
-            <span className="inline-block bg-marca-verde/20 text-marca-verde text-sm font-semibold px-3 py-1 rounded-full">
-              Farmacia conectada a tu IPS
-            </span>
-            <h1 className="text-4xl sm:text-5xl font-black leading-tight">
-              Reclama tus medicamentos <span className="text-marca-verde">sin hacer fila</span>
-            </h1>
-            <p className="text-lg text-blue-100 max-w-xl">
-              Consulta qué hay disponible, pide tu turno desde el celular y llega justo cuando te van a atender.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link to="/paciente"
-                className="inline-flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold text-lg px-6 py-3 rounded-full shadow-lg transition">
-                Pide tu turno
-                <ChevronRight className="w-5 h-5" />
-              </Link>
-              <a href="#como-funciona"
-                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-semibold text-lg px-6 py-3 rounded-full transition">
-                Cómo funciona
-              </a>
-            </div>
-          </div>
-
-          {/* Ilustración: así se ve tu turno */}
-          <div className="hidden lg:flex justify-center" aria-hidden="true">
-            <div className="relative">
-              <div className="absolute -inset-6 bg-marca-verde/20 rounded-[3rem] blur-2xl" />
-              <div className="relative w-72 bg-white text-slate-900 rounded-[2rem] shadow-2xl p-5 space-y-4 border-8 border-marca-noche/40">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tu turno</p>
-                <div className="bg-marca-noche text-white rounded-2xl p-5 text-center">
-                  <p className="text-5xl font-black">V-014</p>
-                  <p className="text-sm text-blue-200 mt-1">Estás en la fila</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="bg-slate-100 rounded-xl p-2.5">
-                    <p className="text-slate-500 text-xs">Tu posición</p>
-                    <p className="font-bold">3º · ~10 min</p>
-                  </div>
-                  <div className="bg-slate-100 rounded-xl p-2.5">
-                    <p className="text-slate-500 text-xs">Atendiendo</p>
-                    <p className="font-bold">V-011</p>
-                  </div>
-                </div>
-                <div className="bg-marca-verde-claro border border-marca-verde rounded-xl p-3 text-sm flex gap-2">
-                  <Bell className="w-4 h-4 text-marca-verde-oscuro shrink-0 mt-0.5" />
-                  Losartán ya está disponible.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <Carrusel />
 
       {/* Accesos rápidos */}
-      <section className="max-w-7xl mx-auto px-4 -mt-8 relative z-10">
+      <section className="max-w-7xl mx-auto px-4 mt-8 relative z-10">
         <div className="grid sm:grid-cols-3 gap-4">
           {[
             { icono: Search, titulo: 'Consultar mi fórmula', a: '/paciente' },
@@ -152,11 +99,11 @@ export default function Inicio() {
       <section id="servicios" className="max-w-7xl mx-auto px-4 py-16 scroll-mt-24">
         <div className="text-center max-w-2xl mx-auto mb-10">
           <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Servicios</p>
-          <h2 className="text-3xl font-black text-marca-noche mt-1">Todo lo de tu fórmula, en un solo lugar</h2>
+          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">Todo lo de tu fórmula, en un solo lugar</h2>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {SERVICIOS.map(({ icono: Icono, titulo, texto }) => (
-            <article key={titulo} className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+            <article key={titulo} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
               <span className="w-12 h-12 rounded-xl bg-marca-verde-claro text-marca-verde-oscuro flex items-center justify-center mb-4">
                 <Icono className="w-6 h-6" />
               </span>
@@ -168,17 +115,17 @@ export default function Inicio() {
       </section>
 
       {/* Cómo funciona */}
-      <section id="como-funciona" className="bg-blue-50 scroll-mt-24">
+      <section id="como-funciona" className="bg-gradient-to-br from-marca-hielo via-marca-verde-claro/60 to-blue-50 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 py-16">
           <div className="text-center max-w-2xl mx-auto mb-10">
             <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Cómo funciona</p>
-            <h2 className="text-3xl font-black text-marca-noche mt-1">De la consulta médica a tus manos en 4 pasos</h2>
+            <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">De la consulta médica a tus manos en 4 pasos</h2>
           </div>
           <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {PASOS.map(({ icono: Icono, titulo, texto }, i) => (
               <li key={titulo} className="bg-white rounded-2xl p-6 shadow-sm relative">
-                <span className="absolute top-5 right-5 text-4xl font-black text-blue-100">{i + 1}</span>
-                <Icono className="w-8 h-8 text-marca-azul-oscuro mb-4" />
+                <span className="absolute top-5 right-5 font-titulo text-4xl font-black text-marca-verde/25">{i + 1}</span>
+                <Icono className="w-8 h-8 text-marca-azul mb-4" />
                 <h3 className="font-bold text-lg text-marca-noche">{titulo}</h3>
                 <p className="text-slate-600 mt-2">{texto}</p>
               </li>
@@ -186,7 +133,7 @@ export default function Inicio() {
           </ol>
           <div className="text-center mt-10">
             <Link to="/paciente"
-              className="inline-flex items-center gap-2 bg-marca-azul-oscuro hover:bg-marca-noche text-white font-bold text-lg px-6 py-3 rounded-full transition">
+              className="inline-flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold text-lg px-6 py-3 rounded-full shadow-lg shadow-marca-verde/30 transition">
               Empezar ahora
               <ChevronRight className="w-5 h-5" />
             </Link>
@@ -198,7 +145,7 @@ export default function Inicio() {
       <section id="preguntas" className="max-w-3xl mx-auto px-4 py-16 scroll-mt-24">
         <div className="text-center mb-8">
           <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Preguntas frecuentes</p>
-          <h2 className="text-3xl font-black text-marca-noche mt-1">¿Tienes dudas?</h2>
+          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">¿Tienes dudas?</h2>
         </div>
         <div className="space-y-3">
           {PREGUNTAS.map(({ p, r }) => (

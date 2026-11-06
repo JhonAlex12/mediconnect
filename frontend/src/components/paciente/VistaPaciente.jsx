@@ -54,7 +54,7 @@ function PaginaPaciente({ children }) {
   return (
     <SitioPublico>
       <TituloPagina titulo="Mi turno" descripcion="Consulta tu fórmula, pide tu turno virtual y síguelo en vivo." />
-      <div className="bg-slate-50 py-8">
+      <div className="bg-marca-hielo py-8">
         <div className="max-w-lg mx-auto px-4">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-5">{children}</div>
         </div>

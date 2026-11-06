@@ -109,16 +109,20 @@ export default function SitioPublico({ children }) {
   );
 }
 
-// Franja de título de cada página interna del sitio (con miga de pan)
+// Franja de título de cada página interna del sitio (con miga de pan), en el estilo claro del banner
 export function TituloPagina({ titulo, descripcion }) {
   return (
-    <section className="bg-gradient-to-r from-marca-noche to-marca-azul text-white">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <p className="text-sm text-blue-200 mb-1">
-          <Link to="/" className="hover:text-white">Inicio</Link> <span aria-hidden="true">›</span> {titulo}
+    <section className="relative overflow-hidden bg-gradient-to-r from-marca-hielo via-marca-verde-claro to-blue-100">
+      <div className="absolute -top-16 right-10 w-72 h-48 rounded-full bg-blue-200/50 blur-2xl" aria-hidden="true" />
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="absolute right-[12%] top-6 w-14 h-14 text-marca-verde/30">
+        <path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z" fill="currentColor" />
+      </svg>
+      <div className="relative max-w-7xl mx-auto px-4 py-8">
+        <p className="text-sm text-slate-600 mb-1">
+          <Link to="/" className="hover:text-marca-azul">Inicio</Link> <span aria-hidden="true">›</span> {titulo}
         </p>
-        <h1 className="text-3xl font-black">{titulo}</h1>
-        {descripcion && <p className="text-blue-100 mt-1">{descripcion}</p>}
+        <h1 className="font-titulo text-3xl font-black text-marca-noche uppercase">{titulo}</h1>
+        {descripcion && <p className="text-slate-700 mt-1">{descripcion}</p>}
       </div>
     </section>
   );

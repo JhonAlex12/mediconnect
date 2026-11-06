@@ -8,6 +8,10 @@
   --color-marca-verde: #14ada2;
   --color-marca-verde-oscuro: #0e8a81;
   --color-marca-verde-claro: #e0f5f3;
+  --color-marca-hielo: #f1f8fb;
+
+  /* Títulos con la misma familia tipográfica del banner */
+  --font-titulo: "Montserrat", ui-sans-serif, system-ui, sans-serif;
 }
 
 /* RNF-01: Facilidad de uso - letra base de al menos 16 px para adultos mayores */
