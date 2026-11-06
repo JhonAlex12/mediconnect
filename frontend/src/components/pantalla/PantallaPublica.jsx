@@ -70,68 +70,56 @@ export default function PantallaPublica() {
     else contenedor.current?.requestFullscreen?.();
   };
 
-  // Botones de control: discretos, pero con foco visible y etiqueta
-  const claseControl =
-    'inline-flex items-center gap-2 h-11 px-4 rounded-md border border-white/40 text-white text-base font-bold ' +
-    'hover:bg-white/10 cursor-pointer focus-visible:outline-white';
-
   return (
-    <div ref={contenedor} className="bg-[#0b1414] text-white min-h-screen flex flex-col">
-      <header className="flex items-center justify-between gap-6 px-8 py-5 border-b border-white/20">
+    <div ref={contenedor} className="bg-slate-950 text-white min-h-screen flex flex-col">
+      <header className="flex items-center justify-between gap-4 px-8 py-4 border-b border-slate-800">
         <div>
-          <p className="text-3xl font-bold">Farmacia</p>
-          <p className="text-xl text-white/80 first-letter:uppercase">
+          <p className="text-2xl font-black">Farmacia</p>
+          <p className="text-slate-400 capitalize">
             {ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-5xl font-bold cifras">
+          <span className="text-4xl font-bold tabular-nums">
             {ahora.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })}
           </span>
-          <span className="inline-flex items-center gap-2 text-base text-white/80" role="status">
-            <span className={`w-3 h-3 rounded-full ${conectado ? 'bg-[#4ade80]' : 'bg-[#f87171]'}`} aria-hidden="true" />
-            {conectado ? 'En vivo' : 'Sin conexión'}
-          </span>
-          <button type="button" onClick={() => setConSonido((v) => !v)} aria-pressed={conSonido} className={claseControl}>
-            {conSonido ? <Volume2 size={20} aria-hidden="true" /> : <VolumeX size={20} aria-hidden="true" />}
-            {conSonido ? 'Voz activada' : 'Voz apagada'}
+          <span className={`w-3 h-3 rounded-full ${conectado ? 'bg-emerald-400' : 'bg-red-500'}`}
+            title={conectado ? 'En vivo' : 'Sin conexión'} aria-label={conectado ? 'En vivo' : 'Sin conexión'} />
+          <button type="button" onClick={() => setConSonido((v) => !v)}
+            aria-label={conSonido ? 'Silenciar anuncios' : 'Activar anuncios por voz'}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
+            {conSonido ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
           </button>
-          <button type="button" onClick={alternarPantallaCompleta} className={claseControl}>
-            {completa ? <Minimize size={20} aria-hidden="true" /> : <Maximize size={20} aria-hidden="true" />}
-            {completa ? 'Salir' : 'Pantalla completa'}
+          <button type="button" onClick={alternarPantallaCompleta}
+            aria-label={completa ? 'Salir de pantalla completa' : 'Pantalla completa'}
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
+            {completa ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
           </button>
         </div>
       </header>
 
       <div className="flex-1 grid lg:grid-cols-[3fr_2fr]">
-        {/* Turno que se está llamando: al cambiar, se invierten los colores unos segundos */}
-        <section
-          aria-live="assertive"
-          aria-label="Turno llamado"
-          className={`flex flex-col items-center justify-center px-8 py-12 border-b lg:border-b-0 lg:border-r border-white/20 transition-colors duration-500 ${
-            destacar ? 'bg-white text-[#0b1414]' : ''
-          }`}
-        >
-          <p className="text-[clamp(2rem,3vw,3rem)] font-bold uppercase tracking-widest">Turno</p>
-          <p className="text-[clamp(8rem,18vw,18rem)] leading-none font-bold cifras my-6">
-            {estado.llamando ?? '—'}
-          </p>
-          <p className="text-[clamp(1.75rem,2.6vw,2.75rem)] font-bold">
-            {estado.llamando ? 'Acérquese a la ventanilla' : 'Espere su turno'}
-          </p>
+        <section className={`flex flex-col items-center justify-center p-10 transition-colors duration-700 ${
+          destacar ? 'bg-emerald-600' : 'bg-slate-900'
+        }`} aria-live="assertive">
+          <p className="text-3xl font-semibold text-slate-300 uppercase tracking-widest">Turno</p>
+          <p className="text-[9rem] leading-none font-black my-4 tabular-nums">{estado.llamando ?? '—'}</p>
+          <p className="text-3xl font-semibold">{estado.llamando ? 'Acérquese a la ventanilla' : 'Espere su turno'}</p>
         </section>
 
-        <section className="px-8 py-10 space-y-10" aria-label="Próximos turnos">
+        <section className="p-8 space-y-8">
           <div>
-            <h2 className="text-2xl font-bold uppercase tracking-wide text-white/80 mb-4">Próximos</h2>
+            <h2 className="text-xl font-bold text-slate-400 uppercase tracking-wide mb-4">Próximos</h2>
             {estado.proximos.length === 0 ? (
-              <p className="text-3xl text-white/70">No hay turnos en espera</p>
+              <p className="text-2xl text-slate-500">No hay turnos en espera</p>
             ) : (
-              <ol className="divide-y divide-white/20 border-y border-white/20">
+              <ol className="space-y-3">
                 {estado.proximos.map((n, i) => (
-                  <li key={n} className="flex items-baseline justify-between py-4">
-                    <span className={`font-bold cifras ${i === 0 ? 'text-7xl' : 'text-5xl text-white/85'}`}>{n}</span>
-                    {i === 0 && <span className="text-2xl font-bold">Sigue</span>}
+                  <li key={n} className={`flex items-center justify-between rounded-xl px-6 py-3 ${
+                    i === 0 ? 'bg-slate-800 text-4xl' : 'bg-slate-900 text-3xl text-slate-300'
+                  } font-black tabular-nums`}>
+                    {n}
+                    {i === 0 && <span className="text-base font-semibold text-emerald-400">Sigue</span>}
                   </li>
                 ))}
               </ol>
@@ -140,15 +128,17 @@ export default function PantallaPublica() {
 
           {estado.en_pausa.length > 0 && (
             <div>
-              <h2 className="text-2xl font-bold uppercase tracking-wide text-white/80">No se presentaron</h2>
-              <p className="text-xl text-white/80 mt-1 mb-4">Si es su turno, acérquese a la ventanilla.</p>
-              <ul className="flex flex-wrap gap-3">
+              <h2 className="text-xl font-bold text-amber-400 uppercase tracking-wide mb-2">
+                Llamados que no se presentaron
+              </h2>
+              <p className="text-slate-400 mb-3">Si es su turno, acérquese a la ventanilla.</p>
+              <div className="flex flex-wrap gap-3">
                 {estado.en_pausa.map((n) => (
-                  <li key={n} className="text-4xl font-bold cifras border-2 border-white/60 px-4 py-2 rounded-md">
+                  <span key={n} className="text-2xl font-black bg-amber-500/15 text-amber-300 px-4 py-2 rounded-lg tabular-nums">
                     {n}
-                  </li>
+                  </span>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
         </section>

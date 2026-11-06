@@ -1,12 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { KeyRound, Pencil, Power, UserPlus, X } from 'lucide-react';
+import { KeyRound, Pencil, Power, UserPlus, Users, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useSesion } from '../../lib/sesion';
-import { Aviso, BotonAccion, useAccion } from './comunes';
-import {
-  Boton, Campo, Cargando, Cuerpo, Encabezado, Entrada, EstadoBadge, EstadoVacio, Fila, Panel, Selector, Tabla, Td,
-  Th, TituloPantalla,
-} from '../ui';
+import { Aviso, BotonAccion, claseCampo, useAccion } from './comunes';
 
 const ROLES = { auxiliar: 'Auxiliar', administrador: 'Administrador' };
 
@@ -50,65 +46,69 @@ export default function UsuariosFarmacia() {
   const enEdicion = usuarios.find((u) => u.id === editando?.id);
 
   return (
-    <div>
-      <TituloPantalla
-        titulo="Usuarios"
-        descripcion="Empleados con acceso al panel de la farmacia"
-        acciones={
-          <Boton variante="primario" icono={UserPlus} onClick={() => setCreando((v) => !v)} aria-expanded={creando}>
-            Nuevo usuario
-          </Boton>
-        }
-      />
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+          <Users className="w-6 h-6 text-slate-600" />
+          Usuarios
+        </h2>
+        <BotonAccion color="oscuro" icono={UserPlus} onClick={() => setCreando((v) => !v)}>
+          Nuevo usuario
+        </BotonAccion>
+      </div>
 
-      <div className="space-y-5">
-        <Aviso aviso={aviso} />
+      <Aviso aviso={aviso} />
 
-        {creando && <NuevoUsuario ocupado={ocupado} ejecutar={ejecutar} alCerrar={() => setCreando(false)} />}
+      {creando && <NuevoUsuario ocupado={ocupado} ejecutar={ejecutar} alCerrar={() => setCreando(false)} />}
 
-        {enEdicion && (
-          <EditarUsuario
-            key={`${enEdicion.id}-${editando.modo}`}
-            u={enEdicion}
-            modo={editando.modo}
-            esYo={enEdicion.id === yo.id}
-            ocupado={ocupado}
-            ejecutar={ejecutar}
-            alCerrar={() => setEditando(null)}
-          />
-        )}
+      {enEdicion && (
+        <EditarUsuario
+          key={`${enEdicion.id}-${editando.modo}`}
+          u={enEdicion}
+          modo={editando.modo}
+          esYo={enEdicion.id === yo.id}
+          ocupado={ocupado}
+          ejecutar={ejecutar}
+          alCerrar={() => setEditando(null)}
+        />
+      )}
 
-        <Panel sinRelleno>
-          {cargando ? (
-            <Cargando texto="Cargando usuarios…" />
-          ) : usuarios.length === 0 ? (
-            <EstadoVacio titulo="No hay usuarios" />
-          ) : (
-            <Tabla etiqueta="Usuarios de la farmacia">
-              <Encabezado>
-                <Th>Nombre</Th>
-                <Th>Usuario</Th>
-                <Th>Rol</Th>
-                <Th>Estado</Th>
-                <Th numero>Creado</Th>
-                <Th oculto>Acciones</Th>
-              </Encabezado>
-              <Cuerpo>
+      <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+        {cargando ? (
+          <p className="p-6 text-slate-500">Cargando usuarios…</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50 text-sm text-slate-600">
+                <tr>
+                  <th className="px-5 py-2 font-semibold">Nombre</th>
+                  <th className="px-3 py-2 font-semibold">Usuario</th>
+                  <th className="px-3 py-2 font-semibold">Rol</th>
+                  <th className="px-3 py-2 font-semibold">Estado</th>
+                  <th className="px-3 py-2 font-semibold">Creado</th>
+                  <th className="px-5 py-2 font-semibold sr-only">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
                 {usuarios.map((u) => {
                   const esYo = u.id === yo.id;
                   return (
-                    <Fila key={u.id} tenue={!u.activo}>
-                      <Td className={`font-bold ${u.activo ? 'text-tinta' : ''}`}>
-                        {u.nombre}
-                        {esYo && <span className="ml-2 font-normal text-tinta-suave">(tú)</span>}
-                      </Td>
-                      <Td className="cifras">{u.usuario}</Td>
-                      <Td>{ROLES[u.rol] ?? u.rol}</Td>
-                      <Td>
-                        <EstadoBadge tono={u.activo ? 'ok' : 'neutro'}>{u.activo ? 'Activo' : 'Inactivo'}</EstadoBadge>
-                      </Td>
-                      <Td numero>{fecha(u.creado_en)}</Td>
-                      <Td>
+                    <tr key={u.id} className={u.activo ? undefined : 'text-slate-400'}>
+                      <td className="px-5 py-3 font-semibold">
+                        <span className={u.activo ? 'text-slate-900' : ''}>{u.nombre}</span>
+                        {esYo && <span className="ml-2 text-xs font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">Tú</span>}
+                      </td>
+                      <td className="px-3 py-3 font-mono text-sm">{u.usuario}</td>
+                      <td className="px-3 py-3">{ROLES[u.rol] ?? u.rol}</td>
+                      <td className="px-3 py-3">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                          u.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                        }`}>
+                          {u.activo ? 'Activo' : 'Inactivo'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-sm">{fecha(u.creado_en)}</td>
+                      <td className="px-5 py-3">
                         <div className="flex gap-2 justify-end flex-wrap">
                           <BotonAccion color="gris" icono={Pencil} ocupado={ocupado}
                             onClick={() => setEditando({ id: u.id, modo: 'datos' })}>
@@ -119,40 +119,50 @@ export default function UsuariosFarmacia() {
                             Clave
                           </BotonAccion>
                           {!esYo && (
-                            <BotonAccion color={u.activo ? 'rojo' : 'gris'} icono={Power} ocupado={ocupado}
+                            <BotonAccion color={u.activo ? 'rojo' : 'verde'} icono={Power} ocupado={ocupado}
                               onClick={() => cambiarEstado(u)}>
                               {u.activo ? 'Desactivar' : 'Activar'}
                             </BotonAccion>
                           )}
                         </div>
-                      </Td>
-                    </Fila>
+                      </td>
+                    </tr>
                   );
                 })}
-              </Cuerpo>
-            </Tabla>
-          )}
-        </Panel>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function Tarjeta({ titulo, alCerrar, children }) {
+function Tarjeta({ titulo, icono: Icono, alCerrar, children }) {
   return (
-    <Panel titulo={titulo} acciones={<Boton variante="fantasma" tamano="sm" icono={X} onClick={alCerrar}>Cerrar</Boton>}>
+    <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+      <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
+        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+          <Icono className="w-5 h-5 text-slate-600" />
+          {titulo}
+        </h3>
+        <button type="button" onClick={alCerrar} aria-label="Cerrar" className="p-1 rounded hover:bg-slate-100 cursor-pointer">
+          <X className="w-5 h-5 text-slate-600" />
+        </button>
+      </div>
       {children}
-    </Panel>
+    </section>
   );
 }
 
-function SelectorRol({ valor, onChange, disabled }) {
+function SelectorRol({ id, valor, onChange, disabled }) {
   return (
-    <Selector value={valor} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+    <select id={id} value={valor} onChange={(e) => onChange(e.target.value)} disabled={disabled}
+      className={`${claseCampo} disabled:bg-slate-100`}>
       {Object.entries(ROLES).map(([v, t]) => (
         <option key={v} value={v}>{t}</option>
       ))}
-    </Selector>
+    </select>
   );
 }
 
@@ -172,28 +182,34 @@ function NuevoUsuario({ ocupado, ejecutar, alCerrar }) {
   };
 
   return (
-    <Tarjeta titulo="Nuevo usuario" alCerrar={alCerrar}>
-      <form onSubmit={enviar} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_12rem_1fr_10rem_auto] lg:items-start">
-        <Campo id="nu-nombre" etiqueta="Nombre completo">
-          <Entrada value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3} />
-        </Campo>
-        <Campo id="nu-usuario" etiqueta="Usuario" ayuda="Minúsculas, números, punto o guion">
-          <Entrada value={usuario} required pattern="[a-z0-9._\-]{3,40}"
-            onChange={(e) => setUsuario(e.target.value.toLowerCase())} autoComplete="off" className="cifras" />
-        </Campo>
-        <Campo id="nu-clave" etiqueta="Contraseña inicial"
-          ayuda={!clave || claveValida(clave) ? AYUDA_CLAVE : undefined}
-          error={clave && !claveValida(clave) ? AYUDA_CLAVE : undefined}>
-          <Entrada type="password" value={clave} onChange={(e) => setClave(e.target.value)} required
-            autoComplete="new-password" />
-        </Campo>
-        <Campo id="nu-rol" etiqueta="Rol">
-          <SelectorRol valor={rol} onChange={setRol} />
-        </Campo>
+    <Tarjeta titulo="Nuevo usuario" icono={UserPlus} alCerrar={alCerrar}>
+      <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_12rem_1fr_10rem_auto] lg:items-start">
+        <div>
+          <label htmlFor="nu-nombre" className="block text-sm font-bold text-slate-800 mb-1">Nombre completo</label>
+          <input id="nu-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3}
+            className={claseCampo} />
+        </div>
+        <div>
+          <label htmlFor="nu-usuario" className="block text-sm font-bold text-slate-800 mb-1">Usuario</label>
+          <input id="nu-usuario" value={usuario} required pattern="[a-z0-9._\-]{3,40}"
+            title="3 a 40 caracteres: letras minúsculas, números, punto o guion"
+            onChange={(e) => setUsuario(e.target.value.toLowerCase())} autoComplete="off"
+            className={`${claseCampo} font-mono`} />
+        </div>
+        <div>
+          <label htmlFor="nu-clave" className="block text-sm font-bold text-slate-800 mb-1">Contraseña inicial</label>
+          <input id="nu-clave" type="password" value={clave} onChange={(e) => setClave(e.target.value)} required
+            autoComplete="new-password" className={claseCampo} />
+          <p className={`text-xs mt-1 ${clave && !claveValida(clave) ? 'text-red-700' : 'text-slate-500'}`}>{AYUDA_CLAVE}</p>
+        </div>
+        <div>
+          <label htmlFor="nu-rol" className="block text-sm font-bold text-slate-800 mb-1">Rol</label>
+          <SelectorRol id="nu-rol" valor={rol} onChange={setRol} />
+        </div>
         <div className="lg:pt-6">
-          <Boton type="submit" variante="primario" disabled={ocupado || !claveValida(clave)}>
+          <BotonAccion type="submit" color="oscuro" ocupado={ocupado || !claveValida(clave)}>
             Crear
-          </Boton>
+          </BotonAccion>
         </div>
       </form>
     </Tarjeta>
@@ -226,23 +242,24 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
   if (modo === 'clave') {
     const coinciden = clave === confirmacion;
     return (
-      <Tarjeta titulo={`Cambiar contraseña: ${u.nombre}`} alCerrar={alCerrar}>
-        <form onSubmit={enviar} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
-          <Campo id="ec-clave" etiqueta="Nueva contraseña"
-            ayuda={!clave || claveValida(clave) ? AYUDA_CLAVE : undefined}
-            error={clave && !claveValida(clave) ? AYUDA_CLAVE : undefined}>
-            <Entrada type="password" value={clave} onChange={(e) => setClave(e.target.value)} required
-              autoComplete="new-password" />
-          </Campo>
-          <Campo id="ec-confirmar" etiqueta="Repetir contraseña"
-            error={confirmacion && !coinciden ? 'No coinciden.' : undefined}>
-            <Entrada type="password" value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)}
-              required autoComplete="new-password" />
-          </Campo>
+      <Tarjeta titulo={`Cambiar contraseña: ${u.nombre}`} icono={KeyRound} alCerrar={alCerrar}>
+        <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
+          <div>
+            <label htmlFor="ec-clave" className="block text-sm font-bold text-slate-800 mb-1">Nueva contraseña</label>
+            <input id="ec-clave" type="password" value={clave} onChange={(e) => setClave(e.target.value)} required
+              autoComplete="new-password" className={claseCampo} />
+            <p className={`text-xs mt-1 ${clave && !claveValida(clave) ? 'text-red-700' : 'text-slate-500'}`}>{AYUDA_CLAVE}</p>
+          </div>
+          <div>
+            <label htmlFor="ec-confirmar" className="block text-sm font-bold text-slate-800 mb-1">Repetir contraseña</label>
+            <input id="ec-confirmar" type="password" value={confirmacion} onChange={(e) => setConfirmacion(e.target.value)}
+              required autoComplete="new-password" className={claseCampo} />
+            {confirmacion && !coinciden && <p className="text-xs mt-1 text-red-700">No coinciden.</p>}
+          </div>
           <div className="sm:pt-6">
-            <Boton type="submit" variante="primario" disabled={ocupado || !claveValida(clave) || !coinciden}>
+            <BotonAccion type="submit" color="oscuro" ocupado={ocupado || !claveValida(clave) || !coinciden}>
               Guardar
-            </Boton>
+            </BotonAccion>
           </div>
         </form>
       </Tarjeta>
@@ -251,18 +268,22 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
 
   const sinCambios = nombre.trim() === u.nombre && rol === u.rol;
   return (
-    <Tarjeta titulo={`Editar: ${u.nombre}`} alCerrar={alCerrar}>
-      <form onSubmit={enviar} className="grid gap-4 sm:grid-cols-[1fr_12rem_auto] sm:items-start">
-        <Campo id="eu-nombre" etiqueta="Nombre completo">
-          <Entrada value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3} />
-        </Campo>
-        <Campo id="eu-rol" etiqueta="Rol" ayuda={esYo ? 'No puedes quitarte el rol de administrador.' : undefined}>
-          <SelectorRol valor={rol} onChange={setRol} disabled={esYo} />
-        </Campo>
+    <Tarjeta titulo={`Editar: ${u.nombre}`} icono={Pencil} alCerrar={alCerrar}>
+      <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-[1fr_12rem_auto] sm:items-start">
+        <div>
+          <label htmlFor="eu-nombre" className="block text-sm font-bold text-slate-800 mb-1">Nombre completo</label>
+          <input id="eu-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3}
+            className={claseCampo} />
+        </div>
+        <div>
+          <label htmlFor="eu-rol" className="block text-sm font-bold text-slate-800 mb-1">Rol</label>
+          <SelectorRol id="eu-rol" valor={rol} onChange={setRol} disabled={esYo} />
+          {esYo && <p className="text-xs mt-1 text-slate-500">No puedes quitarte el rol de administrador.</p>}
+        </div>
         <div className="sm:pt-6">
-          <Boton type="submit" variante="primario" disabled={ocupado || sinCambios || nombre.trim().length < 3}>
+          <BotonAccion type="submit" color="oscuro" ocupado={ocupado || sinCambios || nombre.trim().length < 3}>
             Guardar
-          </Boton>
+          </BotonAccion>
         </div>
       </form>
     </Tarjeta>

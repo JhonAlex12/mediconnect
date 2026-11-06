@@ -1,12 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { CheckCircle2, ClipboardList, Megaphone, PauseCircle, SkipForward, Undo2, UserPlus } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Megaphone, PauseCircle, SkipForward, Undo2, UserPlus, Users } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useEventoEnVivo } from '../../lib/tiempoReal';
-import { Aviso, BotonAccion, IndicadorEnVivo, useAccion } from './comunes';
-import {
-  Boton, Campo, Cargando, Cuerpo, Encabezado, Entrada, EstadoBadge, EstadoVacio, Fila, Panel, Segmentado,
-  Selector, Tabla, Td, Th, TituloPantalla,
-} from '../ui';
+import { Aviso, BotonAccion, IndicadorEnVivo, claseCampo, useAccion } from './comunes';
 import DispensarTurno from './DispensarTurno';
 
 const PRIORIDADES = {
@@ -28,8 +24,12 @@ const hora = (fecha) =>
   fecha ? new Date(fecha).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '—';
 
 function EtiquetaPrioridad({ prioridad }) {
-  if (prioridad === 'ninguna') return <span className="text-tinta-tenue">—</span>;
-  return <EstadoBadge>{PRIORIDADES[prioridad] ?? prioridad}</EstadoBadge>;
+  if (prioridad === 'ninguna') return null;
+  return (
+    <span className="text-xs font-bold bg-violet-100 text-violet-800 px-2 py-0.5 rounded-full">
+      {PRIORIDADES[prioridad] ?? prioridad}
+    </span>
+  );
 }
 
 export default function FilaFarmacia() {
@@ -69,190 +69,172 @@ export default function FilaFarmacia() {
   const porLlegar = datos.fila.filter((t) => t.estado === 'reservado' || t.estado === 'en_camino');
 
   return (
-    <div>
-      <TituloPantalla
-        titulo="Fila de hoy"
-        descripcion={`${presentes.length} en espera · ${enPausa.length} en pausa · ${porLlegar.length} por llegar`}
-        acciones={<IndicadorEnVivo />}
-      />
+    <div className="space-y-6">
+      {/* Estado de la conexión en tiempo real */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-2xl font-bold text-slate-800">Fila de hoy</h2>
+        <IndicadorEnVivo />
+      </div>
 
-      <div className="space-y-5">
-        <Aviso aviso={aviso} />
+      <Aviso aviso={aviso} />
 
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_20rem] gap-5 items-start">
-          <div className="space-y-5 min-w-0">
-            {/* Ventanilla: turno llamado o botón para llamar al siguiente (RF-21, RF-22) */}
-            <Panel titulo="En ventanilla">
-              {llamado ? (
-                <div className="space-y-4">
-                  <div className="flex items-start gap-6 flex-wrap">
-                    <p className="text-5xl font-bold text-tinta cifras leading-none">{llamado.numero}</p>
-                    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                      <dt className="text-tinta-suave">Paciente</dt>
-                      <dd className="font-bold text-tinta">{llamado.paciente ?? 'Sin nombre'}</dd>
-                      <dt className="text-tinta-suave">Fórmula</dt>
-                      <dd className="cifras">{llamado.formula ?? 'Sin fórmula vinculada'}</dd>
-                      <dt className="text-tinta-suave">Llamado</dt>
-                      <dd className="cifras">{hora(llamado.hora_llamado)}</dd>
-                      {llamado.prioridad !== 'ninguna' && (
-                        <>
-                          <dt className="text-tinta-suave">Prioridad</dt>
-                          <dd><EtiquetaPrioridad prioridad={llamado.prioridad} /></dd>
-                        </>
-                      )}
-                    </dl>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Columna principal: ventanilla + fila */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Ventanilla: turno llamado o botón para llamar al siguiente (RF-21, RF-22) */}
+          <section className="bg-white rounded-xl shadow-md border border-slate-300 p-6">
+            <p className="text-sm font-bold uppercase tracking-wide text-slate-500 mb-3">
+              En ventanilla
+            </p>
+            {llamado ? (
+              <div className="space-y-4">
+                <div className="flex items-end gap-4 flex-wrap">
+                  <span className="text-5xl font-black text-slate-900">{llamado.numero}</span>
+                  <div className="pb-1">
+                    <p className="text-lg font-semibold text-slate-800">{llamado.paciente ?? 'Sin nombre'}</p>
+                    <p className="text-sm text-slate-600">
+                      {llamado.formula ? `Fórmula ${llamado.formula}` : 'Sin fórmula vinculada'} · llamado a las{' '}
+                      {hora(llamado.hora_llamado)}
+                    </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {llamado.formula && !entregaAbierta && (
-                      <BotonAccion color="verde" icono={ClipboardList} ocupado={ocupado}
-                        onClick={() => setDispensando(llamado.id)}>
-                        Dispensar
-                      </BotonAccion>
-                    )}
-                    <BotonAccion color={llamado.formula ? 'gris' : 'verde'} icono={CheckCircle2} ocupado={ocupado}
-                      onClick={() => accionTurno(llamado, 'atender', 'atendido')}>
-                      {llamado.formula ? 'Atendido sin entrega' : 'Marcar atendido'}
+                  <EtiquetaPrioridad prioridad={llamado.prioridad} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {llamado.formula && !entregaAbierta && (
+                    <BotonAccion color="verde" icono={ClipboardList} ocupado={ocupado}
+                      onClick={() => setDispensando(llamado.id)}>
+                      Dispensar
                     </BotonAccion>
-                    <BotonAccion color="gris" icono={PauseCircle} ocupado={ocupado}
-                      onClick={() => accionTurno(llamado, 'pausar', 'en pausa')}>
-                      No se presentó (pausar)
-                    </BotonAccion>
-                    <BotonAccion color="gris" icono={SkipForward} ocupado={ocupado}
-                      onClick={() => accionTurno(llamado, 'saltar', 'enviado al final de la fila')}>
-                      Saltar
-                    </BotonAccion>
-                  </div>
-                  {entregaAbierta && (
-                    <DispensarTurno
-                      key={llamado.id}
-                      turno={llamado}
-                      ocupado={ocupado}
-                      ejecutar={ejecutar}
-                      alCerrar={() => setDispensando(null)}
-                    />
                   )}
+                  <BotonAccion color={llamado.formula ? 'gris' : 'verde'} icono={CheckCircle2} ocupado={ocupado}
+                    onClick={() => accionTurno(llamado, 'atender', 'atendido')}>
+                    {llamado.formula ? 'Atendido sin entrega' : 'Marcar atendido'}
+                  </BotonAccion>
+                  <BotonAccion color="ambar" icono={PauseCircle} ocupado={ocupado}
+                    onClick={() => accionTurno(llamado, 'pausar', 'en pausa')}>
+                    No se presentó (pausar)
+                  </BotonAccion>
+                  <BotonAccion color="gris" icono={SkipForward} ocupado={ocupado}
+                    onClick={() => accionTurno(llamado, 'saltar', 'enviado al final de la fila')}>
+                    Saltar
+                  </BotonAccion>
                 </div>
-              ) : (
-                <div className="flex items-center justify-between gap-4 flex-wrap">
-                  <p className="text-tinta-suave">
-                    No hay nadie en ventanilla.{' '}
-                    <strong className="text-tinta cifras">{presentes.length}</strong>{' '}
-                    {presentes.length === 1 ? 'persona espera' : 'personas esperan'}.
-                  </p>
-                  <Boton variante="primario" tamano="lg" icono={Megaphone}
-                    onClick={llamarSiguiente} disabled={ocupado || presentes.length === 0}>
-                    Llamar siguiente
-                  </Boton>
-                </div>
-              )}
-            </Panel>
-
-            {/* Presentes, en el orden en que serán llamados */}
-            <Panel titulo="Esperando en la farmacia" descripcion="En el orden en que serán llamados" sinRelleno>
-              {cargando ? (
-                <Cargando texto="Cargando la fila…" />
-              ) : presentes.length === 0 ? (
-                <EstadoVacio titulo="Nadie está esperando">Los turnos aparecen aquí cuando el paciente llega.</EstadoVacio>
-              ) : (
-                <Tabla etiqueta="Turnos esperando en la farmacia">
-                  <Encabezado>
-                    <Th numero className="w-12">#</Th>
-                    <Th>Turno</Th>
-                    <Th>Paciente</Th>
-                    <Th>Tipo</Th>
-                    <Th numero>Llegó</Th>
-                    <Th>Prioridad</Th>
-                    <Th oculto>Acciones</Th>
-                  </Encabezado>
-                  <Cuerpo>
-                    {presentes.map((t, i) => (
-                      <Fila key={t.id}>
-                        <Td numero className="text-tinta-tenue">{i + 1}</Td>
-                        <Td className="font-bold text-base cifras">{t.numero}</Td>
-                        <Td>
-                          {t.paciente ?? 'Sin nombre'}
-                          {t.veces_pausado > 0 && (
-                            <span className="block text-xs text-tinta-tenue">
-                              Pausado {t.veces_pausado} vez{t.veces_pausado > 1 ? 'es' : ''}
-                            </span>
-                          )}
-                        </Td>
-                        <Td className="text-tinta-suave">{t.tipo === 'fisico' ? 'Físico' : 'Virtual'}</Td>
-                        <Td numero>{hora(t.hora_llegada)}</Td>
-                        <Td><EtiquetaPrioridad prioridad={t.prioridad} /></Td>
-                        <Td className="text-right">
-                          <BotonAccion color="gris" icono={PauseCircle} ocupado={ocupado}
-                            onClick={() => accionTurno(t, 'pausar', 'en pausa')}>
-                            Pausar
-                          </BotonAccion>
-                        </Td>
-                      </Fila>
-                    ))}
-                  </Cuerpo>
-                </Tabla>
-              )}
-            </Panel>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <Panel titulo="En pausa" descripcion="Llamados que no se presentaron" sinRelleno>
-                {cargando ? (
-                  <Cargando />
-                ) : enPausa.length === 0 ? (
-                  <EstadoVacio titulo="No hay turnos en pausa" />
-                ) : (
-                  <Tabla etiqueta="Turnos en pausa">
-                    <Encabezado>
-                      <Th>Turno</Th>
-                      <Th>Paciente</Th>
-                      <Th oculto>Acciones</Th>
-                    </Encabezado>
-                    <Cuerpo>
-                      {enPausa.map((t) => (
-                        <Fila key={t.id}>
-                          <Td className="font-bold cifras">{t.numero}</Td>
-                          <Td>{t.paciente ?? 'Sin nombre'}</Td>
-                          <Td className="text-right">
-                            <BotonAccion color="gris" icono={Undo2} ocupado={ocupado}
-                              onClick={() => accionTurno(t, 'reubicar', 'devuelto a la fila')}>
-                              Llegó
-                            </BotonAccion>
-                          </Td>
-                        </Fila>
-                      ))}
-                    </Cuerpo>
-                  </Tabla>
+                {entregaAbierta && (
+                  <DispensarTurno
+                    key={llamado.id}
+                    turno={llamado}
+                    ocupado={ocupado}
+                    ejecutar={ejecutar}
+                    alCerrar={() => setDispensando(null)}
+                  />
                 )}
-              </Panel>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <p className="text-slate-600">
+                  No hay nadie en ventanilla.{' '}
+                  <strong>{presentes.length}</strong> {presentes.length === 1 ? 'persona espera' : 'personas esperan'}.
+                </p>
+                <button
+                  type="button"
+                  onClick={llamarSiguiente}
+                  disabled={ocupado || presentes.length === 0}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg px-6 py-3 rounded-lg transition cursor-pointer"
+                >
+                  <Megaphone className="w-5 h-5" />
+                  Llamar siguiente
+                </button>
+              </div>
+            )}
+          </section>
 
-              <Panel titulo="Por llegar" descripcion="Turnos virtuales que aún no llegan" sinRelleno>
-                {cargando ? (
-                  <Cargando />
-                ) : porLlegar.length === 0 ? (
-                  <EstadoVacio titulo="No hay turnos virtuales pendientes" />
-                ) : (
-                  <Tabla etiqueta="Turnos por llegar">
-                    <Encabezado>
-                      <Th>Turno</Th>
-                      <Th>Paciente</Th>
-                      <Th>Estado</Th>
-                    </Encabezado>
-                    <Cuerpo>
-                      {porLlegar.map((t) => (
-                        <Fila key={t.id}>
-                          <Td className="font-bold cifras">{t.numero}</Td>
-                          <Td>{t.paciente ?? 'Sin nombre'}</Td>
-                          <Td><EstadoBadge>{ESTADOS[t.estado]}</EstadoBadge></Td>
-                        </Fila>
-                      ))}
-                    </Cuerpo>
-                  </Tabla>
-                )}
-              </Panel>
+          {/* Presentes, en el orden en que serán llamados */}
+          <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+            <div className="px-6 py-3 border-b border-slate-200 flex items-center gap-2">
+              <Users className="w-5 h-5 text-slate-600" />
+              <h3 className="font-bold text-slate-800">Esperando en la farmacia ({presentes.length})</h3>
             </div>
-          </div>
+            {cargando ? (
+              <p className="p-6 text-slate-500">Cargando la fila…</p>
+            ) : presentes.length === 0 ? (
+              <p className="p-6 text-slate-500">Nadie está esperando en este momento.</p>
+            ) : (
+              <ol className="divide-y divide-slate-200">
+                {presentes.map((t, i) => (
+                  <li key={t.id} className="px-6 py-3 flex items-center gap-4 flex-wrap">
+                    <span className="w-6 text-slate-400 font-semibold">{i + 1}</span>
+                    <span className="text-xl font-black text-slate-900 w-20">{t.numero}</span>
+                    <div className="flex-1 min-w-40">
+                      <p className="font-semibold text-slate-800">{t.paciente ?? 'Sin nombre'}</p>
+                      <p className="text-sm text-slate-500">
+                        {t.tipo === 'fisico' ? 'Turno físico' : 'Turno virtual'} · llegó {hora(t.hora_llegada)}
+                        {t.veces_pausado > 0 && ` · pausado ${t.veces_pausado} vez${t.veces_pausado > 1 ? 'es' : ''}`}
+                      </p>
+                    </div>
+                    <EtiquetaPrioridad prioridad={t.prioridad} />
+                    <div className="flex gap-2">
+                      <BotonAccion color="gris" icono={PauseCircle} ocupado={ocupado}
+                        onClick={() => accionTurno(t, 'pausar', 'en pausa')}>
+                        Pausar
+                      </BotonAccion>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </div>
 
-          {/* Columna lateral: registrar turno físico */}
+        {/* Columna lateral: registrar turno físico, pausados y por llegar */}
+        <div className="space-y-6">
           <RegistrarFisico ocupado={ocupado} ejecutar={ejecutar} />
+
+          <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-200">
+              <h3 className="font-bold text-slate-800">En pausa ({enPausa.length})</h3>
+            </div>
+            {enPausa.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-slate-500">No hay turnos en pausa.</p>
+            ) : (
+              <ul className="divide-y divide-slate-200">
+                {enPausa.map((t) => (
+                  <li key={t.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-slate-900">{t.numero}</p>
+                      <p className="text-sm text-slate-500">{t.paciente ?? 'Sin nombre'}</p>
+                    </div>
+                    <BotonAccion color="verde" icono={Undo2} ocupado={ocupado}
+                      onClick={() => accionTurno(t, 'reubicar', 'devuelto a la fila')}>
+                      Llegó
+                    </BotonAccion>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-200">
+              <h3 className="font-bold text-slate-800">Por llegar ({porLlegar.length})</h3>
+            </div>
+            {porLlegar.length === 0 ? (
+              <p className="px-5 py-4 text-sm text-slate-500">No hay turnos virtuales pendientes.</p>
+            ) : (
+              <ul className="divide-y divide-slate-200">
+                {porLlegar.map((t) => (
+                  <li key={t.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-slate-900">{t.numero}</p>
+                      <p className="text-sm text-slate-500">{t.paciente ?? 'Sin nombre'}</p>
+                    </div>
+                    <span className="text-xs font-semibold bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">
+                      {ESTADOS[t.estado]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </div>
       </div>
     </div>
@@ -284,48 +266,76 @@ function RegistrarFisico({ ocupado, ejecutar }) {
   };
 
   return (
-    <Panel titulo="Registrar turno físico" descripcion="Para quien llega sin turno virtual">
-      <form onSubmit={enviar} className="space-y-4">
-        <Segmentado
-          etiqueta="Tipo de registro"
-          ancho
-          valor={conFormula}
-          onChange={setConFormula}
-          opciones={[
-            { valor: true, texto: 'Con fórmula' },
-            { valor: false, texto: 'Solo nombre' },
-          ]}
-        />
+    <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+      <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-2">
+        <UserPlus className="w-5 h-5 text-slate-600" />
+        <h3 className="font-bold text-slate-800">Registrar turno físico</h3>
+      </div>
+      <form onSubmit={enviar} className="p-5 space-y-4">
+        <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-lg" role="group">
+          {[
+            [true, 'Con fórmula'],
+            [false, 'Solo nombre'],
+          ].map(([valor, texto]) => (
+            <button
+              key={texto}
+              type="button"
+              onClick={() => setConFormula(valor)}
+              aria-pressed={conFormula === valor}
+              className={`py-1.5 rounded-md text-sm font-semibold transition cursor-pointer ${
+                conFormula === valor ? 'bg-white shadow text-slate-900' : 'text-slate-600'
+              }`}
+            >
+              {texto}
+            </button>
+          ))}
+        </div>
 
         {conFormula ? (
           <>
-            <Campo id="f-codigo" etiqueta="Código de la fórmula">
-              <Entrada value={codigo} onChange={(e) => setCodigo(e.target.value)}
-                placeholder="F-2026-0001" className="uppercase cifras" />
-            </Campo>
-            <Campo id="f-documento" etiqueta="Documento del paciente">
-              <Entrada value={documento} onChange={(e) => setDocumento(e.target.value)}
-                inputMode="numeric" className="cifras" />
-            </Campo>
+            <div>
+              <label htmlFor="f-codigo" className="block text-sm font-bold text-slate-800 mb-1">
+                Código de la fórmula
+              </label>
+              <input id="f-codigo" value={codigo} onChange={(e) => setCodigo(e.target.value)}
+                placeholder="F-2026-0001" className={`${claseCampo} uppercase`} />
+            </div>
+            <div>
+              <label htmlFor="f-documento" className="block text-sm font-bold text-slate-800 mb-1">
+                Documento del paciente
+              </label>
+              <input id="f-documento" value={documento} onChange={(e) => setDocumento(e.target.value)}
+                inputMode="numeric" className={claseCampo} />
+            </div>
           </>
         ) : (
-          <Campo id="f-nombre" etiqueta="Nombre del paciente">
-            <Entrada value={nombre} onChange={(e) => setNombre(e.target.value)} />
-          </Campo>
+          <div>
+            <label htmlFor="f-nombre" className="block text-sm font-bold text-slate-800 mb-1">
+              Nombre del paciente
+            </label>
+            <input id="f-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} className={claseCampo} />
+          </div>
         )}
 
-        <Campo id="f-prioridad" etiqueta="Prioridad">
-          <Selector value={prioridad} onChange={(e) => setPrioridad(e.target.value)}>
+        <div>
+          <label htmlFor="f-prioridad" className="block text-sm font-bold text-slate-800 mb-1">
+            Prioridad
+          </label>
+          <select id="f-prioridad" value={prioridad} onChange={(e) => setPrioridad(e.target.value)} className={claseCampo}>
             {Object.entries(PRIORIDADES).map(([valor, texto]) => (
               <option key={valor} value={valor}>{texto}</option>
             ))}
-          </Selector>
-        </Campo>
+          </select>
+        </div>
 
-        <Boton type="submit" variante="primario" icono={UserPlus} disabled={ocupado} ancho>
+        <button
+          type="submit"
+          disabled={ocupado}
+          className="w-full bg-slate-800 hover:bg-slate-900 disabled:opacity-50 text-white font-bold py-2.5 rounded-lg transition cursor-pointer"
+        >
           Dar turno
-        </Boton>
+        </button>
       </form>
-    </Panel>
+    </section>
   );
 }
