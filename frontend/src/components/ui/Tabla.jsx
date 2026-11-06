@@ -27,10 +27,11 @@ export function Th({ numero = false, oculto = false, className = '', children, .
       scope="col"
       className={`px-3 py-2 font-bold text-xs uppercase tracking-wide border-b border-borde ${
         numero ? 'text-right' : ''
-      } ${oculto ? 'sr-only' : ''} ${className}`}
+      } ${className}`}
       {...props}
     >
-      {children}
+      {/* oculto: la celda se mantiene (fondo y borde) y el texto solo lo leen los lectores de pantalla */}
+      {oculto ? <span className="sr-only">{children}</span> : children}
     </th>
   );
 }

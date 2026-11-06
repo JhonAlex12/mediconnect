@@ -1,16 +1,18 @@
 import React, { useCallback, useState } from 'react';
-import {
-  AlertTriangle, ArrowDownToLine, ArrowUpFromLine, FlaskConical, Package, PackagePlus,
-  Scale, Search, X,
-} from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, FlaskConical, Package, PackagePlus, Scale, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useEventoEnVivo } from '../../lib/tiempoReal';
-import { Aviso, BotonAccion, IndicadorEnVivo, claseCampo, useAccion } from './comunes';
+import { Aviso, BotonAccion, IndicadorEnVivo, useAccion } from './comunes';
+import {
+  Aviso as AvisoBase, Boton, Campo, Cargando, Casilla, Cuerpo, Encabezado, Entrada, EstadoBadge, EstadoVacio,
+  Fila, Panel, Segmentado, Tabla, Td, Th, TituloPantalla,
+} from '../ui';
 
+// Estado del medicamento → tono con significado (ok = disponible, alerta = stock bajo, error = sin stock)
 const ESTADOS = {
-  normal: { texto: 'Normal', clase: 'bg-emerald-100 text-emerald-800' },
-  stock_bajo: { texto: 'Stock bajo', clase: 'bg-amber-100 text-amber-900' },
-  agotado: { texto: 'Agotado', clase: 'bg-red-100 text-red-800' },
+  normal: { texto: 'Disponible', tono: 'ok' },
+  stock_bajo: { texto: 'Stock bajo', tono: 'alerta' },
+  agotado: { texto: 'Agotado', tono: 'error' },
 };
 
 const TIPOS_MOVIMIENTO = {
@@ -62,110 +64,97 @@ export default function InventarioFarmacia() {
     ejecutar(() => api(`/inventario/${m.id}/demo/${accion}`, { metodo: 'POST' }), (r) => `${texto} · ${textoMovimiento(r)}`);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="text-2xl font-bold text-slate-800">Inventario</h2>
-        <div className="flex items-center gap-3 flex-wrap">
-          <IndicadorEnVivo />
-          <BotonAccion color="oscuro" icono={PackagePlus} onClick={() => setCreando((v) => !v)}>
-            Nuevo medicamento
-          </BotonAccion>
-        </div>
-      </div>
+    <div>
+      <TituloPantalla
+        titulo="Inventario"
+        descripcion={`${datos.medicamentos.length} medicamentos activos`}
+        acciones={
+          <>
+            <IndicadorEnVivo />
+            <Boton variante="primario" icono={PackagePlus} onClick={() => setCreando((v) => !v)} aria-expanded={creando}>
+              Nuevo medicamento
+            </Boton>
+          </>
+        }
+      />
 
-      <Aviso aviso={aviso} />
+      <div className="space-y-5">
+        <Aviso aviso={aviso} />
 
-      {/* Alertas de stock (RF-17) */}
-      {datos.alertas.length > 0 && (
-        <section className="bg-amber-50 border border-amber-300 rounded-xl p-5">
-          <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-5 h-5" />
-            {datos.alertas.length} {datos.alertas.length === 1 ? 'alerta' : 'alertas'} de stock
-          </h3>
-          <ul className="list-disc pl-6 text-amber-900 space-y-0.5">
-            {datos.alertas.map((a) => (
-              <li key={a}>{a}</li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {/* Alertas de stock (RF-17) */}
+        {datos.alertas.length > 0 && (
+          <AvisoBase tono="alerta" titulo={`${datos.alertas.length} ${datos.alertas.length === 1 ? 'alerta' : 'alertas'} de stock`}>
+            <ul className="list-disc pl-5 mt-1 space-y-0.5">
+              {datos.alertas.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </AvisoBase>
+        )}
 
-      {creando && (
-        <NuevoMedicamento
-          ocupado={ocupado}
-          ejecutar={ejecutar}
-          alCerrar={() => setCreando(false)}
-        />
-      )}
+        {creando && (
+          <NuevoMedicamento
+            ocupado={ocupado}
+            ejecutar={ejecutar}
+            alCerrar={() => setCreando(false)}
+          />
+        )}
 
-      {medicamentoAbierto && (
-        <RegistrarMovimiento
-          key={medicamentoAbierto.id}
-          medicamento={medicamentoAbierto}
-          ocupado={ocupado}
-          ejecutar={ejecutar}
-          alCerrar={() => setSeleccionado(null)}
-        />
-      )}
+        {medicamentoAbierto && (
+          <RegistrarMovimiento
+            key={medicamentoAbierto.id}
+            medicamento={medicamentoAbierto}
+            ocupado={ocupado}
+            ejecutar={ejecutar}
+            alCerrar={() => setSeleccionado(null)}
+          />
+        )}
 
-      <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-200 flex items-center gap-4 flex-wrap">
-          <div className="relative flex-1 min-w-52">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="search"
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar medicamento"
-              aria-label="Buscar medicamento"
-              className={`${claseCampo} pl-9`}
-            />
+        <Panel sinRelleno>
+          <div className="px-4 py-3 border-b border-borde flex items-end gap-4 flex-wrap">
+            <Campo id="inv-buscar" etiqueta="Buscar medicamento" className="flex-1 min-w-52 max-w-md">
+              <Entrada type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+                placeholder="Nombre o presentación" />
+            </Campo>
+            <Casilla checked={soloAlertas} onChange={(e) => setSoloAlertas(e.target.checked)} className="h-10">
+              Solo con alertas
+            </Casilla>
           </div>
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-700 cursor-pointer">
-            <input type="checkbox" checked={soloAlertas} onChange={(e) => setSoloAlertas(e.target.checked)} />
-            Solo con alertas
-          </label>
-        </div>
 
-        {cargando ? (
-          <p className="p-6 text-slate-500">Cargando el inventario…</p>
-        ) : visibles.length === 0 ? (
-          <p className="p-6 text-slate-500">
-            {datos.medicamentos.length === 0 ? 'No hay medicamentos registrados.' : 'Ningún medicamento coincide.'}
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 text-sm text-slate-600">
-                <tr>
-                  <th className="px-5 py-2 font-semibold">Medicamento</th>
-                  <th className="px-3 py-2 font-semibold text-right">Stock</th>
-                  <th className="px-3 py-2 font-semibold text-right" title="Apartado para turnos activos">Reservado</th>
-                  <th className="px-3 py-2 font-semibold text-right">Disponible</th>
-                  <th className="px-3 py-2 font-semibold text-right">Mínimo</th>
-                  <th className="px-3 py-2 font-semibold">Estado</th>
-                  <th className="px-5 py-2 font-semibold sr-only">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
+          {cargando ? (
+            <Cargando texto="Cargando el inventario…" />
+          ) : visibles.length === 0 ? (
+            datos.medicamentos.length === 0 ? (
+              <EstadoVacio titulo="No hay medicamentos registrados">Agrega el primero con “Nuevo medicamento”.</EstadoVacio>
+            ) : (
+              <EstadoVacio titulo="Ningún medicamento coincide">Prueba con otro nombre o quita el filtro de alertas.</EstadoVacio>
+            )
+          ) : (
+            <Tabla etiqueta="Inventario de medicamentos">
+              <Encabezado>
+                <Th>Medicamento</Th>
+                <Th numero>Stock</Th>
+                <Th numero title="Apartado para turnos activos">Reservado</Th>
+                <Th numero>Disponible</Th>
+                <Th numero>Mínimo</Th>
+                <Th>Estado</Th>
+                <Th oculto>Acciones</Th>
+              </Encabezado>
+              <Cuerpo>
                 {visibles.map((m) => {
                   const estado = ESTADOS[m.estado] ?? ESTADOS.normal;
                   return (
-                    <tr key={m.id} className={seleccionado === m.id ? 'bg-slate-50' : undefined}>
-                      <td className="px-5 py-3">
-                        <p className="font-semibold text-slate-900">{m.nombre}</p>
-                        <p className="text-sm text-slate-500">{m.presentacion}</p>
-                      </td>
-                      <td className="px-3 py-3 text-right font-bold text-slate-900 tabular-nums">{m.stock_actual}</td>
-                      <td className="px-3 py-3 text-right text-slate-600 tabular-nums">{m.reservado}</td>
-                      <td className="px-3 py-3 text-right text-slate-900 tabular-nums">{m.disponible}</td>
-                      <td className="px-3 py-3 text-right text-slate-600 tabular-nums">{m.stock_minimo}</td>
-                      <td className="px-3 py-3">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${estado.clase}`}>
-                          {estado.texto}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
+                    <Fila key={m.id} resaltada={seleccionado === m.id}>
+                      <Td>
+                        <span className="font-bold text-tinta">{m.nombre}</span>
+                        <span className="block text-xs text-tinta-tenue">{m.presentacion}</span>
+                      </Td>
+                      <Td numero className="font-bold text-tinta">{m.stock_actual}</Td>
+                      <Td numero className="text-tinta-suave">{m.reservado}</Td>
+                      <Td numero>{m.disponible}</Td>
+                      <Td numero className="text-tinta-suave">{m.stock_minimo}</Td>
+                      <Td><EstadoBadge tono={estado.tono}>{estado.texto}</EstadoBadge></Td>
+                      <Td>
                         <div className="flex gap-2 justify-end flex-wrap">
                           <BotonAccion color="gris" icono={Package} ocupado={ocupado}
                             onClick={() => setSeleccionado(seleccionado === m.id ? null : m.id)}>
@@ -175,15 +164,15 @@ export default function InventarioFarmacia() {
                             <MenuDemo m={m} ocupado={ocupado} demo={demo} />
                           )}
                         </div>
-                      </td>
-                    </tr>
+                      </Td>
+                    </Fila>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+              </Cuerpo>
+            </Tabla>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }
@@ -191,8 +180,11 @@ export default function InventarioFarmacia() {
 // Botones de demostración (RF-18): solo aparecen si el backend corre con MODO_DEMO=true
 function MenuDemo({ m, ocupado, demo }) {
   return (
-    <div className="flex gap-1 items-center border border-dashed border-violet-300 rounded-lg px-1.5 py-1" title="Solo para demostraciones">
-      <FlaskConical className="w-4 h-4 text-violet-600" aria-label="Demostración" />
+    <div className="inline-flex items-center rounded-md border border-dashed border-borde-campo" title="Solo para demostraciones">
+      <span className="flex items-center gap-1 pl-2 pr-1 text-xs text-tinta-tenue">
+        <FlaskConical size={14} aria-hidden="true" />
+        Demo
+      </span>
       {[
         ['reducir', 'Reducir', 'Stock reducido a la mitad', m.stock_actual < 2],
         ['vaciar', 'Vaciar', 'Medicamento agotado', m.stock_actual === 0],
@@ -203,7 +195,7 @@ function MenuDemo({ m, ocupado, demo }) {
           type="button"
           disabled={ocupado || deshabilitado}
           onClick={() => demo(m, accion, exito)}
-          className="text-xs font-semibold text-violet-800 hover:bg-violet-100 px-2 py-1 rounded transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-8 px-2 text-xs font-bold text-primario-700 hover:bg-primario-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {texto}
         </button>
@@ -235,64 +227,44 @@ function RegistrarMovimiento({ medicamento: m, ocupado, ejecutar, alCerrar }) {
   };
 
   return (
-    <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
-        <h3 className="font-bold text-slate-800">
-          Movimiento: {m.nombre} <span className="font-normal text-slate-500">{m.presentacion}</span>
-        </h3>
-        <button type="button" onClick={alCerrar} aria-label="Cerrar" className="p-1 rounded hover:bg-slate-100 cursor-pointer">
-          <X className="w-5 h-5 text-slate-600" />
-        </button>
-      </div>
-      <form onSubmit={enviar} className="p-5 grid gap-4 md:grid-cols-[auto_10rem_1fr_auto] md:items-end">
-        <div>
-          <span className="block text-sm font-bold text-slate-800 mb-1">Tipo</span>
-          <div className="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-lg" role="group" aria-label="Tipo de movimiento">
-            {Object.entries(TIPOS_MOVIMIENTO).map(([valor, { texto, icono: Icono }]) => (
-              <button
-                key={valor}
-                type="button"
-                onClick={() => setTipo(valor)}
-                aria-pressed={tipo === valor}
-                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-sm font-semibold transition cursor-pointer ${
-                  tipo === valor ? 'bg-white shadow text-slate-900' : 'text-slate-600'
-                }`}
-              >
-                <Icono className="w-4 h-4" />
-                {texto}
-              </button>
-            ))}
+    <Panel
+      titulo={<>Movimiento: {m.nombre} <span className="font-normal text-tinta-suave">{m.presentacion}</span></>}
+      acciones={<Boton variante="fantasma" tamano="sm" icono={X} onClick={alCerrar}>Cerrar</Boton>}
+    >
+      <form onSubmit={enviar} className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-[auto_10rem_1fr_auto] md:items-end">
+          <div>
+            <span className="block text-sm font-bold text-tinta mb-1">Tipo</span>
+            <Segmentado
+              etiqueta="Tipo de movimiento"
+              valor={tipo}
+              onChange={setTipo}
+              opciones={Object.entries(TIPOS_MOVIMIENTO).map(([valor, { texto, icono }]) => ({ valor, texto, icono }))}
+            />
           </div>
+          <Campo id="mov-cantidad" etiqueta={tipo === 'ajuste' ? 'Stock contado' : 'Cantidad'}>
+            <Entrada type="number" min={tipo === 'ajuste' ? 0 : 1} step={1} required
+              value={cantidad} onChange={(e) => setCantidad(e.target.value)} className="text-right cifras" />
+          </Campo>
+          <Campo id="mov-motivo" etiqueta="Motivo" opcional={tipo === 'entrada'}>
+            <Entrada value={motivo} onChange={(e) => setMotivo(e.target.value)}
+              required={tipo !== 'entrada'} minLength={tipo !== 'entrada' ? 3 : undefined}
+              placeholder={tipo === 'entrada' ? 'Pedido del proveedor' : tipo === 'salida' ? 'Vencido, dañado…' : 'Conteo físico'} />
+          </Campo>
+          <Boton type="submit" variante="primario" disabled={ocupado || !valida}>
+            Registrar
+          </Boton>
         </div>
-        <div>
-          <label htmlFor="mov-cantidad" className="block text-sm font-bold text-slate-800 mb-1">
-            {tipo === 'ajuste' ? 'Stock contado' : 'Cantidad'}
-          </label>
-          <input id="mov-cantidad" type="number" min={tipo === 'ajuste' ? 0 : 1} step={1} required
-            value={cantidad} onChange={(e) => setCantidad(e.target.value)} className={claseCampo} />
-        </div>
-        <div>
-          <label htmlFor="mov-motivo" className="block text-sm font-bold text-slate-800 mb-1">
-            Motivo {tipo === 'entrada' && <span className="font-normal text-slate-500">(opcional)</span>}
-          </label>
-          <input id="mov-motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)}
-            required={tipo !== 'entrada'} minLength={tipo !== 'entrada' ? 3 : undefined}
-            placeholder={tipo === 'entrada' ? 'Pedido del proveedor' : tipo === 'salida' ? 'Vencido, dañado…' : 'Conteo físico'}
-            className={claseCampo} />
-        </div>
-        <BotonAccion type="submit" color="oscuro" ocupado={ocupado || !valida}>
-          Registrar
-        </BotonAccion>
-        <p className={`text-sm md:col-span-4 ${resultante !== null && resultante < 0 ? 'text-red-700 font-semibold' : 'text-slate-600'}`}>
-          {TIPOS_MOVIMIENTO[tipo].ayuda} Stock actual: <strong>{m.stock_actual}</strong>
-          {resultante !== null && (
-            resultante < 0
-              ? ` · No alcanza: solo hay ${m.stock_actual}.`
-              : <> · Quedará en <strong>{resultante}</strong>.</>
-          )}
-        </p>
+        {resultante !== null && resultante < 0 ? (
+          <Aviso aviso={{ tipo: 'error', texto: `No alcanza: solo hay ${m.stock_actual} unidades.` }} />
+        ) : (
+          <p className="text-sm text-tinta-suave">
+            {TIPOS_MOVIMIENTO[tipo].ayuda} Stock actual: <strong className="text-tinta cifras">{m.stock_actual}</strong>
+            {resultante !== null && <> · Quedará en <strong className="text-tinta cifras">{resultante}</strong>.</>}
+          </p>
+        )}
       </form>
-    </section>
+    </Panel>
   );
 }
 
@@ -320,41 +292,30 @@ function NuevoMedicamento({ ocupado, ejecutar, alCerrar }) {
   };
 
   return (
-    <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
-        <h3 className="font-bold text-slate-800 flex items-center gap-2">
-          <PackagePlus className="w-5 h-5 text-slate-600" />
-          Nuevo medicamento
-        </h3>
-        <button type="button" onClick={alCerrar} aria-label="Cerrar" className="p-1 rounded hover:bg-slate-100 cursor-pointer">
-          <X className="w-5 h-5 text-slate-600" />
-        </button>
-      </div>
-      <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_8rem_8rem_auto] lg:items-end">
-        <div>
-          <label htmlFor="nm-nombre" className="block text-sm font-bold text-slate-800 mb-1">Nombre</label>
-          <input id="nm-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={2}
-            placeholder="Losartán" className={claseCampo} />
-        </div>
-        <div>
-          <label htmlFor="nm-presentacion" className="block text-sm font-bold text-slate-800 mb-1">Presentación</label>
-          <input id="nm-presentacion" value={presentacion} onChange={(e) => setPresentacion(e.target.value)} required minLength={2}
-            placeholder="Tableta 50 mg" className={claseCampo} />
-        </div>
-        <div>
-          <label htmlFor="nm-minimo" className="block text-sm font-bold text-slate-800 mb-1">Stock mínimo</label>
-          <input id="nm-minimo" type="number" min={0} step={1} required value={minimo}
-            onChange={(e) => setMinimo(e.target.value)} className={claseCampo} />
-        </div>
-        <div>
-          <label htmlFor="nm-inicial" className="block text-sm font-bold text-slate-800 mb-1">Stock inicial</label>
-          <input id="nm-inicial" type="number" min={0} step={1} required value={inicial}
-            onChange={(e) => setInicial(e.target.value)} className={claseCampo} />
-        </div>
-        <BotonAccion type="submit" color="oscuro" ocupado={ocupado}>
+    <Panel
+      titulo="Nuevo medicamento"
+      acciones={<Boton variante="fantasma" tamano="sm" icono={X} onClick={alCerrar}>Cerrar</Boton>}
+    >
+      <form onSubmit={enviar} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_8rem_8rem_auto] lg:items-end">
+        <Campo id="nm-nombre" etiqueta="Nombre">
+          <Entrada value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={2} placeholder="Losartán" />
+        </Campo>
+        <Campo id="nm-presentacion" etiqueta="Presentación">
+          <Entrada value={presentacion} onChange={(e) => setPresentacion(e.target.value)} required minLength={2}
+            placeholder="Tableta 50 mg" />
+        </Campo>
+        <Campo id="nm-minimo" etiqueta="Stock mínimo">
+          <Entrada type="number" min={0} step={1} required value={minimo}
+            onChange={(e) => setMinimo(e.target.value)} className="text-right cifras" />
+        </Campo>
+        <Campo id="nm-inicial" etiqueta="Stock inicial">
+          <Entrada type="number" min={0} step={1} required value={inicial}
+            onChange={(e) => setInicial(e.target.value)} className="text-right cifras" />
+        </Campo>
+        <Boton type="submit" variante="primario" disabled={ocupado}>
           Agregar
-        </BotonAccion>
+        </Boton>
       </form>
-    </section>
+    </Panel>
   );
 }
