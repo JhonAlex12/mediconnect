@@ -9,11 +9,11 @@ export function useTitulo(titulo) {
 }
 
 // Logo: el símbolo de la marca + el nombre con sus dos colores.
-// Sobre fondo oscuro ("claro") el símbolo va en una placa blanca, porque la imagen tiene fondo blanco.
+// El símbolo tiene fondo transparente: sirve igual sobre fondos claros y oscuros.
 export function Logo({ claro = false, subtitulo }) {
   return (
     <Link to="/" className="flex items-center gap-2.5 shrink-0" aria-label="Mediconnect, ir al inicio">
-      <span className={`flex items-center justify-center shrink-0 ${claro ? 'w-12 h-12 bg-white rounded-xl p-1' : 'w-14 h-14'}`}>
+      <span className={`flex items-center justify-center shrink-0 ${claro ? 'w-12 h-12' : 'w-14 h-14'}`}>
         <img src="/logo-simbolo.svg" alt="" className="w-full h-full object-contain" />
       </span>
       <span className="leading-tight">
