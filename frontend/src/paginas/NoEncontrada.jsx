@@ -1,19 +1,21 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import Encabezado, { useTitulo } from '../components/Encabezado';
+import SitioPublico from '../components/SitioPublico';
+import { useTitulo } from '../components/Encabezado';
+import { clasesBoton } from '../components/ui';
 
 export default function NoEncontrada() {
   useTitulo('Página no encontrada');
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      <Encabezado />
-      <main className="flex-1 flex flex-col items-center justify-center gap-4 px-4 text-center">
-        <p className="text-6xl font-black text-slate-300">404</p>
-        <h1 className="text-2xl font-bold text-slate-800">Esta página no existe</h1>
-        <Link to="/" className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg">
-          Ir al inicio
-        </Link>
-      </main>
-    </div>
+    <SitioPublico>
+      <div className="max-w-xl mx-auto px-4 py-16 space-y-3">
+        <p className="text-sm font-bold text-tinta-suave cifras">Error 404</p>
+        <h1 className="text-3xl font-bold text-tinta">Esta página no existe</h1>
+        <p className="text-tinta-suave">Revisa la dirección o vuelve al inicio para consultar tu fórmula.</p>
+        <div className="pt-2">
+          <Link to="/" className={clasesBoton({ variante: 'primario' })}>Ir al inicio</Link>
+        </div>
+      </div>
+    </SitioPublico>
   );
 }

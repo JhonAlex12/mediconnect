@@ -22,21 +22,9 @@ export function Logo({ claro = false, subtitulo }) {
           <span className="text-marca-verde">connect</span>
         </span>
         {subtitulo && (
-          <span className={`block text-xs ${claro ? 'text-blue-200' : 'text-slate-500'}`}>{subtitulo}</span>
+          <span className={`block text-xs ${claro ? 'text-white/80' : 'text-tinta-suave'}`}>{subtitulo}</span>
         )}
       </span>
     </Link>
-  );
-}
-
-// Barra superior de las páginas internas (farmacia, 404)
-export default function Encabezado({ seccion, children, ancho = 'max-w-7xl' }) {
-  return (
-    <header className="bg-marca-noche text-white shadow-md">
-      <div className={`${ancho} mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4`}>
-        <Logo claro subtitulo={seccion} />
-        {children}
-      </div>
-    </header>
   );
 }

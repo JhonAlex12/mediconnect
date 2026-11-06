@@ -1,41 +1,24 @@
-import React, { useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import {
-  Accessibility, Bell, CalendarCheck, CheckCircle2, ChevronRight, ClipboardList, Clock, PackageCheck,
-  Search, Smartphone, Ticket,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ChevronRight, Search } from 'lucide-react';
 import SitioPublico from '../components/SitioPublico';
-import Carrusel from '../components/Carrusel';
 import { useTitulo } from '../components/Encabezado';
-
-const SERVICIOS = [
-  {
-    icono: Search,
-    titulo: 'Consulta de disponibilidad',
-    texto: 'Con el código de tu fórmula y tu documento ves si cada medicamento está disponible antes de salir de casa.',
-  },
-  {
-    icono: Ticket,
-    titulo: 'Turno virtual',
-    texto: 'Pide tu turno desde el celular. Tus medicamentos quedan apartados mientras llegas.',
-  },
-  {
-    icono: Bell,
-    titulo: 'Avisos en tiempo real',
-    texto: 'Te avisamos cuando te llaman, si tu turno queda en pausa y si cambia la disponibilidad de tus medicamentos.',
-  },
-  {
-    icono: PackageCheck,
-    titulo: 'Entregas pendientes',
-    texto: 'Si algo no alcanzó, queda pendiente en tu fórmula y te avisamos cuando haya.',
-  },
-];
+import { Boton, Campo, Entrada } from '../components/ui';
 
 const PASOS = [
-  { icono: ClipboardList, titulo: 'Tu médico emite la fórmula', texto: 'La IPS la envía directamente a la farmacia. Recibes un código.' },
-  { icono: Smartphone, titulo: 'Consulta y pide tu turno', texto: 'Ingresa el código y tu documento, revisa qué hay y pide tu turno.' },
-  { icono: Clock, titulo: 'Sigue tu turno', texto: 'Ve cuántas personas hay antes que tú y avisa cuando vas en camino.' },
-  { icono: CheckCircle2, titulo: 'Reclama tus medicamentos', texto: 'Al llegar, presiona "Ya llegué" y espera el llamado en pantalla.' },
+  { titulo: 'Recibe tu fórmula', texto: 'Tu médico la registra y la IPS la envía a la farmacia. En la fórmula está su código.' },
+  { titulo: 'Consulta la disponibilidad', texto: 'Con el código y tu documento ves qué medicamentos hay antes de salir.' },
+  { titulo: 'Pide tu turno', texto: 'Tus medicamentos quedan apartados mientras llegas. Avisa cuando vayas en camino.' },
+  { titulo: 'Reclama en ventanilla', texto: 'Al llegar presiona “Ya llegué” y espera tu número en la pantalla de la sala.' },
+];
+
+// Reglas que el paciente necesita saber (valores de backend/src/config/negocio.js)
+const REGLAS = [
+  ['Medicamentos apartados', '2 horas desde que pides el turno'],
+  ['Si se te hace tarde', '20 minutos más, una sola vez, con “Voy retrasado”'],
+  ['Si no te presentas al llamado', 'El turno queda en pausa 30 minutos; después vence'],
+  ['Atención preferencial', 'Adultos mayores, embarazadas y personas con discapacidad'],
+  ['Recoge otra persona', 'Con su nombre y número de documento'],
 ];
 
 const PREGUNTAS = [
@@ -44,117 +27,117 @@ const PREGUNTAS = [
     r: 'Te lo entrega tu médico o la IPS al emitir la fórmula. Tiene la forma F-2026-0001.',
   },
   {
-    p: '¿Cuánto tiempo tengo para llegar después de pedir el turno?',
-    r: 'Tus medicamentos quedan apartados por 2 horas. Si se te hace tarde, puedes pedir 20 minutos más una sola vez con el botón "Voy retrasado".',
+    p: '¿Qué pasa si un medicamento está agotado?',
+    r: 'Puedes pedir el turno igual y reclamar lo que haya. Lo que falte queda pendiente en tu fórmula hasta su fecha límite. Si tienes un turno activo y llega el medicamento, te avisamos.',
   },
   {
     p: '¿Qué pasa si no me presento cuando me llaman?',
-    r: 'Si no te acercas en unos 4 minutos, tu turno queda en pausa. Tienes 30 minutos para presionar "Ya llegué" y volver a la fila; después el turno vence y los medicamentos apartados se liberan.',
+    r: 'Si no te acercas en unos 4 minutos, tu turno queda en pausa. Tienes 30 minutos para presionar “Ya llegué” y volver a la fila; después el turno vence y los medicamentos apartados se liberan.',
   },
   {
     p: '¿Puede reclamar los medicamentos otra persona?',
     r: 'Sí. En la ventanilla se registran el nombre y el documento de quien recoge.',
-  },
-  {
-    p: '¿Tengo atención preferencial?',
-    r: 'Si eres adulto mayor, estás en embarazo o tienes alguna discapacidad, indícalo al pedir el turno y tendrás prioridad en la fila.',
   },
 ];
 
 export default function Inicio() {
   useTitulo(null);
   const { hash } = useLocation();
+  const navigate = useNavigate();
+  const [codigo, setCodigo] = useState('');
+  const [documento, setDocumento] = useState('');
 
-  // Los enlaces del menú (/#servicios...) bajan hasta la sección
+  // Los enlaces del menú (/#como-funciona...) bajan hasta la sección
   useEffect(() => {
     if (!hash) return;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById(hash.slice(1))?.scrollIntoView();
   }, [hash]);
+
+  // La consulta se hace en /paciente, que ya recibe el código y el documento por la dirección
+  const consultar = (e) => {
+    e.preventDefault();
+    navigate(`/paciente?${new URLSearchParams({ codigo: codigo.trim(), documento: documento.trim() })}`);
+  };
 
   return (
     <SitioPublico>
-      <Carrusel />
+      {/* Portada: qué es y la consulta, sin rodeos */}
+      <section className="bg-superficie border-b border-borde">
+        <div className="max-w-6xl mx-auto px-4 py-10 lg:py-14 grid lg:grid-cols-[1fr_24rem] gap-10 items-start">
+          <div className="space-y-4 max-w-xl">
+            <h1 className="text-3xl sm:text-4xl font-bold text-tinta leading-tight">
+              Consulta tu fórmula y pide turno en la farmacia
+            </h1>
+            <p className="text-lg text-tinta-suave">
+              Revisa qué medicamentos hay disponibles antes de ir y espera tu turno desde donde estés.
+              Te avisamos cuando te llamen a la ventanilla.
+            </p>
+            <a href="#como-funciona" className="inline-flex items-center gap-1 font-bold text-primario-700 hover:underline underline-offset-2">
+              Ver cómo funciona
+              <ChevronRight size={16} aria-hidden="true" />
+            </a>
+          </div>
 
-      {/* Accesos rápidos */}
-      <section className="max-w-7xl mx-auto px-4 mt-8 relative z-10">
-        <div className="grid sm:grid-cols-3 gap-4">
-          {[
-            { icono: Search, titulo: 'Consultar mi fórmula', a: '/paciente' },
-            { icono: CalendarCheck, titulo: 'Pedir turno virtual', a: '/paciente' },
-            { icono: Accessibility, titulo: 'Atención preferencial', a: '/#preguntas' },
-          ].map(({ icono: Icono, titulo, a }) => (
-            <Link key={titulo} to={a}
-              className="group bg-white rounded-2xl shadow-lg border border-slate-200 p-5 flex items-center gap-4 hover:border-marca-verde transition">
-              <span className="w-12 h-12 rounded-xl bg-blue-50 text-marca-azul-oscuro flex items-center justify-center group-hover:bg-marca-verde group-hover:text-white transition">
-                <Icono className="w-6 h-6" />
-              </span>
-              <span className="font-bold text-marca-noche">{titulo}</span>
-              <ChevronRight className="w-5 h-5 text-slate-400 ml-auto" />
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Servicios */}
-      <section id="servicios" className="max-w-7xl mx-auto px-4 py-16 scroll-mt-24">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Servicios</p>
-          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">Todo lo de tu fórmula, en un solo lugar</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {SERVICIOS.map(({ icono: Icono, titulo, texto }) => (
-            <article key={titulo} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
-              <span className="w-12 h-12 rounded-xl bg-marca-verde-claro text-marca-verde-oscuro flex items-center justify-center mb-4">
-                <Icono className="w-6 h-6" />
-              </span>
-              <h3 className="font-bold text-lg text-marca-noche">{titulo}</h3>
-              <p className="text-slate-600 mt-2">{texto}</p>
-            </article>
-          ))}
+          <form onSubmit={consultar} className="border border-borde-fuerte rounded-md p-5 space-y-4 bg-fondo">
+            <h2 className="text-lg font-bold text-tinta">Consulta tu fórmula</h2>
+            <Campo id="inicio-codigo" etiqueta="Código de la fórmula" ayuda="Ejemplo: F-2026-0001">
+              <Entrada value={codigo} onChange={(e) => setCodigo(e.target.value)} required
+                className="h-12 text-lg uppercase cifras" autoComplete="off" />
+            </Campo>
+            <Campo id="inicio-documento" etiqueta="Número de documento">
+              <Entrada value={documento} onChange={(e) => setDocumento(e.target.value)} required
+                inputMode="numeric" className="h-12 text-lg cifras" autoComplete="off" />
+            </Campo>
+            <Boton type="submit" variante="primario" tamano="lg" icono={Search} ancho>
+              Consultar
+            </Boton>
+          </form>
         </div>
       </section>
 
       {/* Cómo funciona */}
-      <section id="como-funciona" className="bg-gradient-to-br from-marca-hielo via-marca-verde-claro/60 to-blue-50 scroll-mt-24">
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Cómo funciona</p>
-            <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">De la consulta médica a tus manos en 4 pasos</h2>
+      <section id="como-funciona" className="max-w-6xl mx-auto px-4 py-12 scroll-mt-20">
+        <h2 className="text-2xl font-bold text-tinta mb-6">Cómo funciona</h2>
+        <ol className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
+          {PASOS.map(({ titulo, texto }, i) => (
+            <li key={titulo} className="border-t-2 border-primario-600 pt-3">
+              <p className="text-sm font-bold text-primario-700 cifras">Paso {i + 1}</p>
+              <h3 className="font-bold text-tinta mt-1">{titulo}</h3>
+              <p className="text-tinta-suave mt-1">{texto}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* Reglas clave, en formato de tabla */}
+      <section id="antes-de-ir" className="bg-superficie border-y border-borde scroll-mt-20">
+        <div className="max-w-6xl mx-auto px-4 py-12 grid lg:grid-cols-[16rem_1fr] gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-tinta">Antes de ir</h2>
+            <p className="text-tinta-suave mt-1">Lo que debes tener en cuenta con tu turno.</p>
           </div>
-          <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {PASOS.map(({ icono: Icono, titulo, texto }, i) => (
-              <li key={titulo} className="bg-white rounded-2xl p-6 shadow-sm relative">
-                <span className="absolute top-5 right-5 font-titulo text-4xl font-black text-marca-verde/25">{i + 1}</span>
-                <Icono className="w-8 h-8 text-marca-azul mb-4" />
-                <h3 className="font-bold text-lg text-marca-noche">{titulo}</h3>
-                <p className="text-slate-600 mt-2">{texto}</p>
-              </li>
+          <dl className="divide-y divide-borde border-y border-borde">
+            {REGLAS.map(([dato, valor]) => (
+              <div key={dato} className="grid sm:grid-cols-[16rem_1fr] gap-1 sm:gap-4 py-3">
+                <dt className="font-bold text-tinta">{dato}</dt>
+                <dd className="text-tinta-suave">{valor}</dd>
+              </div>
             ))}
-          </ol>
-          <div className="text-center mt-10">
-            <Link to="/paciente"
-              className="inline-flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold text-lg px-6 py-3 rounded-full shadow-lg shadow-marca-verde/30 transition">
-              Empezar ahora
-              <ChevronRight className="w-5 h-5" />
-            </Link>
-          </div>
+          </dl>
         </div>
       </section>
 
       {/* Preguntas frecuentes */}
-      <section id="preguntas" className="max-w-3xl mx-auto px-4 py-16 scroll-mt-24">
-        <div className="text-center mb-8">
-          <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Preguntas frecuentes</p>
-          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">¿Tienes dudas?</h2>
-        </div>
-        <div className="space-y-3">
+      <section id="preguntas" className="max-w-3xl mx-auto px-4 py-12 scroll-mt-20">
+        <h2 className="text-2xl font-bold text-tinta mb-4">Preguntas frecuentes</h2>
+        <div className="divide-y divide-borde border-y border-borde">
           {PREGUNTAS.map(({ p, r }) => (
-            <details key={p} className="group bg-white border border-slate-200 rounded-xl open:shadow-sm">
-              <summary className="cursor-pointer list-none flex items-center justify-between gap-4 px-5 py-4 font-bold text-marca-noche">
+            <details key={p} className="group">
+              <summary className="cursor-pointer list-none flex items-center justify-between gap-4 py-4 font-bold text-tinta">
                 {p}
-                <ChevronRight className="w-5 h-5 text-slate-400 transition group-open:rotate-90" />
+                <ChevronRight size={20} className="shrink-0 text-tinta-tenue transition-transform group-open:rotate-90" aria-hidden="true" />
               </summary>
-              <p className="px-5 pb-4 text-slate-600">{r}</p>
+              <p className="pb-4 text-tinta-suave">{r}</p>
             </details>
           ))}
         </div>
