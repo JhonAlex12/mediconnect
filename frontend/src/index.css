@@ -1,7 +1,56 @@
 @import "tailwindcss";
 
-/* Colores de la marca, tomados del logo de Mediconnect */
+/* ============================================================
+   TOKENS DE DISEÑO (en Tailwind 4 los tokens viven aquí, en @theme,
+   y reemplazan a tailwind.config.js). Usar SIEMPRE estos nombres,
+   no colores sueltos como slate-500 o emerald-600.
+   ============================================================ */
 @theme {
+  /* Tipografía: pensada para baja visión (RNF-01) */
+  --font-sans: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+  --font-titulo: var(--font-sans);
+
+  /* Color principal: azul petróleo */
+  --color-primario-50: #eef6f5;
+  --color-primario-100: #d5e9e7;
+  --color-primario-200: #abd3cf;
+  --color-primario-300: #7ab7b2;
+  --color-primario-400: #3f918b;
+  --color-primario-500: #1d736f;
+  --color-primario-600: #0f5c5c; /* base: botones, enlaces, foco */
+  --color-primario-700: #0c4a4a; /* hover */
+  --color-primario-800: #0a3b3b;
+  --color-primario-900: #072b2b;
+
+  /* Superficies y texto */
+  --color-fondo: #faf8f5;        /* blanco hueso: fondo de página */
+  --color-superficie: #ffffff;   /* tablas, paneles, campos */
+  --color-hundido: #f3f0eb;      /* encabezados de tabla, zonas secundarias */
+  --color-tinta: #1f2a2a;        /* texto principal */
+  --color-tinta-suave: #4a5757;  /* texto secundario (AA sobre fondo) */
+  --color-tinta-tenue: #636e6e;  /* ayudas y metadatos (AA sobre fondo) */
+  --color-borde: #e3ded6;        /* separadores */
+  --color-borde-fuerte: #c9c2b8; /* contornos de paneles */
+  --color-borde-campo: #858d8d;  /* contorno de campos: 3:1 sobre blanco */
+
+  /* Estados: SOLO con significado.
+     ok = disponible · alerta = por vencer / stock bajo · error = vencido / sin stock */
+  --color-ok-fondo: #e7f4ec;
+  --color-ok-texto: #1e6b3a;
+  --color-ok-borde: #9fd0b0;
+  --color-alerta-fondo: #fdf1dc;
+  --color-alerta-texto: #7f4b00;
+  --color-alerta-borde: #e9c27a;
+  --color-error-fondo: #fbeae8;
+  --color-error-texto: #a2241b;
+  --color-error-borde: #e8a49d;
+  --color-error: #b42318;        /* botón de peligro */
+
+  /* Una sola sombra, suave */
+  --shadow-suave: 0 1px 2px 0 rgb(31 42 42 / 0.06), 0 1px 3px 0 rgb(31 42 42 / 0.04);
+
+  /* Colores de la marca (logo). Solo para el logo y el sitio público
+     mientras se rediseña (paso 7); no usar en pantallas nuevas. */
   --color-marca-azul: #2257c5;
   --color-marca-azul-oscuro: #163f99;
   --color-marca-noche: #0d2259;
@@ -9,12 +58,34 @@
   --color-marca-verde-oscuro: #0e8a81;
   --color-marca-verde-claro: #e0f5f3;
   --color-marca-hielo: #f1f8fb;
-
-  /* Títulos con la misma familia tipográfica del banner */
-  --font-titulo: "Montserrat", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* RNF-01: Facilidad de uso - letra base de al menos 16 px para adultos mayores */
-html {
-  font-size: 16px;
+@layer base {
+  /* RNF-01: letra base de al menos 16 px para adultos mayores */
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    background-color: var(--color-fondo);
+    color: var(--color-tinta);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Foco visible y consistente en todo lo que se puede usar con teclado */
+  :focus-visible {
+    outline: 2px solid var(--color-primario-600);
+    outline-offset: 2px;
+  }
+
+  /* Íconos de lucide con el mismo grosor en toda la aplicación */
+  svg.lucide {
+    stroke-width: 1.75;
+  }
+}
+
+/* Números alineados en tablas, cantidades y turnos */
+@utility cifras {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }

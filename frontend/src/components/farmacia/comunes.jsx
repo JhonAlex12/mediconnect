@@ -1,59 +1,54 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Wifi, WifiOff } from 'lucide-react';
 import { useConexionEnVivo } from '../../lib/tiempoReal';
+import { Aviso as AvisoBase, Boton, claseControl } from '../ui';
 
-export const claseCampo =
-  'w-full border border-slate-400 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-slate-600';
+// Se conservan estos exports y sus props (los usan las pantallas de la farmacia
+// y la del paciente); por dentro ahora usan los componentes base de ../ui.
 
-export function BotonAccion({ onClick, ocupado, color, icono: Icono, children, type = 'button' }) {
-  const colores = {
-    verde: 'bg-emerald-600 hover:bg-emerald-700 text-white',
-    ambar: 'bg-amber-500 hover:bg-amber-600 text-slate-950',
-    rojo: 'bg-red-600 hover:bg-red-700 text-white',
-    oscuro: 'bg-slate-800 hover:bg-slate-900 text-white',
-    gris: 'bg-slate-200 hover:bg-slate-300 text-slate-800',
-  };
+export const claseCampo = claseControl;
+
+// color (nombre heredado) → variante del sistema de diseño
+const VARIANTE_POR_COLOR = {
+  verde: 'primario',
+  oscuro: 'primario',
+  ambar: 'secundario',
+  gris: 'secundario',
+  rojo: 'peligro',
+};
+
+export function BotonAccion({ onClick, ocupado, color, icono, children, type = 'button' }) {
   return (
-    <button
+    <Boton
       type={type}
       onClick={onClick}
       disabled={ocupado}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${colores[color]}`}
+      variante={VARIANTE_POR_COLOR[color] ?? 'secundario'}
+      tamano="sm"
+      icono={icono}
     >
-      {Icono && <Icono className="w-4 h-4" />}
       {children}
-    </button>
+    </Boton>
   );
 }
 
+// Estado de la conexión en tiempo real: punto + texto (el color acompaña, no reemplaza al texto)
 export function IndicadorEnVivo() {
   const conectado = useConexionEnVivo();
   return (
-    <span
-      className={`flex items-center gap-1.5 text-sm font-semibold px-3 py-1 rounded-full ${
-        conectado ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-      }`}
-    >
-      {conectado ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+    <span className="inline-flex items-center gap-2 text-sm text-tinta-suave" role="status">
+      <span
+        className={`w-2 h-2 rounded-full ${conectado ? 'bg-ok-texto' : 'bg-tinta-tenue'}`}
+        aria-hidden="true"
+      />
       {conectado ? 'En vivo' : 'Sin conexión en vivo'}
     </span>
   );
 }
 
+// aviso: { tipo: 'error' | 'exito', texto }
 export function Aviso({ aviso }) {
   if (!aviso) return null;
-  const error = aviso.tipo === 'error';
-  return (
-    <div
-      role={error ? 'alert' : 'status'}
-      className={`border-l-4 p-3 rounded-r-lg flex items-start gap-2 ${
-        error ? 'bg-red-50 border-red-600 text-red-800' : 'bg-emerald-50 border-emerald-600 text-emerald-900'
-      }`}
-    >
-      {error ? <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" /> : <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />}
-      <p>{aviso.texto}</p>
-    </div>
-  );
+  return <AvisoBase tono={aviso.tipo === 'error' ? 'error' : 'ok'}>{aviso.texto}</AvisoBase>;
 }
 
 // Ejecuta una acción contra el backend mostrando el resultado en un aviso.
