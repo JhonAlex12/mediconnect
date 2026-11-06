@@ -47,7 +47,7 @@ function SlideBanner() {
       <img
         src="/img/banner-familia-1600.webp"
         alt="Mediconnect. Tu salud, sin complicaciones: ¡reclama tus medicamentos desde casa! Evita filas y ahorra tiempo."
-        className="w-full h-full object-cover object-[0%_50%] lg:object-[50%_14%]"
+        className="w-full h-full object-cover object-[0%_50%] lg:object-[50%_10%] lg:[mask-image:linear-gradient(to_right,transparent,black_4%,black_96%,transparent)]"
         fetchPriority="high"
       />
     </picture>
@@ -163,8 +163,11 @@ export default function Carrusel() {
   }, [actual, pausado, ir]);
 
   return (
+    // El fondo ocupa todo el ancho; el carrusel mantiene proporción 2:1 y se achica
+    // si la pantalla es baja, para que la imagen nunca quede cortada
+    <div className="bg-marca-hielo">
     <section
-      className="relative max-w-[1440px] mx-auto"
+      className="relative mx-auto w-full lg:w-[min(1440px,100%,calc((100svh-7.5rem)*2))]"
       aria-roledescription="carrusel"
       aria-label="Novedades de Mediconnect"
       onMouseEnter={() => setPausado(true)}
@@ -189,7 +192,7 @@ export default function Carrusel() {
             aria-label={`${i + 1} de ${SLIDES.length}: ${nombre}`}
             aria-hidden={i !== actual}
             inert={i !== actual ? '' : undefined}
-            className={`[grid-area:1/1] min-h-[26rem] lg:min-h-0 lg:aspect-[9/4] transition-opacity duration-700 ${
+            className={`[grid-area:1/1] min-h-[26rem] lg:min-h-0 lg:aspect-[2/1] transition-opacity duration-700 ${
               i === actual ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
           >
@@ -222,5 +225,6 @@ export default function Carrusel() {
         ))}
       </div>
     </section>
+    </div>
   );
 }

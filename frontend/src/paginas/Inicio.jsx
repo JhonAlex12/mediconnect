@@ -1,41 +1,33 @@
 import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  Accessibility, Bell, CalendarCheck, CheckCircle2, ChevronRight, ClipboardList, Clock, PackageCheck,
-  Search, Smartphone, Ticket,
-} from 'lucide-react';
 import SitioPublico from '../components/SitioPublico';
 import Carrusel from '../components/Carrusel';
 import { useTitulo } from '../components/Encabezado';
 
 const SERVICIOS = [
   {
-    icono: Search,
     titulo: 'Consulta de disponibilidad',
     texto: 'Con el código de tu fórmula y tu documento ves si cada medicamento está disponible antes de salir de casa.',
   },
   {
-    icono: Ticket,
     titulo: 'Turno virtual',
     texto: 'Pide tu turno desde el celular. Tus medicamentos quedan apartados mientras llegas.',
   },
   {
-    icono: Bell,
     titulo: 'Avisos en tiempo real',
     texto: 'Te avisamos cuando te llaman, si tu turno queda en pausa y si cambia la disponibilidad de tus medicamentos.',
   },
   {
-    icono: PackageCheck,
     titulo: 'Entregas pendientes',
     texto: 'Si algo no alcanzó, queda pendiente en tu fórmula y te avisamos cuando haya.',
   },
 ];
 
 const PASOS = [
-  { icono: ClipboardList, titulo: 'Tu médico emite la fórmula', texto: 'La IPS la envía directamente a la farmacia. Recibes un código.' },
-  { icono: Smartphone, titulo: 'Consulta y pide tu turno', texto: 'Ingresa el código y tu documento, revisa qué hay y pide tu turno.' },
-  { icono: Clock, titulo: 'Sigue tu turno', texto: 'Ve cuántas personas hay antes que tú y avisa cuando vas en camino.' },
-  { icono: CheckCircle2, titulo: 'Reclama tus medicamentos', texto: 'Al llegar, presiona "Ya llegué" y espera el llamado en pantalla.' },
+  { titulo: 'Tu médico emite la fórmula', texto: 'La IPS la envía directamente a la farmacia. Recibes un código.' },
+  { titulo: 'Consulta y pide tu turno', texto: 'Ingresa el código y tu documento, revisa qué hay y pide tu turno.' },
+  { titulo: 'Sigue tu turno', texto: 'Ve cuántas personas hay antes que tú y avisa cuando vas en camino.' },
+  { titulo: 'Reclama tus medicamentos', texto: 'Al llegar, presiona "Ya llegué" y espera el llamado en pantalla.' },
 ];
 
 const PREGUNTAS = [
@@ -75,86 +67,91 @@ export default function Inicio() {
     <SitioPublico>
       <Carrusel />
 
-      {/* Accesos rápidos */}
-      <section className="max-w-7xl mx-auto px-4 mt-8 relative z-10">
-        <div className="grid sm:grid-cols-3 gap-4">
-          {[
-            { icono: Search, titulo: 'Consultar mi fórmula', a: '/paciente' },
-            { icono: CalendarCheck, titulo: 'Pedir turno virtual', a: '/paciente' },
-            { icono: Accessibility, titulo: 'Atención preferencial', a: '/#preguntas' },
-          ].map(({ icono: Icono, titulo, a }) => (
-            <Link key={titulo} to={a}
-              className="group bg-white rounded-2xl shadow-lg border border-slate-200 p-5 flex items-center gap-4 hover:border-marca-verde transition">
-              <span className="w-12 h-12 rounded-xl bg-blue-50 text-marca-azul-oscuro flex items-center justify-center group-hover:bg-marca-verde group-hover:text-white transition">
-                <Icono className="w-6 h-6" />
-              </span>
-              <span className="font-bold text-marca-noche">{titulo}</span>
-              <ChevronRight className="w-5 h-5 text-slate-400 ml-auto" />
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      {/* Servicios */}
-      <section id="servicios" className="max-w-7xl mx-auto px-4 py-16 scroll-mt-24">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Servicios</p>
-          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">Todo lo de tu fórmula, en un solo lugar</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {SERVICIOS.map(({ icono: Icono, titulo, texto }) => (
-            <article key={titulo} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition">
-              <span className="w-12 h-12 rounded-xl bg-marca-verde-claro text-marca-verde-oscuro flex items-center justify-center mb-4">
-                <Icono className="w-6 h-6" />
-              </span>
-              <h3 className="font-bold text-lg text-marca-noche">{titulo}</h3>
-              <p className="text-slate-600 mt-2">{texto}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {/* Cómo funciona */}
-      <section id="como-funciona" className="bg-gradient-to-br from-marca-hielo via-marca-verde-claro/60 to-blue-50 scroll-mt-24">
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Cómo funciona</p>
-            <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">De la consulta médica a tus manos en 4 pasos</h2>
+      {/* Acceso directo: una sola acción principal, sin tarjetas repetidas */}
+      <section className="bg-marca-noche text-white">
+        <div className="max-w-7xl mx-auto px-4 py-7 flex flex-col md:flex-row md:items-center gap-5 md:gap-10">
+          <div className="flex-1">
+            <p className="font-titulo text-xl sm:text-2xl font-bold">¿Ya tienes el código de tu fórmula?</p>
+            <p className="text-blue-200 mt-1">
+              Es el que te dio la IPS, por ejemplo <span className="font-mono text-white bg-white/10 px-1.5 py-0.5 rounded">F-2026-0001</span>
+            </p>
           </div>
-          <ol className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {PASOS.map(({ icono: Icono, titulo, texto }, i) => (
-              <li key={titulo} className="bg-white rounded-2xl p-6 shadow-sm relative">
-                <span className="absolute top-5 right-5 font-titulo text-4xl font-black text-marca-verde/25">{i + 1}</span>
-                <Icono className="w-8 h-8 text-marca-azul mb-4" />
-                <h3 className="font-bold text-lg text-marca-noche">{titulo}</h3>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Link to="/paciente"
+              className="bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold text-lg px-7 py-3 rounded-full transition">
+              Consultar mi fórmula
+            </Link>
+            <a href="/#preguntas" className="text-blue-100 underline underline-offset-4 decoration-blue-300/50 hover:text-white">
+              Tengo atención preferencial
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Servicios: título a la izquierda, lista con divisores a la derecha */}
+      <section id="servicios" className="max-w-7xl mx-auto px-4 py-20 scroll-mt-24 grid lg:grid-cols-[2fr_3fr] gap-10 lg:gap-20">
+        <div>
+          <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold text-marca-noche leading-tight">
+            Sabes qué hay antes de salir de casa.
+          </h2>
+          <p className="text-lg text-slate-600 mt-4 max-w-md">
+            Tu fórmula llega de la IPS a la farmacia. Desde aquí ves qué medicamentos están, apartas los tuyos
+            y llegas solo cuando es tu turno.
+          </p>
+        </div>
+        <dl className="divide-y divide-slate-200 border-y border-slate-200">
+          {SERVICIOS.map(({ titulo, texto }) => (
+            <div key={titulo} className="py-6 sm:grid sm:grid-cols-[14rem_1fr] sm:gap-8">
+              <dt className="font-bold text-lg text-marca-noche">{titulo}</dt>
+              <dd className="text-slate-600 mt-1 sm:mt-0">{texto}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {/* Cómo funciona: línea de tiempo */}
+      <section id="como-funciona" className="bg-marca-hielo border-y border-slate-200 scroll-mt-24">
+        <div className="max-w-7xl mx-auto px-4 py-20">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-12">
+            <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold text-marca-noche leading-tight max-w-xl">
+              De la consulta médica a tus manos
+            </h2>
+            <Link to="/paciente"
+              className="self-start sm:self-auto bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-6 py-3 rounded-full transition">
+              Empezar ahora
+            </Link>
+          </div>
+          <ol className="relative grid sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
+            <div className="hidden lg:block absolute top-5 left-5 right-[calc(25%-0.75rem)] h-0.5 bg-marca-verde/40" aria-hidden="true" />
+            {PASOS.map(({ titulo, texto }, i) => (
+              <li key={titulo} className="relative">
+                <span className="relative flex items-center justify-center w-10 h-10 rounded-full bg-marca-verde text-white font-titulo font-bold ring-4 ring-marca-hielo">
+                  {i + 1}
+                </span>
+                <h3 className="font-bold text-lg text-marca-noche mt-5">{titulo}</h3>
                 <p className="text-slate-600 mt-2">{texto}</p>
               </li>
             ))}
           </ol>
-          <div className="text-center mt-10">
-            <Link to="/paciente"
-              className="inline-flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold text-lg px-6 py-3 rounded-full shadow-lg shadow-marca-verde/30 transition">
-              Empezar ahora
-              <ChevronRight className="w-5 h-5" />
-            </Link>
-          </div>
         </div>
       </section>
 
       {/* Preguntas frecuentes */}
-      <section id="preguntas" className="max-w-3xl mx-auto px-4 py-16 scroll-mt-24">
-        <div className="text-center mb-8">
-          <p className="text-marca-verde-oscuro font-bold uppercase tracking-wide text-sm">Preguntas frecuentes</p>
-          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-1">¿Tienes dudas?</h2>
+      <section id="preguntas" className="max-w-7xl mx-auto px-4 py-20 scroll-mt-24 grid lg:grid-cols-[2fr_3fr] gap-10 lg:gap-20">
+        <div>
+          <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold text-marca-noche leading-tight">Preguntas frecuentes</h2>
+          <p className="text-lg text-slate-600 mt-4 max-w-sm">
+            ¿No encuentras tu respuesta? Pregunta en la ventanilla de la farmacia.
+          </p>
         </div>
-        <div className="space-y-3">
+        <div className="border-t border-slate-200">
           {PREGUNTAS.map(({ p, r }) => (
-            <details key={p} className="group bg-white border border-slate-200 rounded-xl open:shadow-sm">
-              <summary className="cursor-pointer list-none flex items-center justify-between gap-4 px-5 py-4 font-bold text-marca-noche">
+            <details key={p} className="group border-b border-slate-200">
+              <summary className="cursor-pointer list-none flex items-start justify-between gap-6 py-5 font-bold text-lg text-marca-noche hover:text-marca-azul">
                 {p}
-                <ChevronRight className="w-5 h-5 text-slate-400 transition group-open:rotate-90" />
+                <span className="text-2xl leading-none text-marca-verde font-normal group-open:rotate-45 transition" aria-hidden="true">+</span>
               </summary>
-              <p className="px-5 pb-4 text-slate-600">{r}</p>
+              <p className="pb-5 -mt-1 text-slate-600 max-w-2xl">{r}</p>
             </details>
           ))}
         </div>
