@@ -4,3 +4,4 @@ export { default as Campo, Entrada, Selector, Casilla, claseControl } from './Ca
 export { default as Tabla, Encabezado, Th, Cuerpo, Fila, Td } from './Tabla';
 export { EstadoBadge, Aviso, EstadoVacio, Cargando } from './Estado';
 export { default as Panel, TituloPantalla } from './Panel';
+export { default as Segmentado } from './Segmentado';

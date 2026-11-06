@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { AlertCircle, LogIn, Lock } from 'lucide-react';
+import { LogIn } from 'lucide-react';
+import { Aviso, Boton, Campo, Entrada } from '../ui';
 import { useSesion } from '../../lib/sesion';
 
 export default function LoginEmpleado() {
@@ -28,64 +29,35 @@ export default function LoginEmpleado() {
   };
 
   return (
-    <div className="max-w-md mx-auto bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
-      <div className="bg-marca-azul text-white px-6 py-4 flex items-center gap-3">
-        <Lock className="w-5 h-5" />
-        <h2 className="text-xl font-bold">Ingreso de empleados</h2>
-      </div>
+    <div className="max-w-sm mx-auto">
+      <h1 className="text-2xl font-bold text-tinta">Ingreso de empleados</h1>
+      <p className="text-tinta-suave mt-1 mb-6">Panel de la farmacia, para auxiliares y administradores.</p>
 
-      <form onSubmit={enviar} className="p-6 space-y-5">
-        <p className="text-slate-600">
-          Panel de la farmacia. Solo para auxiliares y administradores.
-        </p>
+      <form onSubmit={enviar} className="space-y-4" noValidate>
+        {error && <Aviso tono="error">{error}</Aviso>}
 
-        {error && (
-          <div
-            role="alert"
-            className="bg-red-50 border-l-4 border-red-600 p-3 rounded-r-lg flex items-start gap-2 text-red-800"
-          >
-            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-            <p>{error}</p>
-          </div>
-        )}
-
-        <div>
-          <label htmlFor="usuario" className="block text-sm font-bold text-slate-800 mb-2">
-            Usuario
-          </label>
-          <input
-            id="usuario"
+        <Campo id="usuario" etiqueta="Usuario">
+          <Entrada
             type="text"
             autoComplete="username"
             autoFocus
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
-            className="w-full border border-slate-400 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-slate-600"
           />
-        </div>
+        </Campo>
 
-        <div>
-          <label htmlFor="clave" className="block text-sm font-bold text-slate-800 mb-2">
-            Contraseña
-          </label>
-          <input
-            id="clave"
+        <Campo id="clave" etiqueta="Contraseña">
+          <Entrada
             type="password"
             autoComplete="current-password"
             value={clave}
             onChange={(e) => setClave(e.target.value)}
-            className="w-full border border-slate-400 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-slate-600"
           />
-        </div>
+        </Campo>
 
-        <button
-          type="submit"
-          disabled={enviando}
-          className="w-full flex items-center justify-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-60 text-white font-bold py-3 rounded-lg transition cursor-pointer"
-        >
-          <LogIn className="w-5 h-5" />
+        <Boton type="submit" variante="primario" icono={LogIn} cargando={enviando} ancho>
           {enviando ? 'Ingresando…' : 'Ingresar'}
-        </button>
+        </Boton>
       </form>
     </div>
   );

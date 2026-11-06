@@ -1,8 +1,10 @@
 import React, { useCallback, useState } from 'react';
-import { ClipboardCheck, UserCheck, X } from 'lucide-react';
+import { ClipboardCheck, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useEventoEnVivo } from '../../lib/tiempoReal';
-import { BotonAccion, claseCampo } from './comunes';
+import {
+  Aviso, Boton, Campo, Cargando, Casilla, Cuerpo, Encabezado, Entrada, EstadoBadge, Fila, Tabla, Td, Th,
+} from '../ui';
 
 // "2026-11-30" → "30 de noviembre de 2026" (sin pasar por zonas horarias)
 const fechaLarga = (iso) => {
@@ -46,14 +48,14 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
   if (error) {
     return (
       <Marco turno={turno} alCerrar={alCerrar}>
-        <p className="text-red-700">{error}</p>
+        <Aviso tono="error">{error}</Aviso>
       </Marco>
     );
   }
   if (!datos) {
     return (
       <Marco turno={turno} alCerrar={alCerrar}>
-        <p className="text-slate-500">Cargando la fórmula…</p>
+        <Cargando texto="Cargando la fórmula…" />
       </Marco>
     );
   }
@@ -92,7 +94,7 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
 
   return (
     <Marco turno={turno} alCerrar={alCerrar}>
-      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
         {[
           ['Paciente', t.paciente ?? 'Sin nombre'],
           ['Documento', t.documento ?? '—'],
@@ -100,53 +102,49 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
           ['Reclamar hasta', fechaLarga(t.fecha_limite)],
         ].map(([etiqueta, valor]) => (
           <div key={etiqueta}>
-            <dt className="text-slate-500">{etiqueta}</dt>
-            <dd className="font-semibold text-slate-900">{valor}</dd>
+            <dt className="text-tinta-suave">{etiqueta}</dt>
+            <dd className="font-bold text-tinta cifras">{valor}</dd>
           </div>
         ))}
       </dl>
 
       {!datos.puede_dispensar && (
-        <p className="text-red-700 font-semibold">Este turno ya no se puede dispensar (estado: {t.estado}).</p>
+        <Aviso tono="error">Este turno ya no se puede dispensar (estado: {t.estado}).</Aviso>
       )}
 
       <form onSubmit={enviar} className="space-y-4">
-        <div className="overflow-x-auto border border-slate-200 rounded-lg">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="px-4 py-2 font-semibold">Medicamento</th>
-                <th className="px-3 py-2 font-semibold text-right">Formulado</th>
-                <th className="px-3 py-2 font-semibold text-right">Ya entregado</th>
-                <th className="px-3 py-2 font-semibold text-right">Pendiente</th>
-                <th className="px-3 py-2 font-semibold text-right" title="Lo pendiente, sin tocar lo apartado para otros turnos">
-                  Se puede entregar
-                </th>
-                <th className="px-4 py-2 font-semibold w-32">Entregar</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
+        <div className="border border-borde rounded-md">
+          <Tabla etiqueta="Medicamentos de la fórmula">
+            <Encabezado>
+              <Th>Medicamento</Th>
+              <Th numero>Formulado</Th>
+              <Th numero>Entregado</Th>
+              <Th numero>Pendiente</Th>
+              <Th numero title="Lo pendiente, sin tocar lo apartado para otros turnos">Se puede entregar</Th>
+              <Th className="w-32">Entregar</Th>
+            </Encabezado>
+            <Cuerpo>
               {datos.medicamentos.map((m) => {
                 const id = `disp-${m.formula_item_id}`;
                 const sinStock = m.pendiente > 0 && m.maximo_entregable === 0;
                 const completo = m.pendiente === 0;
                 return (
-                  <tr key={m.formula_item_id} className={completo ? 'text-slate-400' : undefined}>
-                    <td className="px-4 py-2">
-                      <label htmlFor={id} className="font-semibold text-slate-900">{m.nombre}</label>
-                      <p className="text-slate-500">{m.presentacion}</p>
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">{m.cantidad_formulada}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{m.cantidad_entregada}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{m.pendiente}</td>
-                    <td className={`px-3 py-2 text-right tabular-nums ${sinStock ? 'text-red-700 font-bold' : ''}`}>
-                      {sinStock ? 'Sin stock' : m.maximo_entregable}
-                    </td>
-                    <td className="px-4 py-2">
+                  <Fila key={m.formula_item_id} tenue={completo}>
+                    <Td>
+                      <label htmlFor={id} className={`font-bold ${completo ? '' : 'text-tinta'}`}>{m.nombre}</label>
+                      <span className="block text-xs text-tinta-tenue">{m.presentacion}</span>
+                    </Td>
+                    <Td numero>{m.cantidad_formulada}</Td>
+                    <Td numero>{m.cantidad_entregada}</Td>
+                    <Td numero className="font-bold">{m.pendiente}</Td>
+                    <Td numero>
+                      {sinStock ? <EstadoBadge tono="error">Sin stock</EstadoBadge> : m.maximo_entregable}
+                    </Td>
+                    <Td>
                       {completo ? (
-                        <span className="text-xs font-semibold">Entregado</span>
+                        <EstadoBadge tono="ok">Entregado</EstadoBadge>
                       ) : (
-                        <input
+                        <Entrada
                           id={id}
                           type="number"
                           min={0}
@@ -155,62 +153,57 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
                           disabled={m.maximo_entregable === 0}
                           value={cantidades[m.formula_item_id] ?? ''}
                           onChange={(e) => setCantidades((c) => ({ ...c, [m.formula_item_id]: e.target.value }))}
-                          className={`${claseCampo} py-1 disabled:bg-slate-100`}
+                          className="h-9 text-right cifras"
                         />
                       )}
-                    </td>
-                  </tr>
+                    </Td>
+                  </Fila>
                 );
               })}
-            </tbody>
-          </table>
+            </Cuerpo>
+          </Tabla>
         </div>
 
         {/* Recoge otra persona (RN-16) */}
         <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm font-semibold text-slate-800 cursor-pointer w-fit">
-            <input type="checkbox" checked={conDelegado} onChange={(e) => setConDelegado(e.target.checked)} />
-            <UserCheck className="w-4 h-4" />
+          <Casilla checked={conDelegado} onChange={(e) => setConDelegado(e.target.checked)}>
             Recoge otra persona
-          </label>
+          </Casilla>
           {conDelegado && (
             <div className="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="del-nombre" className="block text-sm font-bold text-slate-800 mb-1">Nombre de quien recoge</label>
-                <input id="del-nombre" value={delegado.nombre} required minLength={3}
-                  onChange={(e) => setDelegado((d) => ({ ...d, nombre: e.target.value }))} className={claseCampo} />
-              </div>
-              <div>
-                <label htmlFor="del-documento" className="block text-sm font-bold text-slate-800 mb-1">Documento</label>
-                <input id="del-documento" value={delegado.documento} required inputMode="numeric" pattern="\d{5,20}"
-                  title="Solo números, entre 5 y 20 dígitos"
-                  onChange={(e) => setDelegado((d) => ({ ...d, documento: e.target.value }))} className={claseCampo} />
-              </div>
+              <Campo id="del-nombre" etiqueta="Nombre de quien recoge">
+                <Entrada value={delegado.nombre} required minLength={3}
+                  onChange={(e) => setDelegado((d) => ({ ...d, nombre: e.target.value }))} />
+              </Campo>
+              <Campo id="del-documento" etiqueta="Documento" ayuda="Solo números, entre 5 y 20 dígitos">
+                <Entrada value={delegado.documento} required inputMode="numeric" pattern="\d{5,20}"
+                  onChange={(e) => setDelegado((d) => ({ ...d, documento: e.target.value }))} className="cifras" />
+              </Campo>
             </div>
           )}
         </div>
 
         {nadaEntregable ? (
-          <p className="text-amber-900 bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm">
+          <Aviso tono="alerta">
             No hay nada que entregar ahora. Si el paciente se va sin medicamentos, cierra este panel y márcalo como atendido.
-          </p>
+          </Aviso>
         ) : (
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-sm text-slate-600">
+          <div className="flex items-center justify-between gap-3 flex-wrap border-t border-borde pt-4">
+            <p className="text-sm text-tinta-suave">
               {items.length === 0
                 ? 'Indica al menos un medicamento a entregar.'
                 : parcial
-                  ? `Entrega parcial: ${totalEntrega} de ${totalPendiente} unidades. Lo demás queda pendiente hasta el ${fechaLarga(t.fecha_limite)}.`
-                  : `Entrega completa: ${totalEntrega} unidades.`}
+                  ? <>Entrega parcial: <strong className="text-tinta cifras">{totalEntrega} de {totalPendiente}</strong> unidades. Lo demás queda pendiente hasta el {fechaLarga(t.fecha_limite)}.</>
+                  : <>Entrega completa: <strong className="text-tinta cifras">{totalEntrega}</strong> unidades.</>}
             </p>
-            <BotonAccion
+            <Boton
               type="submit"
-              color="verde"
+              variante="primario"
               icono={ClipboardCheck}
-              ocupado={ocupado || !datos.puede_dispensar || items.length === 0 || invalidas || !delegadoValido}
+              disabled={ocupado || !datos.puede_dispensar || items.length === 0 || invalidas || !delegadoValido}
             >
               Entregar y cerrar turno
-            </BotonAccion>
+            </Boton>
           </div>
         )}
       </form>
@@ -220,13 +213,12 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
 
 function Marco({ turno, alCerrar, children }) {
   return (
-    <div className="border-t border-slate-200 pt-4 mt-2 space-y-4">
+    <div className="border-t border-borde pt-4 mt-2 space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h4 className="font-bold text-slate-800">Dispensar turno {turno.numero}</h4>
-        <button type="button" onClick={alCerrar} aria-label="Cerrar dispensación"
-          className="p-1 rounded hover:bg-slate-100 cursor-pointer">
-          <X className="w-5 h-5 text-slate-600" />
-        </button>
+        <h3 className="font-bold text-tinta">Dispensar turno <span className="cifras">{turno.numero}</span></h3>
+        <Boton variante="fantasma" tamano="sm" icono={X} onClick={alCerrar}>
+          Cerrar
+        </Boton>
       </div>
       {children}
     </div>
