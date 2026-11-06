@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, CheckCircle2, AlertCircle, Send, FileText, Copy } from 'lucide-react';
 
-export default function SimuladorIPS({ onIrAPaciente }) {
+export default function FormulaMedica({ onIrAPaciente }) {
   // Fechas locales (toISOString usa UTC: de noche en Colombia daría el día siguiente)
   const fechaLocal = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -170,10 +170,10 @@ export default function SimuladorIPS({ onIrAPaciente }) {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Tarjeta principal idéntica al Wireframe de la página 26 */}
       <div className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
-        <div className="bg-neutral-600 text-white px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-bold tracking-wide">Simulador de IPS - Doctor</h2>
-          <span className="text-xs bg-neutral-700 px-3 py-1 rounded-full text-neutral-200">
-            Endpoint: POST /api/simulador/formulas
+        <div className="bg-indigo-900 text-white px-6 py-4 flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-xl font-bold tracking-wide">Nueva fórmula médica</h2>
+          <span className="text-xs bg-indigo-800 px-3 py-1 rounded-full text-indigo-100">
+            Se envía a la farmacia por Mediconect
           </span>
         </div>
 
@@ -209,7 +209,7 @@ export default function SimuladorIPS({ onIrAPaciente }) {
                   onClick={() => onIrAPaciente(exito.codigo, exito.documento)}
                   className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold px-4 py-2 rounded-lg shrink-0 transition cursor-pointer"
                 >
-                  Probar en Vista del Paciente →
+                  Ver como paciente en Mediconect ↗
                 </button>
               )}
             </div>
@@ -447,7 +447,7 @@ export default function SimuladorIPS({ onIrAPaciente }) {
                         onClick={() => onIrAPaciente(f.codigo, f.paciente_documento)}
                         className="text-xs bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded font-semibold cursor-pointer"
                       >
-                        Abrir como Paciente
+                        Ver en Mediconect ↗
                       </button>
                     )}
                   </td>

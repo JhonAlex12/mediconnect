@@ -5,7 +5,8 @@ import {
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Aviso, claseCampo } from '../farmacia/comunes';
-import Encabezado, { useTitulo } from '../Encabezado';
+import { useTitulo } from '../Encabezado';
+import SitioPublico, { TituloPagina } from '../SitioPublico';
 
 // El turno del paciente vive en su teléfono: se guarda su token aparte del de los empleados
 const CLAVE_TURNO = 'mediconect_token_turno';
@@ -48,15 +49,17 @@ const fechaLarga = (iso) => {
 };
 const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }) : '—');
 
-// Página pensada primero para el celular: una sola columna angosta
+// Página del sitio, con el contenido en una columna angosta pensada para el celular
 function PaginaPaciente({ children }) {
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      <Encabezado seccion="Tu turno en la farmacia" ancho="max-w-lg" />
-      <main className="flex-1 w-full max-w-lg mx-auto px-4 py-6">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-5">{children}</div>
-      </main>
-    </div>
+    <SitioPublico>
+      <TituloPagina titulo="Mi turno" descripcion="Consulta tu fórmula, pide tu turno virtual y síguelo en vivo." />
+      <div className="bg-slate-50 py-8">
+        <div className="max-w-lg mx-auto px-4">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-5">{children}</div>
+        </div>
+      </div>
+    </SitioPublico>
   );
 }
 

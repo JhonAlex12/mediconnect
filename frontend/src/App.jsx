@@ -1,10 +1,8 @@
-import React from 'react';
-import { Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
-import SimuladorIPS from './components/SimuladorIPS';
+import React, { useEffect } from 'react';
+import { Route, Routes, useSearchParams } from 'react-router-dom';
 import PanelFarmacia from './components/farmacia/PanelFarmacia';
 import VistaPaciente from './components/paciente/VistaPaciente';
 import PantallaPublica from './components/pantalla/PantallaPublica';
-import Encabezado, { useTitulo } from './components/Encabezado';
 import { SesionProvider } from './lib/sesion';
 import Inicio from './paginas/Inicio';
 import NoEncontrada from './paginas/NoEncontrada';
@@ -24,7 +22,8 @@ export default function App() {
         }
       />
       <Route path="/pantalla" element={<PantallaPublica />} />
-      <Route path="/ips" element={<PaginaIps />} />
+      {/* El sistema de la IPS es otra aplicación (ips/index.html): no se enlaza desde el sitio */}
+      <Route path="/ips" element={<IrA destino="/ips/" />} />
       <Route path="*" element={<NoEncontrada />} />
     </Routes>
   );
@@ -38,17 +37,10 @@ function PaginaPaciente() {
   return <VistaPaciente key={`${codigo}|${documento}`} codigoInicial={codigo} documentoInicial={documento} />;
 }
 
-function PaginaIps() {
-  useTitulo('Simulador de IPS');
-  const navigate = useNavigate();
-  const irAPaciente = (codigo, documento) =>
-    navigate(`/paciente?${new URLSearchParams({ codigo, documento })}`);
-  return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      <Encabezado seccion="Simulador de IPS (médico)" />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
-        <SimuladorIPS onIrAPaciente={irAPaciente} />
-      </main>
-    </div>
-  );
+// Carga completa del navegador hacia otra aplicación
+function IrA({ destino }) {
+  useEffect(() => {
+    window.location.replace(destino);
+  }, [destino]);
+  return null;
 }
