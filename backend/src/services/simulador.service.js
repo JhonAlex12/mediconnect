@@ -25,6 +25,7 @@ export async function siguienteCodigo() {
 export async function formulasRecientes() {
   const { rows } = await pool.query(
     `SELECT f.id, f.codigo, f.fecha_emision, f.fecha_limite, f.origen,
+            f.regimen, f.exencion, f.cuota_moderadora,
             p.nombre AS paciente_nombre, p.documento AS paciente_documento,
             COALESCE(json_agg(json_build_object(
               'medicamento_nombre', m.nombre,
@@ -42,13 +43,19 @@ export async function formulasRecientes() {
 }
 
 // Emite una fórmula como lo haría la IPS: el código lo asigna el sistema
-export async function emitirFormula({ documento, nombre, fecha_emision, fecha_limite, medicamentos }) {
+export async function emitirFormula({
+  documento, nombre, fecha_emision, fecha_limite, medicamentos, regimen, rango_ingreso, eps, exencion,
+}) {
   const datos = {
     documento: typeof documento === 'string' ? documento.trim() : documento,
     nombre,
     fecha_emision,
     fecha_limite,
     medicamentos,
+    regimen,
+    rango_ingreso: rango_ingreso || null,
+    eps: eps || null,
+    exencion: exencion || null,
     origen: 'simulador',
   };
 

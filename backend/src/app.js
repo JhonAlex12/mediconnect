@@ -14,6 +14,7 @@ import filaRoutes from './routes/fila.routes.js';
 import { ErrorNegocio } from './services/formulas.service.js';
 import reportesRoutes from './routes/reportes.routes.js';
 import usuariosRoutes from './routes/usuarios.routes.js';
+import tarifasRoutes from './routes/tarifas.routes.js';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use('/api/inventario', inventarioRoutes);
 app.use('/api/dispensacion', dispensacionRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/tarifas', tarifasRoutes);
 // Estado inicial de la pantalla pública (sin login; luego se actualiza por Socket.IO)
 app.get('/api/pantalla', async (req, res, next) => {
   try {

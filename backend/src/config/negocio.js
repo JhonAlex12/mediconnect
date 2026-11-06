@@ -32,3 +32,17 @@ export const MINUTOS_VENCE_PAUSA = 30;
 
 // Cada cuánto corren las tareas automáticas (cron con segundos: cada 30 s)
 export const CRON_MANTENIMIENTO = '*/30 * * * * *';
+
+// ---------- Cobro de la cuota moderadora ----------
+export const REGIMENES = ['contributivo', 'subsidiado'];
+export const RANGOS_INGRESO = ['A', 'B', 'C'];   // A < 2 SMLMV, B 2 a 5, C > 5
+
+// Casos en los que no se cobra (texto que ve el paciente y el auxiliar)
+export const EXENCIONES = {
+  promocion_prevencion: 'Programa de promoción y prevención',
+  control_prenatal: 'Control prenatal',
+  alto_costo: 'Enfermedad de alto costo',
+  urgencia: 'Urgencia',
+};
+
+export const MEDIOS_PAGO = ['efectivo', 'transferencia', 'datafono'];

@@ -19,6 +19,12 @@ export default function FormulaMedica({ onIrAPaciente }) {
   const [fechaLimite, setFechaLimite] = useState(enQuinceDiasStr);
   const [items, setItems] = useState([]);
 
+  // Afiliación del paciente: define la cuota moderadora que paga al reclamar
+  const [regimen, setRegimen] = useState('contributivo');
+  const [rangoIngreso, setRangoIngreso] = useState('A');
+  const [eps, setEps] = useState('Nueva EPS');
+  const [exencion, setExencion] = useState('');
+
   // Controles para agregar medicamento a la tabla
   const [medSeleccionado, setMedSeleccionado] = useState('');
   const [cantidadSeleccionada, setCantidadSeleccionada] = useState(30);
@@ -138,6 +144,10 @@ export default function FormulaMedica({ onIrAPaciente }) {
           nombre,
           fecha_emision: fechaEmision,
           fecha_limite: fechaLimite,
+          regimen,
+          rango_ingreso: regimen === 'contributivo' ? rangoIngreso : null,
+          eps: eps.trim() || null,
+          exencion: exencion || null,
           medicamentos: items.map((i) => ({
             medicamento_id: i.medicamento_id,
             cantidad: i.cantidad
@@ -154,6 +164,7 @@ export default function FormulaMedica({ onIrAPaciente }) {
           codigo: data.formula.codigo,
           documento: documento,
           nombre: nombre,
+          cuota: data.formula.cuota_moderadora,
           mensaje: `Fórmula ${data.formula.codigo} registrada con ${data.formula.medicamentos} medicamento(s).`
         });
         setSiguienteCodigo(data.siguiente_codigo);
@@ -200,6 +211,10 @@ export default function FormulaMedica({ onIrAPaciente }) {
                   </p>
                   <p className="text-sm text-emerald-800">
                     Paciente: {exito.nombre} (Doc: {exito.documento})
+                  </p>
+                  <p className="text-sm text-emerald-800">
+                    Cuota moderadora al reclamar:{' '}
+                    <strong>{exito.cuota > 0 ? `$${exito.cuota.toLocaleString('es-CO')}` : 'sin costo'}</strong>
                   </p>
                 </div>
               </div>
@@ -270,6 +285,45 @@ export default function FormulaMedica({ onIrAPaciente }) {
               />
             </div>
           </div>
+
+          {/* Afiliación: régimen, rango de ingreso (IBC), EPS y exención */}
+          <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <legend className="sr-only">Afiliación del paciente</legend>
+            <div>
+              <label htmlFor="ips-regimen" className="block text-sm font-bold text-slate-800 mb-2">Régimen</label>
+              <select id="ips-regimen" value={regimen} onChange={(e) => setRegimen(e.target.value)} className="w-full border border-slate-400 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-slate-600">
+                <option value="contributivo">Contributivo</option>
+                <option value="subsidiado">Subsidiado</option>
+              </select>
+            </div>
+            {regimen === 'contributivo' ? (
+              <div>
+                <label htmlFor="ips-rango" className="block text-sm font-bold text-slate-800 mb-2">Rango de ingreso (IBC)</label>
+                <select id="ips-rango" value={rangoIngreso} onChange={(e) => setRangoIngreso(e.target.value)} className="w-full border border-slate-400 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-slate-600">
+                  <option value="A">A · menos de 2 salarios mínimos</option>
+                  <option value="B">B · entre 2 y 5 salarios mínimos</option>
+                  <option value="C">C · más de 5 salarios mínimos</option>
+                </select>
+              </div>
+            ) : (
+              <p className="self-end text-sm text-slate-600 pb-3">El régimen subsidiado no paga cuota moderadora.</p>
+            )}
+            <div>
+              <label htmlFor="ips-eps" className="block text-sm font-bold text-slate-800 mb-2">EPS</label>
+              <input id="ips-eps" type="text" value={eps} maxLength={80} onChange={(e) => setEps(e.target.value)}
+                placeholder="Nombre de la EPS" className="w-full border border-slate-400 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-slate-600" />
+            </div>
+            <div>
+              <label htmlFor="ips-exencion" className="block text-sm font-bold text-slate-800 mb-2">Exención de pago</label>
+              <select id="ips-exencion" value={exencion} onChange={(e) => setExencion(e.target.value)} className="w-full border border-slate-400 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-slate-600">
+                <option value="">Ninguna</option>
+                <option value="promocion_prevencion">Promoción y prevención</option>
+                <option value="control_prenatal">Control prenatal</option>
+                <option value="alto_costo">Alto costo (cáncer, VIH…)</option>
+                <option value="urgencia">Urgencia</option>
+              </select>
+            </div>
+          </fieldset>
 
           {/* Tabla de Medicamentos (Wireframe pág. 26) */}
           <div>

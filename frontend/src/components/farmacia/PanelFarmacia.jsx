@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { BarChart3, ListOrdered, LogOut, Package, UserCircle2, Users } from 'lucide-react';
+import { BarChart3, ListOrdered, LogOut, Package, UserCircle2, Users, Wallet } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 import { TiempoRealProvider } from '../../lib/tiempoReal';
 import Encabezado, { useTitulo } from '../Encabezado';
@@ -9,6 +9,7 @@ import FilaFarmacia from './FilaFarmacia';
 import InventarioFarmacia from './InventarioFarmacia';
 import ReportesFarmacia from './ReportesFarmacia';
 import UsuariosFarmacia from './UsuariosFarmacia';
+import TarifasFarmacia from './TarifasFarmacia';
 
 const ROLES = { auxiliar: 'Auxiliar', administrador: 'Administrador' };
 
@@ -19,6 +20,7 @@ const SECCIONES = [
   // Reportes y usuarios: solo administradores (el backend también lo exige)
   { ruta: 'reportes', texto: 'Reportes', icono: BarChart3, componente: ReportesFarmacia, soloAdmin: true },
   { ruta: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
+  { ruta: 'tarifas', texto: 'Tarifas', icono: Wallet, componente: TarifasFarmacia, soloAdmin: true },
 ];
 
 function Seccion({ titulo, componente: Componente }) {

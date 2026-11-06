@@ -1,12 +1,47 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import {
-  AlertTriangle, Bell, CalendarClock, CheckCircle2, Clock, MapPin, Navigation, Search, Timer, XCircle,
+  AlertTriangle, Bell, CalendarClock, CheckCircle2, Clock, MapPin, Navigation, Search, Timer, Wallet, XCircle,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Aviso, claseCampo } from '../farmacia/comunes';
 import { useTitulo } from '../Encabezado';
 import SitioPublico, { TituloPagina } from '../SitioPublico';
+
+const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
+
+// Cuánto paga el paciente al reclamar (cuota moderadora)
+function CobroFormula({ cobro }) {
+  if (!cobro) return null;
+  if (cobro.valor > 0 && cobro.pagado) {
+    return (
+      <p className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+        <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-700" />
+        Ya pagaste la cuota moderadora de esta fórmula ({pesos(cobro.valor)}). Lo pendiente no tiene costo.
+      </p>
+    );
+  }
+  if (cobro.valor > 0) {
+    return (
+      <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+        <Wallet className="w-5 h-5 shrink-0 text-marca-azul mt-0.5" />
+        <div>
+          <p className="font-bold text-marca-noche">Valor a pagar al reclamar: {pesos(cobro.valor)}</p>
+          <p className="text-sm text-slate-600">
+            Cuota moderadora. Se paga una sola vez en la ventanilla, en efectivo, transferencia o tarjeta.
+            Sin el pago no se pueden entregar los medicamentos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <p className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-900">
+      <CheckCircle2 className="w-5 h-5 shrink-0" />
+      Sin costo. {cobro.motivo}.
+    </p>
+  );
+}
 
 // El turno del paciente vive en su teléfono: se guarda su token aparte del de los empleados
 const CLAVE_TURNO = 'mediconect_token_turno';
@@ -203,6 +238,8 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
             })}
           </ul>
 
+          {!formula.vencida && pendientes.length > 0 && <CobroFormula cobro={formula.cobro} />}
+
           {!formula.vencida && pendientes.length > 0 && (
             avisosTurno ? (
               <div className="space-y-3 bg-amber-50 border border-amber-300 rounded-xl p-4">
@@ -365,6 +402,9 @@ function MiTurno({ token, alSalir }) {
             <Dato icono={Clock} etiqueta="Llega antes de" valor={hora(turno.vence_turno)} />
           )}
           <Dato icono={CalendarClock} etiqueta="Reclamar hasta" valor={fechaLarga(turno.reclamar_hasta)} />
+          {turno.valor_a_pagar > 0 && (
+            <Dato icono={Wallet} etiqueta="Lleva para pagar" valor={pesos(turno.valor_a_pagar)} />
+          )}
         </dl>
       )}
 

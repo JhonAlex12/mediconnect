@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { ZONA_HORARIA, DIAS_ALERTA } from '../config/negocio.js';
 import { ErrorNegocio } from './formulas.service.js';
+import { describirCobro } from './cobros.service.js';
 
 // Calcula el estado de un medicamento según las reglas del negocio:
 //   agotado        → stock = 0                                       (RN-04)
@@ -26,6 +27,9 @@ export async function consultarFormula(codigo, documento) {
   // Busca la fórmula solo si el código y el documento coinciden
   const { rows: [formula] } = await pool.query(
     `SELECT f.id, f.codigo, f.fecha_emision, f.fecha_limite,
+            f.regimen, f.rango_ingreso, f.eps, f.exencion, f.cuota_moderadora,
+            (SELECT json_build_object('valor', pg.valor, 'fecha', pg.fecha)
+               FROM pagos pg WHERE pg.formula_id = f.id) AS pago,
             p.id AS paciente_id, p.nombre,
             (f.fecha_limite - (now() AT TIME ZONE $3)::date) AS dias_restantes
        FROM formulas f
@@ -96,6 +100,7 @@ export async function consultarFormula(codigo, documento) {
     dias_restantes: dias,
     vencida: dias < 0,
     alerta: dias >= 0 && dias <= DIAS_ALERTA,
+    cobro: describirCobro(formula, formula.pago),
     medicamentos,
   };
 }

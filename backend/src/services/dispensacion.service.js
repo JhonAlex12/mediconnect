@@ -2,6 +2,7 @@ import { pool } from '../db/pool.js';
 import { ErrorNegocio } from './formulas.service.js';
 import { registrarAcceso } from './auditoria.service.js';
 import { conAvisoDeCambios } from './inventario.service.js';
+import { describirCobro, validarPago, registrarPago } from './cobros.service.js';
 
 const ESTADOS_DISPENSABLES = ['llamado', 'presente'];
 
@@ -24,7 +25,10 @@ async function reservadoPorOtros(cliente, medicamentoIds, turnoId) {
 export async function verParaDispensar(turnoId) {
   const { rows: [t] } = await pool.query(
     `SELECT t.id, t.numero, t.estado, t.formula_id,
-            p.nombre AS paciente, p.documento, f.codigo AS formula, f.fecha_limite
+            p.nombre AS paciente, p.documento, f.codigo AS formula, f.fecha_limite,
+            f.regimen, f.rango_ingreso, f.eps, f.exencion, f.cuota_moderadora,
+            (SELECT json_build_object('valor', pg.valor, 'medio', pg.medio, 'fecha', pg.fecha)
+               FROM pagos pg WHERE pg.formula_id = f.id) AS pago
        FROM turnos t
        LEFT JOIN pacientes p ON p.id = t.paciente_id
        LEFT JOIN formulas f ON f.id = t.formula_id
@@ -47,9 +51,10 @@ export async function verParaDispensar(turnoId) {
   );
   const otros = await reservadoPorOtros(pool, items.map((i) => i.medicamento_id), t.id);
 
-  const { formula_id, ...turno } = t;
+  const { formula_id, regimen, rango_ingreso, eps, exencion, cuota_moderadora, pago, ...turno } = t;
   return {
     turno,
+    cobro: describirCobro(t, pago),
     puede_dispensar: ESTADOS_DISPENSABLES.includes(t.estado),
     medicamentos: items.map((i) => ({
       ...i,
@@ -62,7 +67,7 @@ export async function verParaDispensar(turnoId) {
 // ============================================================
 // DISPENSAR (CU-07 pasos 3 a 7)
 // ============================================================
-export async function dispensar(turnoId, { items, delegado } = {}, empleado) {
+export async function dispensar(turnoId, { items, delegado, pago } = {}, empleado) {
   // Validación de lo que se quiere entregar
   if (!Array.isArray(items) || items.length === 0) {
     throw new ErrorNegocio('Indica al menos un medicamento a entregar', 400);
@@ -105,6 +110,16 @@ export async function dispensar(turnoId, { items, delegado } = {}, empleado) {
     }
     if (!t.formula_id) throw new ErrorNegocio('Este turno no tiene una fórmula vinculada', 400);
 
+    // Cuota moderadora: no se entrega sin pago. Se cobra una sola vez por fórmula;
+    // la fila de la fórmula se bloquea para que dos ventanillas no cobren dos veces.
+    const { rows: [f] } = await cliente.query(
+      `SELECT f.cuota_moderadora, EXISTS (SELECT 1 FROM pagos WHERE formula_id = f.id) AS pagada
+         FROM formulas f WHERE f.id = $1 FOR UPDATE`,
+      [t.formula_id]
+    );
+    const debeCobrar = f.cuota_moderadora > 0 && !f.pagada;
+    if (debeCobrar) validarPago(pago, f.cuota_moderadora);
+
     // Bloquea los ítems de la fórmula y sus medicamentos
     const { rows: filas } = await cliente.query(
       `SELECT fi.id, fi.medicamento_id, (fi.cantidad_formulada - fi.cantidad_entregada) AS pendiente,
@@ -136,6 +151,12 @@ export async function dispensar(turnoId, { items, delegado } = {}, empleado) {
     }
 
     const medicamentoIds = items.map((it) => porItem.get(it.formula_item_id).medicamento_id);
+
+    const pagoRegistrado = debeCobrar
+      ? await registrarPago(cliente, {
+          formulaId: t.formula_id, turnoId: t.id, valor: f.cuota_moderadora, pago, empleado,
+        })
+      : null;
 
     const { turnosAvisados } = await conAvisoDeCambios(cliente, medicamentoIds, async () => {
       for (const it of items) {
@@ -200,13 +221,14 @@ export async function dispensar(turnoId, { items, delegado } = {}, empleado) {
         usuarioId: empleado.id,
         pacienteId: t.paciente_id,
         accion: 'dispensar',
-        detalle: `${t.numero}${delegado ? ' (delegado)' : ''}`,
+        detalle: `${t.numero}${delegado ? ' (delegado)' : ''}`
+          + (pagoRegistrado ? ` · cobro $${pagoRegistrado.valor} (${pagoRegistrado.medio})` : ''),
       },
       cliente
     );
 
     await cliente.query('COMMIT');
-    return { turno: t.numero, pendientes, turnosAvisados };
+    return { turno: t.numero, pendientes, pago: pagoRegistrado, turnosAvisados };
   } catch (error) {
     await cliente.query('ROLLBACK');
     throw error;

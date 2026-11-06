@@ -167,3 +167,51 @@ ALTER TABLE turnos ADD COLUMN IF NOT EXISTS orden TIMESTAMPTZ;
 UPDATE turnos SET orden = hora_toma WHERE orden IS NULL;
 ALTER TABLE turnos ALTER COLUMN orden SET DEFAULT now();
 ALTER TABLE turnos ALTER COLUMN orden SET NOT NULL;
+
+-- ============================================================
+-- Cobro de la cuota moderadora en ventanilla
+-- (el copago por porcentaje queda para una etapa posterior)
+-- ============================================================
+
+-- Valor de la cuota moderadora por año y rango de ingreso (IBC):
+--   A = menos de 2 SMLMV, B = entre 2 y 5, C = más de 5.
+-- La edita el administrador; no está fija en el código.
+CREATE TABLE IF NOT EXISTS tarifas_cuota_moderadora (
+  anio   INTEGER NOT NULL CHECK (anio BETWEEN 2000 AND 2100),
+  rango  CHAR(1) NOT NULL CHECK (rango IN ('A', 'B', 'C')),
+  valor  INTEGER NOT NULL CHECK (valor >= 0),
+  PRIMARY KEY (anio, rango)
+);
+
+-- Valores iniciales 2026 (verificar contra la circular oficial y ajustar desde el panel)
+INSERT INTO tarifas_cuota_moderadora (anio, rango, valor) VALUES
+  (2026, 'A', 5000), (2026, 'B', 20100), (2026, 'C', 52800)
+ON CONFLICT (anio, rango) DO NOTHING;
+
+-- Datos de afiliación que envía la IPS con la fórmula.
+-- regimen es nulo en fórmulas anteriores a este cambio (no se les cobra).
+ALTER TABLE formulas ADD COLUMN IF NOT EXISTS regimen VARCHAR(15)
+  CHECK (regimen IN ('contributivo', 'subsidiado'));
+ALTER TABLE formulas ADD COLUMN IF NOT EXISTS rango_ingreso CHAR(1)
+  CHECK (rango_ingreso IN ('A', 'B', 'C'));
+ALTER TABLE formulas ADD COLUMN IF NOT EXISTS eps VARCHAR(80);
+ALTER TABLE formulas ADD COLUMN IF NOT EXISTS exencion VARCHAR(30)
+  CHECK (exencion IN ('promocion_prevencion', 'control_prenatal', 'alto_costo', 'urgencia'));
+-- Valor calculado al recibir la fórmula: no cambia aunque después cambie la tarifa
+ALTER TABLE formulas ADD COLUMN IF NOT EXISTS cuota_moderadora INTEGER NOT NULL DEFAULT 0
+  CHECK (cuota_moderadora >= 0);
+
+-- PAGOS: la cuota se cobra una sola vez por fórmula (UNIQUE), en la primera entrega.
+-- Si después vuelve por lo pendiente, no paga de nuevo.
+CREATE TABLE IF NOT EXISTS pagos (
+  id          SERIAL PRIMARY KEY,
+  formula_id  INTEGER     NOT NULL UNIQUE REFERENCES formulas(id),
+  turno_id    INTEGER     NOT NULL REFERENCES turnos(id),
+  valor       INTEGER     NOT NULL CHECK (valor > 0),
+  medio       VARCHAR(20) NOT NULL CHECK (medio IN ('efectivo', 'transferencia', 'datafono')),
+  recibido    INTEGER     CHECK (recibido IS NULL OR recibido >= valor),  -- efectivo entregado por el paciente
+  referencia  VARCHAR(40),                                                -- n.º de transferencia o voucher
+  usuario_id  INTEGER     NOT NULL REFERENCES usuarios_farmacia(id),
+  fecha       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_pagos_fecha ON pagos (fecha);

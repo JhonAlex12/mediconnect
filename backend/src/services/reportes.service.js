@@ -58,6 +58,19 @@ const REPORTES = {
      WHERE t.fecha BETWEEN $1 AND $2
      GROUP BY t.fecha
      ORDER BY t.fecha`,
+
+  // Cierre de caja: lo recaudado por día, auxiliar y medio de pago
+  caja: `
+    SELECT (pg.fecha AT TIME ZONE '${ZONA_HORARIA}')::date AS fecha,
+           u.nombre AS auxiliar,
+           pg.medio,
+           COUNT(*)::int AS pagos,
+           SUM(pg.valor)::int AS total
+      FROM pagos pg
+      JOIN usuarios_farmacia u ON u.id = pg.usuario_id
+     WHERE (pg.fecha AT TIME ZONE '${ZONA_HORARIA}')::date BETWEEN $1 AND $2
+     GROUP BY 1, u.id, pg.medio
+     ORDER BY 1 DESC, u.nombre, pg.medio`,
 };
 
 export async function generarReporte(tipo, { desde, hasta } = {}, empleado) {
@@ -89,6 +102,23 @@ export async function generarReporte(tipo, { desde, hasta } = {}, empleado) {
       [FALTAS_CONFIRMACION]
     );
     resultado.pacientes_con_faltas_seguidas = p.total;
+  }
+
+  // En la caja se agrega el total del periodo y cuántas fórmulas se entregaron sin cobro
+  if (tipo === 'caja') {
+    const { rows: [c] } = await pool.query(
+      `SELECT
+         (SELECT COALESCE(SUM(valor), 0)::int FROM pagos
+           WHERE (fecha AT TIME ZONE '${ZONA_HORARIA}')::date BETWEEN $1 AND $2) AS total_recaudado,
+         (SELECT COUNT(DISTINCT fi.formula_id)::int
+            FROM dispensaciones d
+            JOIN formula_items fi ON fi.id = d.formula_item_id
+            JOIN formulas f ON f.id = fi.formula_id
+           WHERE f.regimen IS NOT NULL AND f.cuota_moderadora = 0
+             AND (d.fecha AT TIME ZONE '${ZONA_HORARIA}')::date BETWEEN $1 AND $2) AS formulas_sin_cobro`,
+      [r.desde, r.hasta]
+    );
+    Object.assign(resultado, c);
   }
 
   await registrarAcceso({ usuarioId: empleado.id, accion: 'consultar_reporte', detalle: tipo });

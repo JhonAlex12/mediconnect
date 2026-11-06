@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ClipboardCheck, UserCheck, X } from 'lucide-react';
+import { ClipboardCheck, UserCheck, Wallet, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useEventoEnVivo } from '../../lib/tiempoReal';
 import { BotonAccion, claseCampo } from './comunes';
@@ -11,6 +11,14 @@ const fechaLarga = (iso) => {
   return new Date(a, m - 1, d).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });
 };
 
+const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
+
+const MEDIOS = [
+  ['efectivo', 'Efectivo'],
+  ['transferencia', 'Transferencia'],
+  ['datafono', 'Tarjeta (datáfono)'],
+];
+
 // Entrega de los medicamentos de un turno en ventanilla (CU-07)
 export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
   const [datos, setDatos] = useState(null);
@@ -18,6 +26,10 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
   const [cantidades, setCantidades] = useState({}); // formula_item_id → texto del campo
   const [conDelegado, setConDelegado] = useState(false);
   const [delegado, setDelegado] = useState({ nombre: '', documento: '' });
+  // Cobro de la cuota moderadora: no se entrega sin pago
+  const [medio, setMedio] = useState('efectivo');
+  const [recibido, setRecibido] = useState('');
+  const [referencia, setReferencia] = useState('');
 
   const cargar = useCallback(async () => {
     try {
@@ -72,18 +84,35 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
   const totalEntrega = items.reduce((s, it) => s + it.cantidad, 0);
   const parcial = totalEntrega < totalPendiente;
 
+  const cobro = datos.cobro;
+  const debeCobrar = cobro?.pendiente_pago;
+  const recibidoNum = Number(recibido);
+  const cambio = medio === 'efectivo' && Number.isInteger(recibidoNum) && recibidoNum >= (cobro?.valor ?? 0)
+    ? recibidoNum - cobro.valor
+    : null;
+  const pagoValido = !debeCobrar
+    || (medio === 'efectivo' ? cambio !== null && recibido !== '' : referencia.trim().length >= 3);
+
   const enviar = async (e) => {
     e.preventDefault();
     const cuerpo = {
       items,
       delegado: conDelegado ? { nombre: delegado.nombre.trim(), documento: delegado.documento.trim() } : undefined,
+      pago: debeCobrar
+        ? medio === 'efectivo'
+          ? { medio, recibido: recibidoNum }
+          : { medio, referencia: referencia.trim() }
+        : undefined,
     };
+    const textoPago = (r) =>
+      r.pago ? ` · Cobrado ${pesos(r.pago.valor)}${r.pago.cambio ? `, cambio ${pesos(r.pago.cambio)}` : ''}` : '';
     const ok = await ejecutar(
       () => api(`/dispensacion/${turno.id}`, { metodo: 'POST', cuerpo }),
       (r) =>
-        r.pendientes.length === 0
+        (r.pendientes.length === 0
           ? `Turno ${r.turno}: entrega completa`
-          : `Turno ${r.turno}: entrega parcial. Pendiente: ${r.pendientes.map((p) => `${p.nombre} (${p.cantidad})`).join(', ')}`
+          : `Turno ${r.turno}: entrega parcial. Pendiente: ${r.pendientes.map((p) => `${p.nombre} (${p.cantidad})`).join(', ')}`)
+        + textoPago(r)
     );
     if (ok) alCerrar();
   };
@@ -190,6 +219,62 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
           )}
         </div>
 
+        {/* Cuota moderadora: se cobra una sola vez por fórmula, antes de entregar */}
+        {cobro && !nadaEntregable && (
+          debeCobrar ? (
+            <fieldset className="border-2 border-marca-azul/40 bg-blue-50/60 rounded-lg p-4 space-y-3">
+              <legend className="px-1 flex items-center gap-2 font-bold text-marca-noche">
+                <Wallet className="w-5 h-5 text-marca-azul" />
+                Cobrar cuota moderadora: {pesos(cobro.valor)}
+              </legend>
+              <p className="text-sm text-slate-600">
+                {cobro.motivo}{cobro.eps ? ` · ${cobro.eps}` : ''}. Sin el pago no se puede entregar.
+              </p>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Medio de pago">
+                {MEDIOS.map(([valor, texto]) => (
+                  <label key={valor}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-semibold cursor-pointer ${
+                      medio === valor ? 'bg-marca-azul text-white border-marca-azul' : 'bg-white border-slate-300 text-slate-700'
+                    }`}>
+                    <input type="radio" name="medio-pago" value={valor} checked={medio === valor}
+                      onChange={() => setMedio(valor)} className="sr-only" />
+                    {texto}
+                  </label>
+                ))}
+              </div>
+              {medio === 'efectivo' ? (
+                <div className="grid sm:grid-cols-2 gap-3 items-end">
+                  <div>
+                    <label htmlFor="pago-recibido" className="block text-sm font-bold text-slate-800 mb-1">Efectivo recibido</label>
+                    <input id="pago-recibido" type="number" min={cobro.valor} step={50} inputMode="numeric"
+                      value={recibido} onChange={(e) => setRecibido(e.target.value)}
+                      placeholder={String(cobro.valor)} className={claseCampo} />
+                  </div>
+                  <p className={`text-sm pb-2 ${cambio === null && recibido !== '' ? 'text-red-700 font-semibold' : 'text-slate-700'}`}>
+                    {recibido === ''
+                      ? 'Escribe cuánto entregó el paciente.'
+                      : cambio === null
+                        ? `Falta dinero: mínimo ${pesos(cobro.valor)}.`
+                        : <>Cambio a devolver: <strong className="text-lg text-slate-900">{pesos(cambio)}</strong></>}
+                  </p>
+                </div>
+              ) : (
+                <div className="sm:w-1/2">
+                  <label htmlFor="pago-referencia" className="block text-sm font-bold text-slate-800 mb-1">
+                    {medio === 'transferencia' ? 'Número de la transferencia' : 'Número del voucher'}
+                  </label>
+                  <input id="pago-referencia" value={referencia} maxLength={40}
+                    onChange={(e) => setReferencia(e.target.value)} className={claseCampo} />
+                </div>
+              )}
+            </fieldset>
+          ) : (
+            <p className="text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg p-3">
+              {cobro.valor > 0 ? `Cuota moderadora ya pagada (${pesos(cobro.valor)}). No se cobra de nuevo.` : `Sin cobro: ${cobro.motivo}.`}
+            </p>
+          )
+        )}
+
         {nadaEntregable ? (
           <p className="text-amber-900 bg-amber-50 border border-amber-300 rounded-lg p-3 text-sm">
             No hay nada que entregar ahora. Si el paciente se va sin medicamentos, cierra este panel y márcalo como atendido.
@@ -207,9 +292,9 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
               type="submit"
               color="verde"
               icono={ClipboardCheck}
-              ocupado={ocupado || !datos.puede_dispensar || items.length === 0 || invalidas || !delegadoValido}
+              ocupado={ocupado || !datos.puede_dispensar || items.length === 0 || invalidas || !delegadoValido || !pagoValido}
             >
-              Entregar y cerrar turno
+              {debeCobrar ? 'Cobrar, entregar y cerrar turno' : 'Entregar y cerrar turno'}
             </BotonAccion>
           </div>
         )}

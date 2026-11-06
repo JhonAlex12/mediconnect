@@ -11,6 +11,8 @@ const fechaCorta = (iso) => {
 };
 
 const dosDigitos = (n) => String(n).padStart(2, '0');
+const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
+const MEDIOS = { efectivo: 'Efectivo', transferencia: 'Transferencia', datafono: 'Tarjeta (datáfono)' };
 
 // Cada reporte: qué mide y cómo se muestran sus columnas
 const REPORTES = {
@@ -51,6 +53,17 @@ const REPORTES = {
       { clave: 'atendidos', texto: 'Atendidos', numero: true },
       { clave: 'cancelados', texto: 'Cancelados', numero: true },
       { clave: 'no_presentados', texto: 'No se presentó', numero: true },
+    ],
+  },
+  caja: {
+    titulo: 'Cierre de caja',
+    descripcion: 'Cuotas moderadoras cobradas por día, auxiliar y medio de pago.',
+    columnas: [
+      { clave: 'fecha', texto: 'Fecha', valor: (f) => fechaCorta(f.fecha) },
+      { clave: 'auxiliar', texto: 'Auxiliar' },
+      { clave: 'medio', texto: 'Medio de pago', valor: (f) => MEDIOS[f.medio] ?? f.medio },
+      { clave: 'pagos', texto: 'Pagos', numero: true },
+      { clave: 'total', texto: 'Total', numero: true, valor: (f) => pesos(f.total) },
     ],
   },
 };
@@ -203,6 +216,13 @@ export default function ReportesFarmacia() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {vigente?.tipo === 'caja' && (
+          <div className="px-5 py-3 border-t border-slate-200 text-sm text-slate-700 flex flex-wrap gap-x-8 gap-y-1">
+            <p>Total recaudado: <strong className="text-base text-slate-900">{pesos(vigente.total_recaudado)}</strong></p>
+            <p>Fórmulas entregadas sin cobro (subsidiado o exentas): <strong>{vigente.formulas_sin_cobro}</strong></p>
           </div>
         )}
 

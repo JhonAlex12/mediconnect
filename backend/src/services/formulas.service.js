@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { validarAfiliacion, calcularCuota } from './cobros.service.js';
 
 // Error con código HTTP, para responder con el estado correcto (400, 409...)
 export class ErrorNegocio extends Error {
@@ -61,6 +62,9 @@ function validar(datos) {
     });
   }
 
+  // Régimen, rango de ingreso, EPS y exención: definen la cuota moderadora
+  errores.push(...validarAfiliacion(d));
+
   return errores;
 }
 
@@ -95,12 +99,18 @@ export async function crearFormula(datos) {
       [datos.documento, datos.nombre.trim(), datos.telefono ?? null]
     );
 
+    // Cuánto pagará el paciente al reclamar (queda fijo con la tarifa de hoy)
+    const rango = datos.regimen === 'contributivo' ? datos.rango_ingreso : null;
+    const cuota = await calcularCuota(cliente, { ...datos, rango_ingreso: rango });
+
     // Guarda la fórmula
     const { rows: [formula] } = await cliente.query(
-      `INSERT INTO formulas (codigo, paciente_id, fecha_emision, fecha_limite, origen)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, codigo, fecha_emision, fecha_limite, origen`,
-      [datos.codigo, paciente.id, datos.fecha_emision, datos.fecha_limite, datos.origen ?? 'ips']
+      `INSERT INTO formulas (codigo, paciente_id, fecha_emision, fecha_limite, origen,
+                             regimen, rango_ingreso, eps, exencion, cuota_moderadora)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING id, codigo, fecha_emision, fecha_limite, origen, regimen, cuota_moderadora`,
+      [datos.codigo, paciente.id, datos.fecha_emision, datos.fecha_limite, datos.origen ?? 'ips',
+       datos.regimen, rango, datos.eps?.trim() || null, datos.exencion ?? null, cuota]
     );
 
     // Guarda cada medicamento de la fórmula
