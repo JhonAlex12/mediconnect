@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import {
-  AlertTriangle, Bell, CalendarClock, CheckCircle2, Clock, MapPin, Navigation, Search, Timer, XCircle,
+  Bell, CalendarClock, CheckCircle2, Clock, MapPin, Navigation, Search, Ticket, Timer, XCircle,
 } from 'lucide-react';
 import { api } from '../../lib/api';
-import { Aviso, claseCampo } from '../farmacia/comunes';
+import { Aviso } from '../farmacia/comunes';
+import {
+  Aviso as AvisoBase, Boton, Campo, Cargando, Entrada, EstadoBadge, EstadoVacio, Selector,
+} from '../ui';
 import { useTitulo } from '../Encabezado';
 import SitioPublico, { TituloPagina } from '../SitioPublico';
 
@@ -34,11 +37,12 @@ const PRIORIDADES = {
   discapacidad: 'Persona con discapacidad',
 };
 
+// Estado del medicamento → tono con significado
 const ESTADO_MEDICAMENTO = {
-  disponible: { texto: 'Disponible', clase: 'bg-emerald-100 text-emerald-800' },
-  pocas_unidades: { texto: 'Pocas unidades', clase: 'bg-amber-100 text-amber-900' },
-  agotado: { texto: 'Agotado', clase: 'bg-red-100 text-red-800' },
-  entregado: { texto: 'Ya entregado', clase: 'bg-slate-200 text-slate-600' },
+  disponible: { texto: 'Disponible', tono: 'ok' },
+  pocas_unidades: { texto: 'Pocas unidades', tono: 'alerta' },
+  agotado: { texto: 'Agotado', tono: 'error' },
+  entregado: { texto: 'Ya entregado', tono: 'neutro' },
 };
 
 // "2026-11-30" → "30 de noviembre" (sin pasar por zonas horarias)
@@ -54,10 +58,8 @@ function PaginaPaciente({ children }) {
   return (
     <SitioPublico>
       <TituloPagina titulo="Mi turno" descripcion="Consulta tu fórmula, pide tu turno virtual y síguelo en vivo." />
-      <div className="bg-marca-hielo py-8">
-        <div className="max-w-lg mx-auto px-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-5">{children}</div>
-        </div>
+      <div className="bg-fondo py-6 sm:py-10">
+        <div className="max-w-lg mx-auto px-4 space-y-5">{children}</div>
       </div>
     </SitioPublico>
   );
@@ -141,106 +143,104 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
 
   return (
     <>
-      <form onSubmit={consultar} className="space-y-3">
-        <h2 className="text-lg font-bold text-slate-800">Consulta tu fórmula</h2>
+      <form onSubmit={consultar} className="bg-superficie border border-borde-fuerte rounded-md p-5 space-y-4">
         <div>
-          <label htmlFor="p-codigo" className="block text-sm font-bold text-slate-800 mb-1">Código de la fórmula</label>
-          <input id="p-codigo" value={codigo} onChange={(e) => setCodigo(e.target.value)} required
-            placeholder="F-2026-0001" className={`${claseCampo} uppercase`} />
+          <h2 className="text-xl font-bold text-tinta">Consulta tu fórmula</h2>
+          <p className="text-tinta-suave text-sm mt-0.5">Los datos están en la fórmula que te entregó tu médico.</p>
         </div>
-        <div>
-          <label htmlFor="p-documento" className="block text-sm font-bold text-slate-800 mb-1">Número de documento</label>
-          <input id="p-documento" value={documento} onChange={(e) => setDocumento(e.target.value)} required
-            inputMode="numeric" className={claseCampo} />
-        </div>
-        <button type="submit" disabled={ocupado}
-          className="w-full flex items-center justify-center gap-2 bg-marca-azul hover:bg-marca-azul-oscuro disabled:opacity-50 text-white font-bold py-3 rounded-xl transition cursor-pointer">
-          <Search className="w-5 h-5" />
+        <Campo id="p-codigo" etiqueta="Código de la fórmula" ayuda="Ejemplo: F-2026-0001">
+          <Entrada value={codigo} onChange={(e) => setCodigo(e.target.value)} required
+            className="h-12 text-lg uppercase cifras" autoComplete="off" />
+        </Campo>
+        <Campo id="p-documento" etiqueta="Número de documento">
+          <Entrada value={documento} onChange={(e) => setDocumento(e.target.value)} required
+            inputMode="numeric" className="h-12 text-lg cifras" autoComplete="off" />
+        </Campo>
+        <Boton type="submit" variante="primario" tamano="lg" icono={Search} disabled={ocupado} cargando={ocupado && !formula} ancho>
           Consultar
-        </button>
+        </Boton>
       </form>
 
-      {error && <Aviso aviso={{ tipo: 'error', texto: error }} />}
+      {error && <AvisoBase tono="error">{error}</AvisoBase>}
 
       {formula && (
-        <section className="space-y-4 border-t border-slate-200 pt-4">
-          <div>
-            <p className="text-sm text-slate-500">Fórmula {formula.codigo}</p>
-            <p className="text-lg font-bold text-slate-900">{formula.paciente}</p>
-            <p className="text-sm text-slate-600 flex items-center gap-1.5">
-              <CalendarClock className="w-4 h-4" />
-              Reclamar hasta el {fechaLarga(formula.fecha_limite)}
+        <section className="bg-superficie border border-borde-fuerte rounded-md" aria-labelledby="titulo-formula">
+          <div className="p-5 border-b border-borde space-y-1">
+            <p className="text-sm text-tinta-suave cifras">Fórmula {formula.codigo}</p>
+            <h2 id="titulo-formula" className="text-xl font-bold text-tinta">{formula.paciente}</h2>
+            <p className="text-tinta-suave flex items-center gap-1.5">
+              <CalendarClock size={16} aria-hidden="true" />
+              Reclamar hasta el <strong className="text-tinta">{fechaLarga(formula.fecha_limite)}</strong>
             </p>
           </div>
 
-          {formula.vencida ? (
-            <Aviso aviso={{ tipo: 'error', texto: 'Esta fórmula superó su fecha límite. Pide una nueva en tu IPS.' }} />
-          ) : formula.alerta && (
-            <p className="flex items-start gap-2 bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-3 text-sm">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              {formula.dias_restantes === 0
-                ? 'Hoy es el último día para reclamar.'
-                : `Te ${formula.dias_restantes === 1 ? 'queda 1 día' : `quedan ${formula.dias_restantes} días`} para reclamar.`}
-            </p>
-          )}
+          <div className="p-5 space-y-4">
+            {formula.vencida ? (
+              <AvisoBase tono="error" titulo="Fórmula vencida">Superó su fecha límite. Pide una nueva en tu IPS.</AvisoBase>
+            ) : formula.alerta && (
+              <AvisoBase tono="alerta" titulo="Fórmula por vencer">
+                {formula.dias_restantes === 0
+                  ? 'Hoy es el último día para reclamar.'
+                  : `Te ${formula.dias_restantes === 1 ? 'queda 1 día' : `quedan ${formula.dias_restantes} días`} para reclamar.`}
+              </AvisoBase>
+            )}
 
-          <ul className="divide-y divide-slate-200 border border-slate-200 rounded-xl">
-            {formula.medicamentos.map((m) => {
-              const e = ESTADO_MEDICAMENTO[m.estado] ?? ESTADO_MEDICAMENTO.disponible;
-              return (
-                <li key={m.medicamento_id} className="px-4 py-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-slate-900">{m.nombre}</p>
-                    <p className="text-sm text-slate-500">
-                      {m.presentacion} · {m.entrega_parcial
-                        ? `te faltan ${m.cantidad_pendiente} de ${m.cantidad_formulada}`
-                        : `${m.cantidad_formulada} unidades`}
-                    </p>
+            <ul className="divide-y divide-borde border border-borde rounded-md" aria-label="Medicamentos de la fórmula">
+              {formula.medicamentos.map((m) => {
+                const e = ESTADO_MEDICAMENTO[m.estado] ?? ESTADO_MEDICAMENTO.disponible;
+                return (
+                  <li key={m.medicamento_id} className="px-4 py-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-bold text-tinta">{m.nombre}</p>
+                      <p className="text-sm text-tinta-suave">
+                        {m.presentacion} ·{' '}
+                        <span className="cifras">
+                          {m.entrega_parcial
+                            ? `te faltan ${m.cantidad_pendiente} de ${m.cantidad_formulada}`
+                            : `${m.cantidad_formulada} unidades`}
+                        </span>
+                      </p>
+                    </div>
+                    <EstadoBadge tono={e.tono}>{e.texto}</EstadoBadge>
+                  </li>
+                );
+              })}
+            </ul>
+
+            {!formula.vencida && pendientes.length > 0 && (
+              avisosTurno ? (
+                <div className="space-y-3">
+                  <AvisoBase tono="alerta" titulo="Antes de pedir el turno, ten en cuenta:">
+                    <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                      {avisosTurno.map((a) => <li key={a}>{a}</li>)}
+                    </ul>
+                  </AvisoBase>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Boton variante="secundario" tamano="lg" onClick={() => setAvisosTurno(null)}>
+                      Volver
+                    </Boton>
+                    <Boton variante="primario" tamano="lg" onClick={() => pedirTurno(true)} disabled={ocupado}>
+                      Pedir igual
+                    </Boton>
                   </div>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${e.clase}`}>{e.texto}</span>
-                </li>
-              );
-            })}
-          </ul>
-
-          {!formula.vencida && pendientes.length > 0 && (
-            avisosTurno ? (
-              <div className="space-y-3 bg-amber-50 border border-amber-300 rounded-xl p-4">
-                <p className="font-bold text-amber-900">Antes de pedir el turno, ten en cuenta:</p>
-                <ul className="list-disc pl-5 text-sm text-amber-900 space-y-0.5">
-                  {avisosTurno.map((a) => <li key={a}>{a}</li>)}
-                </ul>
-                <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setAvisosTurno(null)}
-                    className="py-2.5 rounded-xl font-semibold bg-white border border-slate-300 text-slate-800 cursor-pointer">
-                    Volver
-                  </button>
-                  <button type="button" onClick={() => pedirTurno(true)} disabled={ocupado}
-                    className="py-2.5 rounded-xl font-bold bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-50 text-white cursor-pointer">
-                    Pedir de todos modos
-                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div>
-                  <label htmlFor="p-prioridad" className="block text-sm font-bold text-slate-800 mb-1">
-                    ¿Tienes atención preferencial?
-                  </label>
-                  <select id="p-prioridad" value={prioridad} onChange={(e) => setPrioridad(e.target.value)} className={claseCampo}>
-                    {Object.entries(PRIORIDADES).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
-                  </select>
+              ) : (
+                <div className="space-y-4 border-t border-borde pt-4">
+                  <Campo id="p-prioridad" etiqueta="¿Tienes atención preferencial?">
+                    <Selector value={prioridad} onChange={(e) => setPrioridad(e.target.value)} className="h-12 text-lg">
+                      {Object.entries(PRIORIDADES).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+                    </Selector>
+                  </Campo>
+                  <Boton variante="primario" tamano="lg" icono={Ticket} onClick={() => pedirTurno(false)} disabled={ocupado} ancho>
+                    Pedir turno virtual
+                  </Boton>
                 </div>
-                <button type="button" onClick={() => pedirTurno(false)} disabled={ocupado}
-                  className="w-full bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-50 text-white font-bold text-lg py-3 rounded-xl transition cursor-pointer">
-                  Pedir turno virtual
-                </button>
-              </div>
-            )
-          )}
-          {!formula.vencida && pendientes.length === 0 && (
-            <p className="text-center text-slate-600">Ya recibiste todos los medicamentos de esta fórmula.</p>
-          )}
+              )
+            )}
+            {!formula.vencida && pendientes.length === 0 && (
+              <EstadoVacio titulo="Ya recibiste todos los medicamentos de esta fórmula" icono={CheckCircle2} />
+            )}
+          </div>
         </section>
       )}
     </>
@@ -328,7 +328,13 @@ function MiTurno({ token, alSalir }) {
     }
   };
 
-  if (!turno) return <p className="text-center text-slate-500 py-12">Cargando tu turno…</p>;
+  if (!turno) {
+    return (
+      <div className="bg-superficie border border-borde-fuerte rounded-md">
+        <Cargando texto="Cargando tu turno…" className="justify-center" />
+      </div>
+    );
+  }
 
   const llamado = turno.estado === 'llamado';
   const terminado = TERMINADOS.includes(turno.estado);
@@ -336,30 +342,33 @@ function MiTurno({ token, alSalir }) {
 
   return (
     <>
-      <div className="flex justify-end">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-          conectado ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-        }`}>
-          {conectado ? 'En vivo' : 'Sin conexión en vivo'}
-        </span>
-      </div>
-
-      <section className={`rounded-2xl p-5 text-center space-y-2 ${
-        llamado ? 'bg-emerald-600 text-white animate-pulse' : terminado ? 'bg-slate-100' : 'bg-slate-900 text-white'
-      }`} aria-live="polite">
-        <p className={`text-sm font-semibold uppercase tracking-wide ${llamado ? 'text-emerald-100' : 'text-slate-400'}`}>
-          Tu turno
+      <section
+        className={`rounded-md border p-6 text-center ${
+          llamado
+            ? 'bg-primario-700 border-primario-700 text-white'
+            : 'bg-superficie border-borde-fuerte text-tinta'
+        }`}
+        aria-live="polite"
+        aria-labelledby="titulo-turno"
+      >
+        <div className="flex justify-between items-center text-sm mb-3">
+          <span id="titulo-turno" className={`font-bold ${llamado ? 'text-primario-100' : 'text-tinta-suave'}`}>Tu turno</span>
+          <span className={`inline-flex items-center gap-1.5 ${llamado ? 'text-primario-100' : 'text-tinta-suave'}`}>
+            <span className={`w-2 h-2 rounded-full ${conectado ? (llamado ? 'bg-white' : 'bg-ok-texto') : 'bg-tinta-tenue'}`} aria-hidden="true" />
+            {conectado ? 'En vivo' : 'Sin conexión en vivo'}
+          </span>
+        </div>
+        <p className={`text-7xl font-bold cifras leading-none ${terminado ? 'text-tinta-tenue' : ''}`}>{turno.numero}</p>
+        <p className={`mt-4 text-lg font-bold ${terminado ? 'text-tinta-suave' : ''}`}>
+          {TEXTO_ESTADO[turno.estado] ?? turno.estado}
         </p>
-        <p className={`text-6xl font-black ${terminado ? 'text-slate-400' : ''}`}>{turno.numero}</p>
-        <p className={`font-semibold ${terminado ? 'text-slate-700' : ''}`}>{TEXTO_ESTADO[turno.estado] ?? turno.estado}</p>
       </section>
 
       {!terminado && (
-        <dl className="grid grid-cols-2 gap-3 text-sm">
+        <dl className="bg-superficie border border-borde-fuerte rounded-md divide-y divide-borde">
           <Dato icono={MapPin} etiqueta="Atendiendo ahora" valor={turno.turno_actual ?? 'Nadie'} />
           {turno.posicion !== null && (
-            <Dato icono={Timer} etiqueta="Tu posición"
-              valor={`${turno.posicion}º · ~${turno.minutos_estimados} min`} />
+            <Dato icono={Timer} etiqueta="Tu posición" valor={`${turno.posicion}º · unos ${turno.minutos_estimados} min`} />
           )}
           {['reservado', 'en_camino'].includes(turno.estado) && (
             <Dato icono={Clock} etiqueta="Llega antes de" valor={hora(turno.vence_turno)} />
@@ -371,61 +380,64 @@ function MiTurno({ token, alSalir }) {
       <Aviso aviso={aviso} />
 
       {!terminado ? (
-        <div className="grid gap-2">
+        <div className="grid gap-3">
           {turno.estado === 'reservado' && (
-            <BotonGrande color="oscuro" icono={Navigation} disabled={ocupado} onClick={() => accion('en-camino')}>
+            <Boton variante="secundario" tamano="lg" icono={Navigation} disabled={ocupado} onClick={() => accion('en-camino')} ancho>
               Voy en camino
-            </BotonGrande>
+            </Boton>
           )}
           {['reservado', 'en_camino', 'en_pausa'].includes(turno.estado) && (
-            <BotonGrande color="verde" icono={CheckCircle2} disabled={ocupado} onClick={() => accion('llegue')}>
+            <Boton variante="primario" tamano="lg" icono={CheckCircle2} disabled={ocupado} onClick={() => accion('llegue')} ancho>
               Ya llegué
-            </BotonGrande>
+            </Boton>
           )}
           {turno.retraso_disponible && (
-            <BotonGrande color="ambar" icono={Clock} disabled={ocupado}
+            <Boton variante="secundario" tamano="lg" icono={Clock} disabled={ocupado} ancho
               onClick={() => accion('retrasado', '¿Pedir 20 minutos más? Solo puedes hacerlo una vez.')}>
               Voy retrasado (+20 min)
-            </BotonGrande>
+            </Boton>
           )}
-          <button type="button" disabled={ocupado}
-            onClick={() => accion('cancelar', '¿Seguro que quieres cancelar tu turno? Los medicamentos apartados se liberan.')}
-            className="flex items-center justify-center gap-2 py-2.5 text-red-700 font-semibold hover:bg-red-50 rounded-xl transition cursor-pointer disabled:opacity-50">
-            <XCircle className="w-5 h-5" />
+          <Boton variante="peligro" tamano="lg" icono={XCircle} disabled={ocupado} ancho
+            onClick={() => accion('cancelar', '¿Seguro que quieres cancelar tu turno? Los medicamentos apartados se liberan.')}>
             Cancelar turno
-          </button>
+          </Boton>
         </div>
       ) : (
-        <BotonGrande color="oscuro" onClick={() => alSalir()}>
+        <Boton variante="primario" tamano="lg" onClick={() => alSalir()} ancho>
           Consultar otra fórmula
-        </BotonGrande>
+        </Boton>
       )}
 
-      <section className="border-t border-slate-200 pt-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2">
-            <Bell className="w-4 h-4" />
+      <section className="bg-superficie border border-borde-fuerte rounded-md" aria-labelledby="titulo-notificaciones">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-borde">
+          <h2 id="titulo-notificaciones" className="font-bold text-tinta flex items-center gap-2">
+            <Bell size={20} aria-hidden="true" />
             Notificaciones
-            {sinLeer > 0 && (
-              <span className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded-full">{sinLeer}</span>
-            )}
-          </h3>
+            {sinLeer > 0 && <span className="text-sm font-normal text-tinta-suave cifras">({sinLeer} sin leer)</span>}
+          </h2>
           {sinLeer > 0 && (
-            <button type="button" onClick={marcarLeidas} className="text-sm font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">
-              Marcar como leídas
-            </button>
+            <Boton variante="fantasma" tamano="sm" onClick={marcarLeidas}>Marcar como leídas</Boton>
           )}
         </div>
         {notificaciones.length === 0 ? (
-          <p className="text-sm text-slate-500">Aún no tienes notificaciones.</p>
+          <EstadoVacio titulo="Aún no tienes notificaciones" icono={Bell}>
+            Aquí verás cuándo te llamen y si cambia la disponibilidad.
+          </EstadoVacio>
         ) : (
-          <ul className="space-y-2">
+          <ul className="divide-y divide-borde">
             {notificaciones.map((n) => (
-              <li key={n.id} className={`text-sm rounded-lg p-3 border ${
-                n.leida ? 'border-slate-200 text-slate-600' : 'border-emerald-300 bg-emerald-50 text-slate-900'
-              }`}>
-                <p>{n.mensaje}</p>
-                <p className="text-xs text-slate-500 mt-1">{hora(n.fecha)}</p>
+              <li key={n.id} className="px-4 py-3 flex gap-3">
+                <span
+                  className={`mt-2 w-2 h-2 shrink-0 rounded-full ${n.leida ? 'bg-transparent' : 'bg-primario-600'}`}
+                  aria-hidden="true"
+                />
+                <div>
+                  <p className={n.leida ? 'text-tinta-suave' : 'text-tinta font-bold'}>
+                    {!n.leida && <span className="sr-only">Sin leer: </span>}
+                    {n.mensaje}
+                  </p>
+                  <p className="text-xs text-tinta-tenue mt-0.5 cifras">{hora(n.fecha)}</p>
+                </div>
               </li>
             ))}
           </ul>
@@ -437,24 +449,12 @@ function MiTurno({ token, alSalir }) {
 
 function Dato({ icono: Icono, etiqueta, valor }) {
   return (
-    <div className="bg-slate-50 rounded-xl p-3">
-      <dt className="text-slate-500 flex items-center gap-1"><Icono className="w-3.5 h-3.5" />{etiqueta}</dt>
-      <dd className="font-bold text-slate-900">{valor}</dd>
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <dt className="text-tinta-suave flex items-center gap-2">
+        <Icono size={16} aria-hidden="true" />
+        {etiqueta}
+      </dt>
+      <dd className="font-bold text-tinta text-right cifras">{valor}</dd>
     </div>
-  );
-}
-
-function BotonGrande({ color, icono: Icono, children, ...props }) {
-  const colores = {
-    verde: 'bg-marca-verde hover:bg-marca-verde-oscuro text-white',
-    ambar: 'bg-amber-400 hover:bg-amber-500 text-slate-950',
-    oscuro: 'bg-slate-800 hover:bg-slate-900 text-white',
-  };
-  return (
-    <button type="button" {...props}
-      className={`w-full flex items-center justify-center gap-2 font-bold text-lg py-3 rounded-xl transition cursor-pointer disabled:opacity-50 ${colores[color]}`}>
-      {Icono && <Icono className="w-5 h-5" />}
-      {children}
-    </button>
   );
 }
