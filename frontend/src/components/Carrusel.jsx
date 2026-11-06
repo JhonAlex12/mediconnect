@@ -30,7 +30,7 @@ function BotonSlide({ to, children, variante = 'verde' }) {
     ? 'bg-marca-verde hover:bg-marca-verde-oscuro text-white shadow-lg shadow-marca-verde/30'
     : 'bg-white hover:bg-slate-50 text-marca-noche border border-slate-200';
   return (
-    <Link to={to} className={`inline-flex items-center gap-2 font-bold text-lg px-6 py-3 rounded-full transition ${clases}`}>
+    <Link to={to} className={`inline-flex items-center gap-2 font-bold sm:text-lg px-5 py-2.5 sm:px-6 sm:py-3 rounded-full transition ${clases}`}>
       {children}
       <ChevronRight className="w-5 h-5" />
     </Link>
@@ -47,7 +47,7 @@ function SlideBanner() {
       <img
         src="/img/banner-familia-1600.webp"
         alt="Mediconnect. Tu salud, sin complicaciones: ¡reclama tus medicamentos desde casa! Evita filas y ahorra tiempo."
-        className="w-full h-full object-cover object-[0%_50%] lg:object-[50%_10%] lg:[mask-image:linear-gradient(to_right,transparent,black_4%,black_96%,transparent)]"
+        className="w-full h-full object-contain lg:object-cover lg:object-[50%_10%] lg:[mask-image:linear-gradient(to_right,transparent,black_4%,black_96%,transparent)]"
         fetchPriority="high"
       />
     </picture>
@@ -58,13 +58,13 @@ function SlideBanner() {
 function SlideTurno() {
   return (
     <FondoMarca>
-      <div className="h-full grid lg:grid-cols-2 gap-8 items-center px-6 sm:px-16 lg:px-24 py-10">
-        <div className="space-y-5">
-          <p className="text-marca-noche font-semibold">Sin madrugar, sin filas</p>
-          <h2 className="font-titulo font-black text-3xl sm:text-5xl leading-tight text-marca-noche uppercase">
+      <div className="h-full grid lg:grid-cols-2 gap-8 items-center px-6 sm:px-16 lg:px-24 py-6 sm:py-10">
+        <div className="space-y-4 sm:space-y-5">
+          <p className="hidden sm:block text-marca-noche font-semibold">Sin madrugar, sin filas</p>
+          <h2 className="font-titulo font-black text-2xl sm:text-5xl leading-tight text-marca-noche uppercase">
             Pide tu <span className="text-marca-verde">turno virtual</span> desde el celular
           </h2>
-          <p className="text-lg text-slate-700 max-w-lg">
+          <p className="hidden sm:block text-lg text-slate-700 max-w-lg">
             Tus medicamentos quedan apartados mientras llegas. Te avisamos cuando te llamen a la ventanilla.
           </p>
           <BotonSlide to="/paciente">Pedir mi turno</BotonSlide>
@@ -106,13 +106,13 @@ function SlideDisponibilidad() {
   ];
   return (
     <FondoMarca>
-      <div className="h-full grid lg:grid-cols-2 gap-8 items-center px-6 sm:px-16 lg:px-24 py-10">
-        <div className="space-y-5">
-          <p className="text-marca-noche font-semibold">Antes de salir de casa</p>
-          <h2 className="font-titulo font-black text-3xl sm:text-5xl leading-tight text-marca-noche uppercase">
+      <div className="h-full grid lg:grid-cols-2 gap-8 items-center px-6 sm:px-16 lg:px-24 py-6 sm:py-10">
+        <div className="space-y-4 sm:space-y-5">
+          <p className="hidden sm:block text-marca-noche font-semibold">Antes de salir de casa</p>
+          <h2 className="font-titulo font-black text-2xl sm:text-5xl leading-tight text-marca-noche uppercase">
             Consulta si tus <span className="text-marca-verde">medicamentos</span> están disponibles
           </h2>
-          <p className="text-lg text-slate-700 max-w-lg">
+          <p className="hidden sm:block text-lg text-slate-700 max-w-lg">
             Solo necesitas el código de tu fórmula y tu documento. Si algo falta, te avisamos cuando llegue.
           </p>
           <BotonSlide to="/paciente">Consultar mi fórmula</BotonSlide>
@@ -192,7 +192,7 @@ export default function Carrusel() {
             aria-label={`${i + 1} de ${SLIDES.length}: ${nombre}`}
             aria-hidden={i !== actual}
             inert={i !== actual ? '' : undefined}
-            className={`[grid-area:1/1] min-h-[26rem] lg:min-h-0 lg:aspect-[2/1] transition-opacity duration-700 ${
+            className={`[grid-area:1/1] aspect-[4/3] lg:aspect-[2/1] transition-opacity duration-700 ${
               i === actual ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
           >
