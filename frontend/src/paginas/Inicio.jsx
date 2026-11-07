@@ -1,159 +1,109 @@
-import React, { useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, FileText, IdCard, Search, Ticket, Wallet } from 'lucide-react';
 import SitioPublico from '../components/SitioPublico';
 import Carrusel from '../components/Carrusel';
 import { useTitulo } from '../components/Encabezado';
+import { ARTICULOS } from '../lib/articulos';
+import { TarjetaArticulo } from './SaludAlDia';
 
-const SERVICIOS = [
-  {
-    titulo: 'Consulta de disponibilidad',
-    texto: 'Con el código de tu fórmula y tu documento ves si cada medicamento está disponible antes de salir de casa.',
-  },
-  {
-    titulo: 'Turno virtual',
-    texto: 'Pide tu turno desde el celular. Tus medicamentos quedan apartados mientras llegas.',
-  },
-  {
-    titulo: 'Avisos en tiempo real',
-    texto: 'Te avisamos cuando te llaman, si tu turno queda en pausa y si cambia la disponibilidad de tus medicamentos.',
-  },
-  {
-    titulo: 'Entregas pendientes',
-    texto: 'Si algo no alcanzó, queda pendiente en tu fórmula y te avisamos cuando haya.',
-  },
+const ACCESOS = [
+  [Search, 'Consultar fórmula', 'Disponibilidad de tus medicamentos', 'bg-marca-azul', '/paciente'],
+  [Ticket, 'Turno virtual', 'Pide tu turno desde el celular', 'bg-marca-verde-oscuro', '/paciente'],
+  [Wallet, 'Cuota moderadora', 'Conoce cuánto debes pagar', 'bg-marca-noche', '/informacion#cuotas'],
 ];
 
-const PASOS = [
-  { titulo: 'Tu médico emite la fórmula', texto: 'La IPS la envía directamente a la farmacia. Recibes un código.' },
-  { titulo: 'Consulta y pide tu turno', texto: 'Ingresa el código y tu documento, revisa qué hay y pide tu turno.' },
-  { titulo: 'Sigue tu turno', texto: 'Ve cuántas personas hay antes que tú y avisa cuando vas en camino.' },
-  { titulo: 'Reclama tus medicamentos', texto: 'Al llegar, presiona "Ya llegué" y espera el llamado en pantalla.' },
-];
-
-const PREGUNTAS = [
-  {
-    p: '¿Dónde encuentro el código de mi fórmula?',
-    r: 'Te lo entrega tu médico o la IPS al emitir la fórmula. Tiene la forma F-2026-0001.',
-  },
-  {
-    p: '¿Cuánto tiempo tengo para llegar después de pedir el turno?',
-    r: 'Tus medicamentos quedan apartados por 2 horas. Si se te hace tarde, puedes pedir 20 minutos más una sola vez con el botón "Voy retrasado".',
-  },
-  {
-    p: '¿Qué pasa si no me presento cuando me llaman?',
-    r: 'Si no te acercas en unos 4 minutos, tu turno queda en pausa. Tienes 30 minutos para presionar "Ya llegué" y volver a la fila; después el turno vence y los medicamentos apartados se liberan.',
-  },
-  {
-    p: '¿Puede reclamar los medicamentos otra persona?',
-    r: 'Sí. En la ventanilla se registran el nombre y el documento de quien recoge.',
-  },
-  {
-    p: '¿Tengo atención preferencial?',
-    r: 'Si eres adulto mayor, estás en embarazo o tienes alguna discapacidad, indícalo al pedir el turno y tendrás prioridad en la fila.',
-  },
+const INFORMACION = [
+  ['requisitos', 'Requisitos para reclamar'],
+  ['cuotas', 'Cuotas moderadoras y exenciones'],
+  ['pendientes', 'Entregas pendientes'],
+  ['preferencial', 'Atención preferencial'],
+  ['derechos', 'Derechos y deberes del paciente'],
 ];
 
 export default function Inicio() {
   useTitulo(null);
-  const { hash } = useLocation();
-
-  // Los enlaces del menú (/#servicios...) bajan hasta la sección
-  useEffect(() => {
-    if (!hash) return;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
-  }, [hash]);
 
   return (
     <SitioPublico>
       <Carrusel />
 
-      {/* Acceso directo: una sola acción principal, sin tarjetas repetidas */}
-      <section className="bg-marca-noche text-white">
-        <div className="max-w-7xl mx-auto px-4 py-7 flex flex-col md:flex-row md:items-center gap-5 md:gap-10">
-          <div className="flex-1">
-            <p className="font-titulo text-xl sm:text-2xl font-bold">¿Ya tienes el código de tu fórmula?</p>
-            <p className="text-blue-200 mt-1">
-              Es el que te dio la IPS, por ejemplo <span className="font-mono text-white bg-white/10 px-1.5 py-0.5 rounded">F-2026-0001</span>
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <Link to="/paciente"
-              className="bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold text-lg px-7 py-3 rounded-full transition">
-              Consultar mi fórmula
+      {/* Accesos rápidos en bloque de color, montados sobre el carrusel en computador */}
+      <section className="max-w-6xl mx-auto px-4 mt-6 lg:-mt-10 relative z-20">
+        <div className="grid sm:grid-cols-3 shadow-xl rounded-lg overflow-hidden">
+          {ACCESOS.map(([Icono, titulo, texto, color, a]) => (
+            <Link key={titulo} to={a} className={`${color} text-white p-6 flex items-center gap-4 hover:brightness-110 transition`}>
+              <Icono className="w-10 h-10 shrink-0 opacity-90" strokeWidth={1.5} />
+              <span>
+                <span className="block font-bold text-lg">{titulo}</span>
+                <span className="block text-sm text-white/80">{texto}</span>
+              </span>
             </Link>
-            <a href="/#preguntas" className="text-blue-100 underline underline-offset-4 decoration-blue-300/50 hover:text-white">
-              Tengo atención preferencial
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* Servicios: título a la izquierda, lista con divisores a la derecha */}
-      <section id="servicios" className="max-w-7xl mx-auto px-4 py-20 scroll-mt-24 grid lg:grid-cols-[2fr_3fr] gap-10 lg:gap-20">
-        <div>
-          <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold text-marca-noche leading-tight">
-            Sabes qué hay antes de salir de casa.
-          </h2>
-          <p className="text-lg text-slate-600 mt-4 max-w-md">
-            Tu fórmula llega de la IPS a la farmacia. Desde aquí ves qué medicamentos están, apartas los tuyos
-            y llegas solo cuando es tu turno.
-          </p>
-        </div>
-        <dl className="divide-y divide-slate-200 border-y border-slate-200">
-          {SERVICIOS.map(({ titulo, texto }) => (
-            <div key={titulo} className="py-6 sm:grid sm:grid-cols-[14rem_1fr] sm:gap-8">
-              <dt className="font-bold text-lg text-marca-noche">{titulo}</dt>
-              <dd className="text-slate-600 mt-1 sm:mt-0">{texto}</dd>
-            </div>
           ))}
-        </dl>
+        </div>
       </section>
 
-      {/* Cómo funciona: línea de tiempo */}
-      <section id="como-funciona" className="bg-marca-hielo border-y border-slate-200 scroll-mt-24">
-        <div className="max-w-7xl mx-auto px-4 py-20">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-12">
-            <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold text-marca-noche leading-tight max-w-xl">
-              De la consulta médica a tus manos
-            </h2>
-            <Link to="/paciente"
-              className="self-start sm:self-auto bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-6 py-3 rounded-full transition">
-              Empezar ahora
-            </Link>
-          </div>
-          <ol className="relative grid sm:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-8">
-            <div className="hidden lg:block absolute top-5 left-5 right-[calc(25%-0.75rem)] h-0.5 bg-marca-verde/40" aria-hidden="true" />
-            {PASOS.map(({ titulo, texto }, i) => (
-              <li key={titulo} className="relative">
-                <span className="relative flex items-center justify-center w-10 h-10 rounded-full bg-marca-verde text-white font-titulo font-bold ring-4 ring-marca-hielo">
-                  {i + 1}
-                </span>
-                <h3 className="font-bold text-lg text-marca-noche mt-5">{titulo}</h3>
-                <p className="text-slate-600 mt-2">{texto}</p>
+      {/* Información para pacientes */}
+      <section className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-2 gap-10 items-center">
+        <div className="rounded-lg bg-gradient-to-br from-marca-azul to-marca-verde p-8 sm:p-10 text-white">
+          <p className="font-titulo text-2xl font-extrabold">Para reclamar necesitas</p>
+          <ul className="mt-6 space-y-4">
+            {[
+              [IdCard, 'Documento de identidad', 'Tuyo o de quien recoge por ti'],
+              [FileText, 'Fórmula vigente', 'Puedes reclamar hasta su fecha límite'],
+              [Wallet, 'Cuota moderadora', 'La ves al consultar tu fórmula'],
+            ].map(([Icono, t, d]) => (
+              <li key={t} className="flex items-start gap-4 bg-white/10 rounded-lg p-4">
+                <Icono className="w-7 h-7 shrink-0" />
+                <span><span className="block font-bold text-lg">{t}</span><span className="block text-white/85">{d}</span></span>
               </li>
             ))}
-          </ol>
+          </ul>
+        </div>
+        <div>
+          <p className="text-marca-verde-oscuro font-bold text-sm uppercase tracking-wider">Pacientes y familiares</p>
+          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-2 mb-6">Información para reclamar tus medicamentos</h2>
+          <ul className="divide-y divide-slate-200 border-y border-slate-200">
+            {INFORMACION.map(([id, t]) => (
+              <li key={id}>
+                <Link to={`/informacion#${id}`} className="flex items-center justify-between py-3.5 font-semibold text-slate-800 hover:text-marca-azul group">
+                  {t}
+                  <ArrowRight className="w-5 h-5 text-marca-verde group-hover:translate-x-1 transition" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      {/* Preguntas frecuentes */}
-      <section id="preguntas" className="max-w-7xl mx-auto px-4 py-20 scroll-mt-24 grid lg:grid-cols-[2fr_3fr] gap-10 lg:gap-20">
+      {/* Salud al día: los tres artículos más recientes */}
+      <section className="bg-slate-50 border-y border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 py-16">
+          <div className="flex items-end justify-between gap-4 mb-8">
+            <h2 className="font-titulo text-3xl font-extrabold text-marca-noche">Salud al día</h2>
+            <Link to="/salud-al-dia" className="font-semibold text-marca-azul hover:underline">Ver todos los artículos</Link>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {ARTICULOS.slice(0, 3).map((a) => <TarjetaArticulo key={a.slug} articulo={a} />)}
+          </div>
+        </div>
+      </section>
+
+      {/* Quiénes somos */}
+      <section id="quienes-somos" className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[3fr_2fr] gap-10 items-center scroll-mt-28">
         <div>
-          <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold text-marca-noche leading-tight">Preguntas frecuentes</h2>
-          <p className="text-lg text-slate-600 mt-4 max-w-sm">
-            ¿No encuentras tu respuesta? Pregunta en la ventanilla de la farmacia.
+          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche">Quiénes somos</h2>
+          <p className="text-lg text-slate-600 mt-4">
+            Mediconnect conecta las fórmulas de tu IPS con la farmacia. Sabes qué medicamentos hay antes de salir,
+            apartas los tuyos con un turno virtual y conoces desde el principio el valor de tu cuota moderadora.
           </p>
         </div>
-        <div className="border-t border-slate-200">
-          {PREGUNTAS.map(({ p, r }) => (
-            <details key={p} className="group border-b border-slate-200">
-              <summary className="cursor-pointer list-none flex items-start justify-between gap-6 py-5 font-bold text-lg text-marca-noche hover:text-marca-azul">
-                {p}
-                <span className="text-2xl leading-none text-marca-verde font-normal group-open:rotate-45 transition" aria-hidden="true">+</span>
-              </summary>
-              <p className="pb-5 -mt-1 text-slate-600 max-w-2xl">{r}</p>
-            </details>
-          ))}
+        <div className="bg-marca-hielo border-l-4 border-marca-verde rounded p-6">
+          <p className="font-bold text-marca-noche text-lg">¿Tienes una fórmula vigente?</p>
+          <p className="text-slate-600 mt-1">Consulta disponibilidad y pide tu turno en dos minutos.</p>
+          <Link to="/paciente" className="inline-flex items-center gap-2 mt-4 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold px-5 py-2.5 rounded">
+            Consultar ahora <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
       </section>
     </SitioPublico>

@@ -6,7 +6,8 @@ import PantallaPublica from './components/pantalla/PantallaPublica';
 import { SesionProvider } from './lib/sesion';
 import Inicio from './paginas/Inicio';
 import NoEncontrada from './paginas/NoEncontrada';
-import Propuestas from './paginas/Propuestas';
+import Informacion from './paginas/Informacion';
+import SaludAlDia from './paginas/SaludAlDia';
 
 // Cada módulo es una página independiente con su propia dirección
 export default function App() {
@@ -23,8 +24,9 @@ export default function App() {
         }
       />
       <Route path="/pantalla" element={<PantallaPublica />} />
-      {/* Propuestas de diseño para comparar (temporal) */}
-      <Route path="/propuesta/:id" element={<Propuestas />} />
+      <Route path="/informacion" element={<Informacion />} />
+      <Route path="/salud-al-dia" element={<SaludAlDia />} />
+      <Route path="/salud-al-dia/:slug" element={<SaludAlDia />} />
       {/* El sistema de la IPS es otra aplicación (ips/index.html): no se enlaza desde el sitio */}
       <Route path="/ips" element={<IrA destino="/ips/" />} />
       <Route path="*" element={<NoEncontrada />} />

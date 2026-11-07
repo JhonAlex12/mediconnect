@@ -4,7 +4,17 @@ import { listarTarifas, guardarTarifas } from '../services/cobros.service.js';
 
 const router = Router();
 
-// Solo administradores: valores de la cuota moderadora por año
+// Pública: valores del año más reciente, para la página de información al paciente
+router.get('/vigentes', async (req, res, next) => {
+  try {
+    const [vigente] = await listarTarifas();
+    res.json({ ok: true, tarifa: vigente ?? null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Lo demás, solo administradores: valores de la cuota moderadora por año
 router.use(exigirEmpleado('administrador'));
 
 // GET /api/tarifas
