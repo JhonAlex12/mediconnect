@@ -3,13 +3,27 @@ import { ZONA_HORARIA } from '../config/negocio.js';
 
 const HOY = `(now() AT TIME ZONE '${ZONA_HORARIA}')::date`;
 
-// "María Fernanda Rojas" → "María R.": basta para reconocerse y expone lo mínimo
+// Partículas que forman parte del apellido: "de la Hoz", "del Río"
+const PARTICULAS = new Set(['de', 'del', 'la', 'las', 'los', 'y']);
+
+// "MARÍA" / "maría" → "María"; las partículas quedan en minúscula
+const capitalizar = (p) =>
+  PARTICULAS.has(p.toLowerCase()) ? p.toLowerCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+
+// Primer nombre + primer apellido, como en la cédula (uno o dos nombres y dos apellidos):
+//   "María Fernanda Rojas Pérez" → "María Rojas"
+//   "Laura Gómez Ruiz"           → "Laura Gómez"   (3 palabras: un nombre y dos apellidos)
+//   "Juan Pérez"                 → "Juan Pérez"
+//   "Ana María de la Hoz Pérez"  → "Ana de la Hoz"
 export function nombreCorto(nombre) {
-  const partes = String(nombre ?? '').trim().split(/\s+/).filter(Boolean);
+  const partes = String(nombre ?? '').trim().split(/\s+/).filter(Boolean).map(capitalizar);
   if (partes.length === 0) return null;
-  // Con 3 o más palabras se asume nombre compuesto: la inicial es del primer apellido
-  const apellido = partes.length >= 3 ? partes[partes.length - 2] : partes[1];
-  return apellido ? `${partes[0]} ${apellido[0].toUpperCase()}.` : partes[0];
+  if (partes.length <= 2) return partes.join(' ');
+
+  // El primer apellido es la penúltima palabra, con las partículas que lleve antes
+  let i = partes.length - 2;
+  while (i > 1 && PARTICULAS.has(partes[i - 1].toLowerCase())) i -= 1;
+  return `${partes[0]} ${partes.slice(i, partes.length - 1).join(' ')}`;
 }
 
 // La pantalla la abre un empleado con su sesión (no es pública):
