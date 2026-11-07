@@ -18,18 +18,16 @@ function SlideBanner() {
   );
 }
 
-// Slides de foto 16:9 con el texto a la izquierda.
-// Computador: la foto completa; a los lados, la misma foto desenfocada (sin franjas de color).
-// Celular: versión recortada a 4:3 desde la izquierda, para que el texto se lea completo.
-function SlideFoto({ nombre, alt, enlace }) {
+// Slides de foto 16:9, tratadas igual que el banner: la imagen completa (sin recortes),
+// con los bordes desvanecidos hacia un fondo de sus mismos tonos.
+// Celular: el desvanecido es arriba y abajo; computador: a los lados.
+function SlideFoto({ nombre, alt, enlace, fondo }) {
   const contenido = (
-    <div className="relative h-full overflow-hidden bg-slate-100">
-      <img src={`/img/slide-${nombre}-900.webp`} alt="" aria-hidden="true"
-        className="hidden lg:block absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-70" />
-      <picture className="relative block h-full lg:flex lg:justify-center">
+    <div className="h-full" style={{ background: fondo }}>
+      <picture className="block h-full lg:flex lg:justify-center">
         <source media="(max-width: 700px)" srcSet={`/img/slide-${nombre}-900.webp`} />
         <img src={`/img/slide-${nombre}-1600.webp`} alt={alt} loading="lazy"
-          className="w-full h-full object-cover lg:object-contain lg:w-auto lg:max-w-none lg:shadow-2xl" />
+          className="w-full h-full object-contain [mask-image:linear-gradient(to_bottom,transparent,black_6%,black_94%,transparent)] lg:w-auto lg:max-w-none lg:[mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]" />
       </picture>
     </div>
   );
@@ -42,7 +40,7 @@ const SLIDES = [
     id: 'bienestar',
     nombre: 'El bienestar de tu familia',
     Componente: () => (
-      <SlideFoto nombre="bienestar"
+      <SlideFoto nombre="bienestar" fondo="linear-gradient(to right, #f2ebe1 0%, #ece3d8 45%, #b9ada1 100%)"
         alt="El bienestar de tu familia es nuestra prioridad. Trabajamos de la mano para que disfrutes cada momento con tranquilidad." />
     ),
   },
@@ -50,7 +48,7 @@ const SLIDES = [
     id: 'sede',
     nombre: 'IPS y droguería en un solo lugar',
     Componente: () => (
-      <SlideFoto nombre="sede" enlace="/#quienes-somos"
+      <SlideFoto nombre="sede" enlace="/#quienes-somos" fondo="linear-gradient(to right, #fbfdfd 0%, #eef7f9 45%, #a9d3db 100%)"
         alt="La salud y el bienestar en un solo lugar: IPS y droguería juntas para cuidar de ti y de tu familia. Conoce más." />
     ),
   },
@@ -104,7 +102,7 @@ export default function Carrusel() {
             aria-label={`${i + 1} de ${SLIDES.length}: ${nombre}`}
             aria-hidden={i !== actual}
             inert={i !== actual ? '' : undefined}
-            className={`[grid-area:1/1] aspect-[4/3] lg:aspect-auto lg:h-[min(calc(100svh-7.5rem),56vw,1080px)] transition-opacity duration-700 ${
+            className={`[grid-area:1/1] aspect-[4/3] lg:aspect-auto lg:h-[min(calc(100svh-11rem),56vw,1080px)] transition-opacity duration-700 ${
               i === actual ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
           >

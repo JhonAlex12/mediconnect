@@ -34,7 +34,8 @@ function useDesplazarAAncla() {
 }
 
 const claseMenu = (activo) =>
-  `px-3.5 py-2 font-semibold text-[15px] transition ${activo ? 'text-marca-azul' : 'text-slate-700 hover:text-marca-azul'}`;
+  `px-4 py-2.5 font-semibold text-[15px] border-b-2 transition ${
+    activo ? 'text-marca-azul border-marca-azul' : 'text-slate-700 border-transparent hover:text-marca-azul'}`;
 
 // Estructura de las páginas públicas: franja superior, encabezado, contenido y pie de página
 export default function SitioPublico({ children }) {
@@ -66,18 +67,11 @@ export default function SitioPublico({ children }) {
 
       {/* Encabezado */}
       <header className="border-b-4 border-marca-azul sticky top-0 bg-white z-40">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-6">
+        {/* Fila 1: logo centrado; a la derecha, "Pedir turno" y el botón del menú en celular */}
+        <div className="max-w-7xl mx-auto px-4 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+          <span aria-hidden="true" />
           <Logo subtitulo="Tu farmacia conectada" />
-          <nav className="hidden lg:flex items-center" aria-label="Menú principal">
-            {MENU.map(({ a, texto, fin, ancla }) =>
-              ancla ? (
-                <Link key={a} to={a} className={claseMenu(false)}>{texto}</Link>
-              ) : (
-                <NavLink key={a} to={a} end={fin} className={({ isActive }) => claseMenu(isActive)}>{texto}</NavLink>
-              )
-            )}
-          </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-end gap-2">
             <Link to="/paciente" className="hidden sm:block bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-5 py-2.5 rounded transition">
               Pedir turno
             </Link>
@@ -88,6 +82,17 @@ export default function SitioPublico({ children }) {
             </button>
           </div>
         </div>
+
+        {/* Fila 2: menú centrado (computador) */}
+        <nav className="hidden lg:flex justify-center border-t border-slate-100" aria-label="Menú principal">
+          {MENU.map(({ a, texto, fin, ancla }) =>
+            ancla ? (
+              <Link key={a} to={a} className={claseMenu(false)}>{texto}</Link>
+            ) : (
+              <NavLink key={a} to={a} end={fin} className={({ isActive }) => claseMenu(isActive)}>{texto}</NavLink>
+            )
+          )}
+        </nav>
 
         {abierto && (
           <nav className="lg:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1" aria-label="Menú principal">
