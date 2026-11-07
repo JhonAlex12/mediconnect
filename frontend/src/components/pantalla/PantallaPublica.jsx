@@ -19,6 +19,14 @@ export default function PantallaPublica() {
   const [conSonido, setConSonido] = useState(true);
   const [completa, setCompleta] = useState(false);
   const [destacar, setDestacar] = useState(false);
+  const voces = useVocesEspanol();
+  const [voz, setVoz] = useState(() => leerVozGuardada());
+  const vozActual = useRef(voz);
+  vozActual.current = voz;
+  const elegirVoz = (nombre) => {
+    setVoz(nombre);
+    try { localStorage.setItem(CLAVE_VOZ, nombre); } catch { /* sin almacenamiento */ }
+  };
   const contenedor = useRef(null);
   const anterior = useRef(undefined);
   const sonido = useRef(false);
@@ -64,7 +72,7 @@ export default function PantallaPublica() {
     anterior.current = numero;
     setDestacar(true);
     const t = setTimeout(() => setDestacar(false), 8000);
-    if (sonido.current) anunciar(numero, estado.llamando_nombre);
+    if (sonido.current) anunciar(numero, estado.llamando_nombre, vozActual.current);
     return () => clearTimeout(t);
   }, [estado.llamando, estado.llamando_nombre]);
 
@@ -127,7 +135,14 @@ export default function PantallaPublica() {
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
             {conSonido ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
           </button>
-          <button type="button" onClick={() => anunciar(estado.llamando ?? 'V-001', estado.llamando ? estado.llamando_nombre : 'Prueba de sonido')}
+          {voces.length > 0 && (
+            <select value={voz} onChange={(e) => elegirVoz(e.target.value)} aria-label="Voz de los anuncios"
+              className="bg-slate-800 text-white text-sm rounded-lg px-2 py-2 max-w-56 cursor-pointer">
+              <option value="">Voz automática</option>
+              {voces.map((v) => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
+            </select>
+          )}
+          <button type="button" onClick={() => anunciar(estado.llamando ?? 'V-001', estado.llamando ? estado.llamando_nombre : 'María Rojas', voz)}
             aria-label="Probar el anuncio" title="Probar el anuncio"
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
             <Bell className="w-5 h-5" />
@@ -242,16 +257,49 @@ function campanada() {
   }
 }
 
-// Voz en español si el equipo tiene una (prefiere es-CO, luego cualquier español)
-function vozEspanol() {
-  const voces = window.speechSynthesis?.getVoices() ?? [];
-  return voces.find((v) => v.lang === 'es-CO')
-    ?? voces.find((v) => v.lang?.startsWith('es-4') || v.lang === 'es-MX' || v.lang === 'es-US')
-    ?? voces.find((v) => v.lang?.startsWith('es'));
+// ---------- Voces ----------
+// Dependen del equipo y del navegador: Edge trae voces "naturales" de Colombia,
+// Chrome las de Google; Firefox en Linux suele tener solo una voz robótica.
+const CLAVE_VOZ = 'mediconect_voz_pantalla';
+
+function leerVozGuardada() {
+  try { return localStorage.getItem(CLAVE_VOZ) ?? ''; } catch { return ''; }
 }
 
-// Campanada y luego: "Turno V 0 1 4. María R. Acérquese a la ventanilla." (se repite el turno)
-function anunciar(numero, nombre) {
+const esEspanol = (v) => v.lang?.toLowerCase().startsWith('es');
+
+// Las voces cargan de forma asíncrona: se vuelven a leer cuando el navegador avisa
+function useVocesEspanol() {
+  const [voces, setVoces] = useState([]);
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return undefined;
+    const leer = () => {
+      const todas = synth.getVoices();
+      const es = todas.filter(esEspanol);
+      // Primero las de Colombia y las "naturales" (suenan mejor)
+      const puntaje = (v) => (v.lang === 'es-CO' ? 2 : 0) + (/natural|online|google/i.test(v.name) ? 1 : 0);
+      setVoces((es.length ? es : todas).slice().sort((a, b) => puntaje(b) - puntaje(a)));
+    };
+    leer();
+    synth.addEventListener?.('voiceschanged', leer);
+    return () => synth.removeEventListener?.('voiceschanged', leer);
+  }, []);
+  return voces;
+}
+
+// La elegida; si no hay, la mejor en español disponible
+function buscarVoz(nombre) {
+  const todas = window.speechSynthesis?.getVoices() ?? [];
+  return todas.find((v) => v.name === nombre)
+    ?? todas.find((v) => v.lang === 'es-CO' && /natural|online/i.test(v.name))
+    ?? todas.find((v) => v.lang === 'es-CO')
+    ?? todas.find((v) => esEspanol(v) && /natural|online|google/i.test(v.name))
+    ?? todas.find(esEspanol);
+}
+
+// Campanada y luego: "Turno V 0 1 4. María Rojas. Acérquese a la ventanilla." (se repite el turno)
+function anunciar(numero, nombre, nombreVoz) {
   const espera = campanada();
   setTimeout(() => {
     try {
@@ -263,8 +311,11 @@ function anunciar(numero, nombre) {
       [texto, `Turno ${deletreado}.`].forEach((t) => {
         const frase = new SpeechSynthesisUtterance(t);
         frase.lang = 'es-CO';
-        const voz = vozEspanol();
-        if (voz) frase.voice = voz;
+        const voz = buscarVoz(nombreVoz);
+        if (voz) {
+          frase.voice = voz;
+          frase.lang = voz.lang;
+        }
         frase.rate = 0.9;
         synth.speak(frase);
       });
