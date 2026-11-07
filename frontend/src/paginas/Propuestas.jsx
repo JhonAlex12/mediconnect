@@ -97,7 +97,7 @@ function Institucional() {
       <Carrusel />
 
       {/* Accesos rápidos en bloque de color, pegados al carrusel */}
-      <section className="max-w-6xl mx-auto px-4 -mt-10 relative z-20">
+      <section className="max-w-6xl mx-auto px-4 mt-6 lg:-mt-10 relative z-20">
         <div className="grid sm:grid-cols-3 shadow-xl rounded-lg overflow-hidden">
           {[
             [Search, 'Consultar fórmula', 'Disponibilidad de tus medicamentos', 'bg-marca-azul'],
@@ -177,7 +177,7 @@ function Institucional() {
       </section>
 
       {/* Institucional + llamado */}
-      <section className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[3fr_2fr] gap-10 items-center">
+      <section id="quienes-somos" className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[3fr_2fr] gap-10 items-center scroll-mt-24">
         <div>
           <h2 className="font-titulo text-3xl font-extrabold text-marca-noche">Quiénes somos</h2>
           <p className="text-lg text-slate-600 mt-4">

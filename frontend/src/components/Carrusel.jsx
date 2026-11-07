@@ -1,45 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-// Cruz decorativa del estilo del banner
-function Cruz({ className }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
-      <path d="M9 2h6v7h7v6h-7v7H9v-7H2V9h7z" fill="currentColor" />
-    </svg>
-  );
-}
-
-// Fondo claro con manchas suaves en azul y verde agua, como el banner
-function FondoMarca({ children }) {
-  return (
-    <div className="relative h-full overflow-hidden bg-marca-hielo">
-      <div className="absolute -top-24 right-10 w-96 h-72 rounded-full bg-blue-200/50 blur-2xl" aria-hidden="true" />
-      <div className="absolute -bottom-24 -left-10 w-96 h-72 rounded-full bg-marca-verde/20 blur-2xl" aria-hidden="true" />
-      <div className="absolute top-1/3 right-1/3 w-72 h-72 rounded-full bg-marca-verde/10 blur-2xl" aria-hidden="true" />
-      <Cruz className="absolute top-8 right-[42%] w-12 h-12 text-marca-verde/40" />
-      <Cruz className="absolute bottom-10 left-6 w-10 h-10 text-blue-300/60" />
-      <div className="relative h-full">{children}</div>
-    </div>
-  );
-}
-
-function BotonSlide({ to, children, variante = 'verde' }) {
-  const clases = variante === 'verde'
-    ? 'bg-marca-verde hover:bg-marca-verde-oscuro text-white shadow-lg shadow-marca-verde/30'
-    : 'bg-white hover:bg-slate-50 text-marca-noche border border-slate-200';
-  return (
-    <Link to={to} className={`inline-flex items-center gap-2 font-bold sm:text-lg px-5 py-2.5 sm:px-6 sm:py-3 rounded-full transition ${clases}`}>
-      {children}
-      <ChevronRight className="w-5 h-5" />
-    </Link>
-  );
-}
-
-// Slide 1: el banner de la marca (imagen con su propio texto).
-// Se recorta solo por abajo en computador y por la derecha en celular,
-// para que el logo y el mensaje siempre queden a la vista.
+// Slide 1: el banner de la marca (imagen 4:3 con su propio texto).
+// En computador se muestra completo a la altura de la pantalla y sus bordes se funden con el fondo.
 function SlideBanner() {
   return (
     <picture className="block h-full bg-marca-hielo lg:bg-transparent lg:flex lg:justify-center">
@@ -54,94 +18,42 @@ function SlideBanner() {
   );
 }
 
-// Slide 2: turno virtual
-function SlideTurno() {
-  return (
-    <FondoMarca>
-      <div className="h-full max-w-[1440px] mx-auto grid lg:grid-cols-2 gap-8 items-center px-6 sm:px-16 lg:px-24 py-6 sm:py-10">
-        <div className="space-y-4 sm:space-y-5">
-          <p className="hidden sm:block text-marca-noche font-semibold">Sin madrugar, sin filas</p>
-          <h2 className="font-titulo font-black text-2xl sm:text-5xl leading-tight text-marca-noche uppercase">
-            Pide tu <span className="text-marca-verde">turno virtual</span> desde el celular
-          </h2>
-          <p className="hidden sm:block text-lg text-slate-700 max-w-lg">
-            Tus medicamentos quedan apartados mientras llegas. Te avisamos cuando te llamen a la ventanilla.
-          </p>
-          <BotonSlide to="/paciente">Pedir mi turno</BotonSlide>
-        </div>
-        <div className="hidden lg:flex justify-center" aria-hidden="true">
-          <div className="w-72 bg-white rounded-[2rem] shadow-2xl shadow-marca-azul/20 p-5 space-y-4 border border-slate-200">
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Tu turno</p>
-            <div className="bg-gradient-to-br from-marca-azul to-marca-verde text-white rounded-2xl p-5 text-center">
-              <p className="font-titulo text-5xl font-black">V-014</p>
-              <p className="text-sm text-white/80 mt-1">Estás en la fila</p>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="bg-marca-hielo rounded-xl p-2.5">
-                <p className="text-slate-500 text-xs">Tu posición</p>
-                <p className="font-bold text-marca-noche">3º · ~10 min</p>
-              </div>
-              <div className="bg-marca-hielo rounded-xl p-2.5">
-                <p className="text-slate-500 text-xs">Atendiendo</p>
-                <p className="font-bold text-marca-noche">V-011</p>
-              </div>
-            </div>
-            <div className="bg-marca-verde-claro rounded-xl p-3 text-sm flex gap-2 text-marca-noche">
-              <Bell className="w-4 h-4 text-marca-verde-oscuro shrink-0 mt-0.5" />
-              Te avisaremos cuando te llamen.
-            </div>
-          </div>
-        </div>
-      </div>
-    </FondoMarca>
+// Slides de foto 16:9 con el texto a la izquierda.
+// Computador: la foto completa; a los lados, la misma foto desenfocada (sin franjas de color).
+// Celular: versión recortada a 4:3 desde la izquierda, para que el texto se lea completo.
+function SlideFoto({ nombre, alt, enlace }) {
+  const contenido = (
+    <div className="relative h-full overflow-hidden bg-slate-100">
+      <img src={`/img/slide-${nombre}-900.webp`} alt="" aria-hidden="true"
+        className="hidden lg:block absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-70" />
+      <picture className="relative block h-full lg:flex lg:justify-center">
+        <source media="(max-width: 700px)" srcSet={`/img/slide-${nombre}-900.webp`} />
+        <img src={`/img/slide-${nombre}-1600.webp`} alt={alt} loading="lazy"
+          className="w-full h-full object-cover lg:object-contain lg:w-auto lg:max-w-none lg:shadow-2xl" />
+      </picture>
+    </div>
   );
-}
-
-// Slide 3: consulta de disponibilidad
-function SlideDisponibilidad() {
-  const ejemplo = [
-    ['Acetaminofén 500 mg', 'Disponible', 'bg-emerald-100 text-emerald-800'],
-    ['Losartán 50 mg', 'Pocas unidades', 'bg-amber-100 text-amber-900'],
-    ['Metformina 850 mg', 'Disponible', 'bg-emerald-100 text-emerald-800'],
-  ];
-  return (
-    <FondoMarca>
-      <div className="h-full max-w-[1440px] mx-auto grid lg:grid-cols-2 gap-8 items-center px-6 sm:px-16 lg:px-24 py-6 sm:py-10">
-        <div className="space-y-4 sm:space-y-5">
-          <p className="hidden sm:block text-marca-noche font-semibold">Antes de salir de casa</p>
-          <h2 className="font-titulo font-black text-2xl sm:text-5xl leading-tight text-marca-noche uppercase">
-            Consulta si tus <span className="text-marca-verde">medicamentos</span> están disponibles
-          </h2>
-          <p className="hidden sm:block text-lg text-slate-700 max-w-lg">
-            Solo necesitas el código de tu fórmula y tu documento. Si algo falta, te avisamos cuando llegue.
-          </p>
-          <BotonSlide to="/paciente">Consultar mi fórmula</BotonSlide>
-        </div>
-        <div className="hidden lg:flex justify-center" aria-hidden="true">
-          <div className="w-96 bg-white rounded-3xl shadow-2xl shadow-marca-azul/20 p-6 space-y-4 border border-slate-200">
-            <div className="flex items-center gap-2 text-marca-noche font-bold">
-              <Search className="w-5 h-5 text-marca-verde" />
-              Fórmula F-2026-0014
-            </div>
-            <ul className="divide-y divide-slate-100">
-              {ejemplo.map(([nombre, estado, clase]) => (
-                <li key={nombre} className="py-3 flex items-center justify-between gap-3">
-                  <span className="font-semibold text-slate-800">{nombre}</span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${clase}`}>{estado}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </FondoMarca>
-  );
+  return enlace ? <Link to={enlace} className="block h-full" aria-label={alt}>{contenido}</Link> : contenido;
 }
 
 const SLIDES = [
   { id: 'banner', nombre: 'Reclama tus medicamentos', Componente: SlideBanner },
-  { id: 'turno', nombre: 'Turno virtual', Componente: SlideTurno },
-  { id: 'disponibilidad', nombre: 'Consulta de disponibilidad', Componente: SlideDisponibilidad },
+  {
+    id: 'bienestar',
+    nombre: 'El bienestar de tu familia',
+    Componente: () => (
+      <SlideFoto nombre="bienestar"
+        alt="El bienestar de tu familia es nuestra prioridad. Trabajamos de la mano para que disfrutes cada momento con tranquilidad." />
+    ),
+  },
+  {
+    id: 'sede',
+    nombre: 'IPS y droguería en un solo lugar',
+    Componente: () => (
+      <SlideFoto nombre="sede" enlace="/#quienes-somos"
+        alt="La salud y el bienestar en un solo lugar: IPS y droguería juntas para cuidar de ti y de tu familia. Conoce más." />
+    ),
+  },
 ];
 
 const INTERVALO = 7000;
@@ -202,11 +114,11 @@ export default function Carrusel() {
       </div>
 
       <button type="button" onClick={() => ir(actual - 1)} aria-label="Slide anterior"
-        className="hidden sm:flex absolute left-3 xl:left-[max(0.75rem,calc(50%-45rem))] top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/90 hover:bg-white shadow-md text-marca-noche items-center justify-center cursor-pointer">
+        className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/90 hover:bg-white shadow-md text-marca-noche items-center justify-center cursor-pointer">
         <ChevronLeft className="w-6 h-6" />
       </button>
       <button type="button" onClick={() => ir(actual + 1)} aria-label="Slide siguiente"
-        className="hidden sm:flex absolute right-3 xl:right-[max(0.75rem,calc(50%-45rem))] top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/90 hover:bg-white shadow-md text-marca-noche items-center justify-center cursor-pointer">
+        className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white/90 hover:bg-white shadow-md text-marca-noche items-center justify-center cursor-pointer">
         <ChevronRight className="w-6 h-6" />
       </button>
 
