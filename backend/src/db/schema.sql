@@ -215,3 +215,14 @@ CREATE TABLE IF NOT EXISTS pagos (
   fecha       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_pagos_fecha ON pagos (fecha);
+
+-- ============================================================
+-- Cajas de atención: 1 a 5 generales y 6 preferencial
+-- ============================================================
+-- Caja en la que se llamó el turno (queda guardada para reportes)
+ALTER TABLE turnos ADD COLUMN IF NOT EXISTS caja SMALLINT CHECK (caja BETWEEN 1 AND 6);
+
+-- Un solo turno llamado por caja a la vez
+CREATE UNIQUE INDEX IF NOT EXISTS un_llamado_por_caja
+  ON turnos (fecha, caja)
+  WHERE estado = 'llamado';

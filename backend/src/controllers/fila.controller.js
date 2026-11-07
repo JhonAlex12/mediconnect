@@ -25,7 +25,7 @@ export async function fisico(req, res, next) {
 // POST /api/fila/llamar-siguiente
 export async function llamar(req, res, next) {
   try {
-    const turno = await llamarSiguiente(req.empleado);
+    const turno = await llamarSiguiente(req.empleado, Number(req.body?.caja));
     publicarCambios([turno.id]);
     res.json({ ok: true, turno });
   } catch (error) {

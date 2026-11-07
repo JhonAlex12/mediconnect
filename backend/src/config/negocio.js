@@ -46,3 +46,8 @@ export const EXENCIONES = {
 };
 
 export const MEDIOS_PAGO = ['efectivo', 'transferencia', 'datafono'];
+
+// ---------- Cajas de atención ----------
+// 1 a 5: generales. 6: preferencial (adultos mayores, embarazadas y personas con discapacidad)
+export const CAJAS = [1, 2, 3, 4, 5, 6];
+export const CAJA_PREFERENCIAL = 6;

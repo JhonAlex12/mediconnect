@@ -181,7 +181,7 @@ export async function obtenerMiTurno(turnoId) {
   // LEFT JOIN: los turnos físicos pueden no tener fórmula vinculada
   const { rows: [t] } = await pool.query(
     `SELECT t.id, t.numero, t.estado, t.prioridad, t.fecha, t.hora_toma,
-            t.hora_vencimiento, t.retraso_usado, f.codigo AS formula, f.fecha_limite,
+            t.hora_vencimiento, t.retraso_usado, t.caja, f.codigo AS formula, f.fecha_limite,
             CASE WHEN EXISTS (SELECT 1 FROM pagos pg WHERE pg.formula_id = f.id) THEN 0
                  ELSE COALESCE(f.cuota_moderadora, 0) END AS valor_a_pagar
        FROM turnos t
@@ -221,6 +221,7 @@ export async function obtenerMiTurno(turnoId) {
     prioridad: t.prioridad,
     formula: t.formula,
     reclamar_hasta: t.fecha_limite,
+    caja: t.estado === 'llamado' ? t.caja : null,
     valor_a_pagar: t.valor_a_pagar,
     vence_turno: t.hora_vencimiento,
     retraso_disponible: !t.retraso_usado && ['reservado', 'en_camino'].includes(t.estado),

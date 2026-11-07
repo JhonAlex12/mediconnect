@@ -1,36 +1,45 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { Bell, Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
+import { Accessibility, Bell, Maximize, Minimize, Pill, Volume2, VolumeX } from 'lucide-react';
 import { useTitulo } from '../Encabezado';
 import { leerToken } from '../../lib/api';
 
-// Pantalla de la sala de espera.
-// La abre un empleado desde el panel (usa su sesión): muestra el nombre corto de quien
-// están llamando ("María R."), lo anuncia con una campanada y por voz.
-// La lista de próximos turnos va sin nombres.
+// Pantalla de la sala de espera (para el televisor).
+// La abre un empleado desde el panel (usa su sesión). Muestra quién está en cada una de las
+// 6 cajas, anuncia cada llamado con campanada y voz, y la fila de próximos va sin nombres.
+
+const MENSAJES = [
+  'Recuerda reclamar tus medicamentos antes de la fecha límite de tu fórmula.',
+  'Ten listo tu documento y el valor de tu cuota moderadora.',
+  'Caja 6: atención preferencial para adultos mayores, embarazadas y personas con discapacidad.',
+  'Pide tu turno virtual desde el celular y evita la fila.',
+];
+
+const ESTADO_INICIAL = { cajas: [], ultimo: null, proximos: [], en_pausa: [] };
+
 export default function PantallaPublica() {
   useTitulo('Pantalla de la sala');
   const [token] = useState(leerToken);
-  const [estado, setEstado] = useState({ llamando: null, llamando_nombre: null, proximos: [], en_pausa: [] });
+  const [estado, setEstado] = useState(ESTADO_INICIAL);
   const [conectado, setConectado] = useState(false);
   const [sinSesion, setSinSesion] = useState(!token);
   const [ahora, setAhora] = useState(() => new Date());
   const [iniciada, setIniciada] = useState(false);   // el navegador solo permite sonido tras un toque
   const [conSonido, setConSonido] = useState(true);
   const [completa, setCompleta] = useState(false);
-  const [destacar, setDestacar] = useState(false);
+  const [aviso, setAviso] = useState(null);          // llamado que se muestra en grande unos segundos
+  const [mensaje, setMensaje] = useState(0);
   const voces = useVocesEspanol();
   const [voz, setVoz] = useState(() => leerVozGuardada());
-  const vozActual = useRef(voz);
-  vozActual.current = voz;
+  const contenedor = useRef(null);
+  const anterior = useRef(undefined);
+  const config = useRef({});
+  config.current = { sonido: iniciada && conSonido, voz };
+
   const elegirVoz = (nombre) => {
     setVoz(nombre);
     try { localStorage.setItem(CLAVE_VOZ, nombre); } catch { /* sin almacenamiento */ }
   };
-  const contenedor = useRef(null);
-  const anterior = useRef(undefined);
-  const sonido = useRef(false);
-  sonido.current = iniciada && conSonido;
 
   // Estado inicial por HTTP y después en vivo por Socket.IO (ambos con la sesión del empleado)
   useEffect(() => {
@@ -58,27 +67,27 @@ export default function PantallaPublica() {
     return () => socket.disconnect();
   }, [token]);
 
-  // Al cambiar el turno llamado: se resalta y, si el sonido está activo, se anuncia
+  // Cada llamado nuevo (en cualquier caja) se muestra en grande y se anuncia
   useEffect(() => {
-    const numero = estado.llamando;
+    if (estado === ESTADO_INICIAL) return undefined; // aún no llega el primer estado
+    const u = estado.ultimo;
     if (anterior.current === undefined) {
-      anterior.current = numero; // primera carga: no se anuncia
+      anterior.current = u?.id ?? null; // primera carga: no se anuncia
       return undefined;
     }
-    if (!numero || numero === anterior.current) {
-      anterior.current = numero;
-      return undefined;
-    }
-    anterior.current = numero;
-    setDestacar(true);
-    const t = setTimeout(() => setDestacar(false), 8000);
-    if (sonido.current) anunciar(numero, estado.llamando_nombre, vozActual.current);
+    if (!u || u.id === anterior.current) return undefined;
+    anterior.current = u.id;
+    setAviso(u);
+    if (config.current.sonido) anunciar(u, config.current.voz);
+    const t = setTimeout(() => setAviso(null), 9000);
     return () => clearTimeout(t);
-  }, [estado.llamando, estado.llamando_nombre]);
+  }, [estado]);
 
+  // Reloj y mensajes de la franja inferior
   useEffect(() => {
-    const t = setInterval(() => setAhora(new Date()), 15000);
-    return () => clearInterval(t);
+    const reloj = setInterval(() => setAhora(new Date()), 10000);
+    const rotar = setInterval(() => setMensaje((m) => (m + 1) % MENSAJES.length), 12000);
+    return () => { clearInterval(reloj); clearInterval(rotar); };
   }, []);
 
   useEffect(() => {
@@ -101,119 +110,197 @@ export default function PantallaPublica() {
 
   if (sinSesion) {
     return (
-      <div className="bg-slate-950 text-white min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="bg-marca-noche text-white min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
         <p className="text-3xl font-bold">Pantalla de la sala de espera</p>
-        <p className="text-slate-300 text-lg max-w-lg">
+        <p className="text-blue-100 text-lg max-w-lg">
           Esta pantalla la abre un empleado desde el panel de la farmacia, con su sesión iniciada.
           Si la sesión venció, vuelve a abrirla desde el panel.
         </p>
-        <a href="/farmacia" className="bg-emerald-600 hover:bg-emerald-500 font-bold px-6 py-3 rounded-lg">Ir al panel de la farmacia</a>
+        <a href="/farmacia" className="bg-marca-verde hover:bg-marca-verde-oscuro font-bold px-6 py-3 rounded-lg">Ir al panel de la farmacia</a>
       </div>
     );
   }
 
+  const [hh, mm] = ahora.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit', hour12: true }).split(':');
+  const ampm = ahora.getHours() < 12 ? 'AM' : 'PM';
+
   return (
-    <div ref={contenedor} className="bg-slate-950 text-white min-h-screen flex flex-col relative">
-      <header className="flex items-center justify-between gap-4 px-8 py-4 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <img src="/img/logo-simbolo.png" alt="" className="w-12 h-12 object-contain" />
-          <div>
-            <p className="text-2xl font-black">Mediconnect · Farmacia</p>
-            <p className="text-slate-400 capitalize">
-              {ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+    <div ref={contenedor} className="relative h-screen w-screen overflow-hidden bg-white text-marca-noche select-none">
+      <Fondo />
+
+      <div className="relative h-full grid grid-cols-[58fr_42fr] grid-rows-[1fr_auto]">
+        {/* ---------- Izquierda: logo y tabla de cajas ---------- */}
+        <div className="pl-[5vw] pr-[2vw] pt-[5vh] flex flex-col min-h-0">
+          <div className="flex items-center gap-[1vw]">
+            <img src="/img/logo-simbolo.png" alt="" className="h-[9vh] w-auto drop-shadow" />
+            <p className="font-titulo font-extrabold text-[5.5vh] leading-none text-white drop-shadow">
+              Medi<span className="text-marca-verde-claro">connect</span>
+            </p>
+          </div>
+
+          <div className="mt-[3vh] rounded-[1.5vh] bg-white p-[0.6vh] shadow-2xl">
+            <table className="w-full border-separate border-spacing-[0.5vh] text-left">
+              <thead>
+                <tr className="text-white font-titulo font-bold text-[3vh] tracking-wide">
+                  <th className="bg-marca-noche px-[1.5vw] py-[1.4vh] rounded-tl-[1vh] w-[52%]">PACIENTE</th>
+                  <th className="bg-marca-noche px-[1vw] py-[1.4vh] text-center">TURNO</th>
+                  <th className="bg-marca-noche px-[1vw] py-[1.4vh] text-center rounded-tr-[1vh]">CAJA</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estado.cajas.map((c) => {
+                  const resaltar = aviso && aviso.caja === c.caja;
+                  return (
+                    <tr key={c.caja} className={resaltar ? 'animate-pulse' : undefined}>
+                      <td className={`px-[1.5vw] h-[7.4vh] text-[3.8vh] font-semibold truncate ${
+                        resaltar ? 'bg-marca-verde text-white' : 'bg-marca-noche text-white'}`}>
+                        {c.nombre ?? <span className="text-white/40">—</span>}
+                      </td>
+                      <td className={`text-center font-titulo font-extrabold text-[5vh] tabular-nums ${
+                        resaltar ? 'bg-marca-verde-claro' : 'bg-slate-100'}`}>
+                        {c.numero ?? <span className="text-slate-300">—</span>}
+                      </td>
+                      <td className="text-center bg-slate-200/80">
+                        <span className="font-titulo font-extrabold text-[5vh] leading-none">{c.caja}</span>
+                        {c.preferencial && (
+                          <span className="flex items-center justify-center gap-1 text-[1.7vh] font-bold text-marca-verde-oscuro">
+                            <Accessibility className="w-[2vh] h-[2vh]" /> Preferencial
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {/* Próximos (sin nombres) y llamados que no se presentaron */}
+            <div className="px-[1.2vw] py-[1vh] text-[2.5vh] font-semibold flex flex-wrap gap-x-[2vw] gap-y-[0.3vh]">
+              <p>
+                <span className="text-slate-500">Próximos: </span>
+                <span className="tabular-nums">{estado.proximos.length ? estado.proximos.join('  ·  ') : 'nadie en espera'}</span>
+              </p>
+              {estado.en_pausa.length > 0 && (
+                <p className="text-amber-700">
+                  <span>No se presentaron: </span>
+                  <span className="tabular-nums">{estado.en_pausa.join('  ·  ')}</span>
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ---------- Derecha: sede y bienvenida ---------- */}
+        <div className="pr-[4vw] pl-[1vw] pt-[5vh] flex flex-col items-center min-h-0">
+          <h1 className="font-titulo font-extrabold text-[6.5vh] leading-[1.05] text-center">
+            Sede Principal<br /><span className="text-marca-verde-oscuro">Mediconnect</span>
+          </h1>
+          <img src="/img/pantalla-sede.webp" alt="Sede de Mediconnect"
+            className="mt-[3vh] w-full max-h-[45vh] object-cover rounded-[4vh] shadow-xl" />
+          <p className="mt-[3vh] font-titulo font-black text-[6vh] leading-none">BIENVENIDOS</p>
+          <p className="text-[3.2vh] mt-[0.8vh]">Estamos para cuidarte</p>
+        </div>
+
+        {/* ---------- Franja inferior: mensajes y hora ---------- */}
+        <div className="col-span-2 relative h-[15vh] flex items-center">
+          <div className="ml-[3vw] mr-[18vw] flex-1 h-[10vh] rounded-r-full rounded-l-[2vh] bg-marca-verde flex items-center gap-[2vw] px-[2vw] text-white shadow-lg">
+            <Pill className="w-[6vh] h-[6vh] shrink-0" strokeWidth={1.5} />
+            <span className="w-px h-[6vh] bg-white/50" aria-hidden="true" />
+            <p key={mensaje} className="text-[3.3vh] font-semibold leading-tight animate-[aparecer_0.8s_ease]">{MENSAJES[mensaje]}</p>
+          </div>
+          <div className="absolute right-0 bottom-0 w-[17vw] h-[19vh] rounded-tl-[12vh] bg-gradient-to-br from-marca-azul to-marca-verde-oscuro text-white flex flex-col items-center justify-center">
+            <p className="font-titulo font-extrabold text-[8vh] leading-none tabular-nums">{hh}:{mm.slice(0, 2)}</p>
+            <p className="font-titulo font-bold text-[3.5vh] leading-none mt-[0.5vh]">{ampm}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Controles discretos (arriba a la derecha) */}
+      <div className="absolute top-[1.5vh] right-[1.5vw] z-20 flex items-center gap-2 opacity-30 hover:opacity-100 transition">
+        <span className={`w-3 h-3 rounded-full ${conectado ? 'bg-emerald-500' : 'bg-red-500'}`}
+          title={conectado ? 'En vivo' : 'Sin conexión'} aria-label={conectado ? 'En vivo' : 'Sin conexión'} />
+        {voces.length > 0 && (
+          <select value={voz} onChange={(e) => elegirVoz(e.target.value)} aria-label="Voz de los anuncios"
+            className="bg-white border border-slate-300 text-sm rounded-lg px-2 py-1.5 max-w-56 cursor-pointer">
+            <option value="">Voz automática</option>
+            {voces.map((v) => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
+          </select>
+        )}
+        <Control onClick={() => setConSonido((v) => !v)} etiqueta={conSonido ? 'Silenciar anuncios' : 'Activar anuncios'}>
+          {conSonido ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+        </Control>
+        <Control onClick={() => anunciar(estado.ultimo ?? { numero: 'V-001', nombre: 'María Rojas', caja: 1 }, voz)} etiqueta="Probar el anuncio">
+          <Bell className="w-5 h-5" />
+        </Control>
+        <Control onClick={alternarPantallaCompleta} etiqueta={completa ? 'Salir de pantalla completa' : 'Pantalla completa'}>
+          {completa ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+        </Control>
+      </div>
+
+      {/* Aviso grande del llamado */}
+      {aviso && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-marca-noche/60 backdrop-blur-sm" aria-live="assertive">
+          <div className="bg-white rounded-[4vh] shadow-2xl px-[6vw] py-[5vh] text-center border-[1vh] border-marca-verde animate-[aparecer_0.5s_ease]">
+            <p className="font-titulo font-bold text-[4vh] text-slate-500 tracking-widest">TURNO</p>
+            <p className="font-titulo font-black text-[16vh] leading-none tabular-nums">{aviso.numero}</p>
+            {aviso.nombre && <p className="text-[6vh] font-bold mt-[1vh]">{aviso.nombre}</p>}
+            <p className="mt-[2vh] inline-block bg-marca-verde text-white font-titulo font-extrabold text-[6vh] px-[3vw] py-[1vh] rounded-[2vh]">
+              Caja {aviso.caja}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className="text-4xl font-bold tabular-nums">
-            {ahora.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })}
-          </span>
-          <span className={`w-3 h-3 rounded-full ${conectado ? 'bg-emerald-400' : 'bg-red-500'}`}
-            title={conectado ? 'En vivo' : 'Sin conexión'} aria-label={conectado ? 'En vivo' : 'Sin conexión'} />
-          <button type="button" onClick={() => setConSonido((v) => !v)}
-            aria-label={conSonido ? 'Silenciar anuncios' : 'Activar anuncios'}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
-            {conSonido ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
-          </button>
-          {voces.length > 0 && (
-            <select value={voz} onChange={(e) => elegirVoz(e.target.value)} aria-label="Voz de los anuncios"
-              className="bg-slate-800 text-white text-sm rounded-lg px-2 py-2 max-w-56 cursor-pointer">
-              <option value="">Voz automática</option>
-              {voces.map((v) => <option key={v.name} value={v.name}>{v.name} ({v.lang})</option>)}
-            </select>
-          )}
-          <button type="button" onClick={() => anunciar(estado.llamando ?? 'V-001', estado.llamando ? estado.llamando_nombre : 'María Rojas', voz)}
-            aria-label="Probar el anuncio" title="Probar el anuncio"
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
-            <Bell className="w-5 h-5" />
-          </button>
-          <button type="button" onClick={alternarPantallaCompleta}
-            aria-label={completa ? 'Salir de pantalla completa' : 'Pantalla completa'}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
-            {completa ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-          </button>
-        </div>
-      </header>
-
-      <div className="flex-1 grid lg:grid-cols-[3fr_2fr]">
-        <section className={`flex flex-col items-center justify-center p-10 text-center transition-colors duration-700 ${
-          destacar ? 'bg-emerald-600' : 'bg-slate-900'
-        }`} aria-live="assertive">
-          <p className="text-3xl font-semibold text-slate-300 uppercase tracking-widest">Turno</p>
-          <p className="text-[9rem] leading-none font-black my-4 tabular-nums">{estado.llamando ?? '—'}</p>
-          {estado.llamando_nombre && (
-            <p className="text-6xl font-bold mb-4">{estado.llamando_nombre}</p>
-          )}
-          <p className="text-3xl font-semibold">{estado.llamando ? 'Acérquese a la ventanilla' : 'Espere su turno'}</p>
-        </section>
-
-        <section className="p-8 space-y-8">
-          <div>
-            <h2 className="text-xl font-bold text-slate-400 uppercase tracking-wide mb-4">Próximos</h2>
-            {estado.proximos.length === 0 ? (
-              <p className="text-2xl text-slate-500">No hay turnos en espera</p>
-            ) : (
-              <ol className="space-y-3">
-                {estado.proximos.map((n, i) => (
-                  <li key={n} className={`flex items-center justify-between rounded-xl px-6 py-3 ${
-                    i === 0 ? 'bg-slate-800 text-4xl' : 'bg-slate-900 text-3xl text-slate-300'
-                  } font-black tabular-nums`}>
-                    {n}
-                    {i === 0 && <span className="text-base font-semibold text-emerald-400">Sigue</span>}
-                  </li>
-                ))}
-              </ol>
-            )}
-          </div>
-
-          {estado.en_pausa.length > 0 && (
-            <div>
-              <h2 className="text-xl font-bold text-amber-400 uppercase tracking-wide mb-2">
-                Llamados que no se presentaron
-              </h2>
-              <p className="text-slate-400 mb-3">Si es su turno, acérquese a la ventanilla.</p>
-              <div className="flex flex-wrap gap-3">
-                {estado.en_pausa.map((n) => (
-                  <span key={n} className="text-2xl font-black bg-amber-500/15 text-amber-300 px-4 py-2 rounded-lg tabular-nums">
-                    {n}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </section>
-      </div>
+      )}
 
       {/* Primer toque: el navegador no deja reproducir sonido sin una interacción */}
       {!iniciada && (
         <button type="button" onClick={iniciar}
-          className="absolute inset-0 z-10 bg-slate-950/85 flex flex-col items-center justify-center gap-4 cursor-pointer">
-          <Volume2 className="w-20 h-20 text-emerald-400" />
+          className="absolute inset-0 z-40 bg-marca-noche/85 text-white flex flex-col items-center justify-center gap-4 cursor-pointer">
+          <Volume2 className="w-20 h-20 text-marca-verde" />
           <span className="text-4xl font-black">Toca para iniciar la pantalla</span>
-          <span className="text-xl text-slate-300">Se activan el sonido y la pantalla completa</span>
+          <span className="text-xl text-blue-100">Se activan el sonido y la pantalla completa</span>
         </button>
       )}
+
+      <style>{'@keyframes aparecer { from { opacity: 0; transform: translateY(1.5vh) scale(0.98); } to { opacity: 1; transform: none; } }'}</style>
     </div>
+  );
+}
+
+function Control({ onClick, etiqueta, children }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={etiqueta} title={etiqueta}
+      className="p-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 cursor-pointer">
+      {children}
+    </button>
+  );
+}
+
+// Fondo con formas curvas de la marca (azul → verde agua), como la imagen de referencia
+function Fondo() {
+  return (
+    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="fondo-azul" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#2257c5" />
+          <stop offset="0.55" stopColor="#163f99" />
+          <stop offset="1" stopColor="#14ada2" />
+        </linearGradient>
+        <linearGradient id="fondo-verde" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#14ada2" />
+          <stop offset="1" stopColor="#2257c5" />
+        </linearGradient>
+      </defs>
+      <rect width="1600" height="900" fill="#f1f8fb" />
+      {/* Mancha principal a la izquierda */}
+      <path fill="url(#fondo-azul)"
+        d="M0 0 H560 C640 40 600 150 520 190 C430 235 460 330 560 380 C690 445 760 560 700 690 C660 780 560 800 470 760 C380 720 330 760 260 820 C190 880 80 880 0 860 Z" />
+      {/* Ola inferior */}
+      <path fill="url(#fondo-verde)" opacity="0.9"
+        d="M0 760 C220 700 420 790 650 760 C900 725 1100 690 1300 740 C1450 778 1540 760 1600 730 V900 H0 Z" />
+      {/* Detalles */}
+      <circle cx="90" cy="250" r="22" fill="#14ada2" />
+      <ellipse cx="110" cy="420" rx="40" ry="62" fill="#14ada2" opacity="0.85" />
+      <path fill="#e0f5f3" opacity="0.6" d="M1600 0 V160 C1500 120 1440 40 1460 0 Z" />
+    </svg>
   );
 }
 
@@ -226,7 +313,6 @@ function desbloquearAudio() {
   try {
     contextoAudio ??= new (window.AudioContext || window.webkitAudioContext)();
     contextoAudio.resume?.();
-    // Algunos navegadores solo cargan las voces después de una interacción
     window.speechSynthesis?.getVoices();
   } catch {
     // Sin audio: queda el aviso visual
@@ -277,7 +363,6 @@ function useVocesEspanol() {
     const leer = () => {
       const todas = synth.getVoices();
       const es = todas.filter(esEspanol);
-      // Primero las de Colombia y las "naturales" (suenan mejor)
       const puntaje = (v) => (v.lang === 'es-CO' ? 2 : 0) + (/natural|online|google/i.test(v.name) ? 1 : 0);
       setVoces((es.length ? es : todas).slice().sort((a, b) => puntaje(b) - puntaje(a)));
     };
@@ -298,17 +383,17 @@ function buscarVoz(nombre) {
     ?? todas.find(esEspanol);
 }
 
-// Campanada y luego: "Turno V 0 1 4. María Rojas. Acérquese a la ventanilla." (se repite el turno)
-function anunciar(numero, nombre, nombreVoz) {
+// Campanada y luego: "Turno V 0 0 5. Carlos Gómez. Caja 6." (se repite turno y caja)
+function anunciar({ numero, nombre, caja }, nombreVoz) {
   const espera = campanada();
   setTimeout(() => {
     try {
       const synth = window.speechSynthesis;
       if (!synth) return;
       const deletreado = numero.replace('-', ' ').split('').join(' ');
-      const texto = `Turno ${deletreado}.${nombre ? ` ${nombre.replace(/\.$/, '')}.` : ''} Acérquese a la ventanilla.`;
+      const texto = `Turno ${deletreado}.${nombre ? ` ${nombre}.` : ''} Caja ${caja}.`;
       synth.cancel();
-      [texto, `Turno ${deletreado}.`].forEach((t) => {
+      [texto, `Turno ${deletreado}, caja ${caja}.`].forEach((t) => {
         const frase = new SpeechSynthesisUtterance(t);
         frase.lang = 'es-CO';
         const voz = buscarVoz(nombreVoz);

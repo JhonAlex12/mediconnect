@@ -28,7 +28,7 @@ function CobroFormula({ cobro }) {
         <div>
           <p className="font-bold text-marca-noche">Valor a pagar al reclamar: {pesos(cobro.valor)}</p>
           <p className="text-sm text-slate-600">
-            Cuota moderadora. Se paga una sola vez en la ventanilla, en efectivo, transferencia o tarjeta.
+            Cuota moderadora. Se paga una sola vez en la caja, en efectivo, transferencia o tarjeta.
             Sin el pago no se pueden entregar los medicamentos.
           </p>
         </div>
@@ -291,7 +291,7 @@ const TEXTO_ESTADO = {
   reservado: 'Tu turno está reservado. Avísanos cuando salgas hacia la farmacia.',
   en_camino: 'Vas en camino. Cuando llegues, presiona "Ya llegué".',
   presente: 'Estás en la fila. Te llamaremos pronto.',
-  llamado: '¡Es tu turno! Acércate a la ventanilla.',
+  llamado: '¡Es tu turno! Acércate a la caja.',
   en_pausa: 'Te llamamos y no te encontramos. Si ya estás aquí, presiona "Ya llegué".',
   atendido: 'Tu turno fue atendido. ¡Gracias!',
   cancelado: 'Cancelaste este turno.',
@@ -388,7 +388,11 @@ function MiTurno({ token, alSalir }) {
           Tu turno
         </p>
         <p className={`text-6xl font-black ${terminado ? 'text-slate-400' : ''}`}>{turno.numero}</p>
-        <p className={`font-semibold ${terminado ? 'text-slate-700' : ''}`}>{TEXTO_ESTADO[turno.estado] ?? turno.estado}</p>
+        {llamado && turno.caja ? (
+          <p className="text-2xl font-black">¡Es tu turno! Acércate a la caja {turno.caja}.</p>
+        ) : (
+          <p className={`font-semibold ${terminado ? 'text-slate-700' : ''}`}>{TEXTO_ESTADO[turno.estado] ?? turno.estado}</p>
+        )}
       </section>
 
       {!terminado && (

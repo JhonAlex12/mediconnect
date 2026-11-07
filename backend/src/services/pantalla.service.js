@@ -1,5 +1,5 @@
 import { pool } from '../db/pool.js';
-import { ZONA_HORARIA } from '../config/negocio.js';
+import { ZONA_HORARIA, CAJAS, CAJA_PREFERENCIAL } from '../config/negocio.js';
 
 const HOY = `(now() AT TIME ZONE '${ZONA_HORARIA}')::date`;
 
@@ -30,7 +30,7 @@ export function nombreCorto(nombre) {
 // muestra el nombre corto SOLO del turno que se está llamando; la fila va sin nombres.
 export async function estadoPantalla() {
   const { rows } = await pool.query(
-    `SELECT t.numero, t.estado, COALESCE(p.nombre, t.nombre_visitante) AS nombre
+    `SELECT t.id, t.numero, t.estado, t.caja, t.hora_llamado, COALESCE(p.nombre, t.nombre_visitante) AS nombre
        FROM turnos t
        LEFT JOIN pacientes p ON p.id = t.paciente_id
       WHERE t.fecha = ${HOY}
@@ -45,10 +45,24 @@ export async function estadoPantalla() {
                (t.prioridad <> 'ninguna') DESC, t.orden ASC`
   );
 
-  const llamado = rows.find((r) => r.estado === 'llamado');
+  const llamados = rows.filter((r) => r.estado === 'llamado' && r.caja);
+  // El llamado más reciente es el que se anuncia
+  const ultimo = llamados.reduce((a, r) => (!a || r.hora_llamado > a.hora_llamado ? r : a), null);
   return {
-    llamando: llamado?.numero ?? null,
-    llamando_nombre: llamado ? nombreCorto(llamado.nombre) : null,
+    // Una fila por caja: quién está siendo atendido en cada una
+    cajas: CAJAS.map((caja) => {
+      const t = llamados.find((r) => r.caja === caja);
+      return {
+        caja,
+        preferencial: caja === CAJA_PREFERENCIAL,
+        numero: t?.numero ?? null,
+        nombre: t ? nombreCorto(t.nombre) : null,
+      };
+    }),
+    ultimo: ultimo
+      ? { id: `${ultimo.id}-${new Date(ultimo.hora_llamado).getTime()}`, numero: ultimo.numero,
+          nombre: nombreCorto(ultimo.nombre), caja: ultimo.caja }
+      : null,
     proximos: rows
       .filter((r) => ['presente', 'en_camino', 'reservado'].includes(r.estado))
       .slice(0, 5)

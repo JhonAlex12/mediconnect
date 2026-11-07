@@ -20,6 +20,17 @@ const ESTADOS = {
   en_pausa: 'En pausa',
 };
 
+// Cajas de atención: 1 a 5 generales, 6 preferencial (igual que en el backend)
+const CAJAS = [1, 2, 3, 4, 5, 6];
+const CAJA_PREFERENCIAL = 6;
+const nombreCaja = (c) => (c === CAJA_PREFERENCIAL ? `Caja ${c} · Preferencial` : `Caja ${c}`);
+
+// Cada equipo recuerda en qué caja trabaja su auxiliar
+const CLAVE_CAJA = 'mediconect_caja';
+const leerCaja = () => {
+  try { return Number(localStorage.getItem(CLAVE_CAJA)) || null; } catch { return null; }
+};
+
 const hora = (fecha) =>
   fecha ? new Date(fecha).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '—';
 
@@ -36,6 +47,12 @@ export default function FilaFarmacia() {
   const [datos, setDatos] = useState({ turno_actual: null, presentes: 0, fila: [] });
   const [cargando, setCargando] = useState(true);
   const [dispensando, setDispensando] = useState(null); // id del turno con la entrega abierta
+  const [caja, setCaja] = useState(leerCaja);
+  const elegirCaja = (c) => {
+    setCaja(c);
+    setDispensando(null);
+    try { localStorage.setItem(CLAVE_CAJA, String(c)); } catch { /* sin almacenamiento */ }
+  };
 
   const cargar = useCallback(async () => {
     try {
@@ -54,14 +71,16 @@ export default function FilaFarmacia() {
 
   const llamarSiguiente = () =>
     ejecutar(
-      () => api('/fila/llamar-siguiente', { metodo: 'POST' }),
-      (r) => `Llamando al turno ${r.turno.numero}`
+      () => api('/fila/llamar-siguiente', { metodo: 'POST', cuerpo: { caja } }),
+      (r) => `Caja ${caja}: llamando al turno ${r.turno.numero}`
     );
 
   const accionTurno = (turno, accion, texto) =>
     ejecutar(() => api(`/fila/${turno.id}/${accion}`, { metodo: 'POST' }), `Turno ${turno.numero}: ${texto}`);
 
-  const llamado = datos.fila.find((t) => t.estado === 'llamado');
+  // Lo que se atiende en MI caja; los llamados de las otras cajas se ven aparte
+  const llamado = datos.fila.find((t) => t.estado === 'llamado' && t.caja === caja);
+  const otrasCajas = datos.fila.filter((t) => t.estado === 'llamado' && t.caja !== caja);
   // La entrega solo sigue abierta mientras ese mismo turno esté en ventanilla
   const entregaAbierta = llamado && dispensando === llamado.id;
   const presentes = datos.fila.filter((t) => t.estado === 'presente');
@@ -76,6 +95,26 @@ export default function FilaFarmacia() {
         <IndicadorEnVivo />
       </div>
 
+      {/* Caja en la que trabaja este auxiliar */}
+      <section className="bg-white rounded-xl border border-slate-300 p-4 flex items-center gap-3 flex-wrap">
+        <p className="font-bold text-slate-800">Estoy atendiendo en:</p>
+        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Mi caja">
+          {CAJAS.map((c) => (
+            <button key={c} type="button" role="radio" aria-checked={caja === c} onClick={() => elegirCaja(c)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-bold border transition cursor-pointer ${
+                caja === c ? 'bg-marca-azul text-white border-marca-azul' : 'bg-white text-slate-700 border-slate-300 hover:border-marca-azul'
+              }`}>
+              {nombreCaja(c)}
+            </button>
+          ))}
+        </div>
+        {otrasCajas.length > 0 && (
+          <p className="text-sm text-slate-500 w-full">
+            En otras cajas: {otrasCajas.map((t) => `${t.numero} (caja ${t.caja ?? '?'})`).join(' · ')}
+          </p>
+        )}
+      </section>
+
       <Aviso aviso={aviso} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -84,7 +123,7 @@ export default function FilaFarmacia() {
           {/* Ventanilla: turno llamado o botón para llamar al siguiente (RF-21, RF-22) */}
           <section className="bg-white rounded-xl shadow-md border border-slate-300 p-6">
             <p className="text-sm font-bold uppercase tracking-wide text-slate-500 mb-3">
-              En ventanilla
+              {caja ? `En ${nombreCaja(caja).toLowerCase()}` : 'Elige tu caja para empezar'}
             </p>
             {llamado ? (
               <div className="space-y-4">
@@ -132,13 +171,13 @@ export default function FilaFarmacia() {
             ) : (
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <p className="text-slate-600">
-                  No hay nadie en ventanilla.{' '}
+                  {caja ? 'No hay nadie en tu caja.' : 'Elige arriba en qué caja estás.'}{' '}
                   <strong>{presentes.length}</strong> {presentes.length === 1 ? 'persona espera' : 'personas esperan'}.
                 </p>
                 <button
                   type="button"
                   onClick={llamarSiguiente}
-                  disabled={ocupado || presentes.length === 0}
+                  disabled={ocupado || !caja || presentes.length === 0}
                   className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-lg px-6 py-3 rounded-lg transition cursor-pointer"
                 >
                   <Megaphone className="w-5 h-5" />

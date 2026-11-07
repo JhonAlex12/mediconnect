@@ -1,12 +1,21 @@
 import { pool } from '../db/pool.js';
 import { ErrorNegocio } from './formulas.service.js';
 import { registrarAcceso } from './auditoria.service.js';
-import { ZONA_HORARIA, ESTADOS_ACTIVOS, PRIORIDADES } from '../config/negocio.js';
+import { ZONA_HORARIA, ESTADOS_ACTIVOS, PRIORIDADES, CAJAS, CAJA_PREFERENCIAL } from '../config/negocio.js';
 
 const HOY = `(now() AT TIME ZONE '${ZONA_HORARIA}')::date`;
 
-// Orden de llamado: primero quienes tienen prioridad (RN-05), luego por lugar en la fila
+// Orden de la fila: primero quienes tienen prioridad (RN-05), luego por lugar en la fila
 const ORDEN_LLAMADO = `(t.prioridad <> 'ninguna') DESC, t.orden ASC`;
+
+// A quién llama cada caja:
+//  - Caja preferencial: primero prioridad; si no hay, el siguiente general.
+//  - Cajas generales: primero los turnos sin prioridad; si no queda ninguno, toman uno con prioridad
+//    (así nadie se queda esperando si la caja preferencial está ocupada).
+const ordenPorCaja = (caja) =>
+  caja === CAJA_PREFERENCIAL
+    ? `(t.prioridad <> 'ninguna') DESC, t.orden ASC`
+    : `(t.prioridad <> 'ninguna') ASC, t.orden ASC`;
 
 // Notificación al paciente, solo si el turno tiene un paciente registrado (RN-14)
 async function notificar(cliente, pacienteId, tipo, mensaje) {
@@ -22,7 +31,7 @@ async function notificar(cliente, pacienteId, tipo, mensaje) {
 // ============================================================
 export async function verFila() {
   const { rows } = await pool.query(
-    `SELECT t.id, t.numero, t.tipo, t.prioridad, t.estado, t.veces_pausado,
+    `SELECT t.id, t.numero, t.tipo, t.prioridad, t.estado, t.veces_pausado, t.caja,
             t.hora_toma, t.hora_llegada, t.hora_llamado,
             COALESCE(p.nombre, t.nombre_visitante) AS paciente,
             f.codigo AS formula
@@ -119,7 +128,10 @@ export async function registrarFisico({ nombre, codigo, documento, prioridad = '
 // ============================================================
 // LLAMAR SIGUIENTE (RF-21)
 // ============================================================
-export async function llamarSiguiente(empleado) {
+export async function llamarSiguiente(empleado, caja) {
+  if (!CAJAS.includes(caja)) {
+    throw new ErrorNegocio(`Elige tu caja (${CAJAS[0]} a ${CAJAS[CAJAS.length - 1]}) antes de llamar`, 400);
+  }
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
@@ -127,21 +139,23 @@ export async function llamarSiguiente(empleado) {
     // Evita que dos empleados llamen al mismo tiempo y crucen turnos
     await cliente.query(`SELECT pg_advisory_xact_lock(hashtext('mediconect_llamado'))`);
 
+    // Cada caja atiende un turno a la vez
     const { rows: [actual] } = await cliente.query(
-      `SELECT numero FROM turnos WHERE fecha = ${HOY} AND estado = 'llamado'`
+      `SELECT numero FROM turnos WHERE fecha = ${HOY} AND estado = 'llamado' AND caja = $1`,
+      [caja]
     );
     if (actual) {
       throw new ErrorNegocio(
-        `Primero marca como atendido o pausa el turno ${actual.numero}`,
+        `Primero marca como atendido o pausa el turno ${actual.numero} de la caja ${caja}`,
         409
       );
     }
 
-    // El primer turno presente según prioridad y lugar en la fila (RN-05, RN-06)
+    // El siguiente turno presente según la caja (RN-05, RN-06)
     const { rows: [siguiente] } = await cliente.query(
       `SELECT t.id FROM turnos t
         WHERE t.fecha = ${HOY} AND t.estado = 'presente'
-        ORDER BY ${ORDEN_LLAMADO}
+        ORDER BY ${ordenPorCaja(caja)}
         LIMIT 1
           FOR UPDATE`
     );
@@ -150,16 +164,16 @@ export async function llamarSiguiente(empleado) {
     }
 
     const { rows: [turno] } = await cliente.query(
-      `UPDATE turnos SET estado = 'llamado', hora_llamado = now()
+      `UPDATE turnos SET estado = 'llamado', hora_llamado = now(), caja = $2
         WHERE id = $1
-        RETURNING id, numero, estado, prioridad, paciente_id`,
-      [siguiente.id]
+        RETURNING id, numero, estado, prioridad, caja, paciente_id`,
+      [siguiente.id, caja]
     );
 
     await notificar(cliente, turno.paciente_id, 'llamado',
-      `Es tu turno ${turno.numero}. Acércate a la ventanilla.`);
+      `Es tu turno ${turno.numero}. Acércate a la caja ${caja}.`);
     await registrarAcceso(
-      { usuarioId: empleado.id, pacienteId: turno.paciente_id, accion: 'llamar_turno', detalle: turno.numero },
+      { usuarioId: empleado.id, pacienteId: turno.paciente_id, accion: 'llamar_turno', detalle: `${turno.numero} · caja ${caja}` },
       cliente
     );
 
