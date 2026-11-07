@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { estadoPantalla } from './services/pantalla.service.js';
+import { exigirEmpleado } from './middleware/autenticacion.js';
 import formulasRoutes from './routes/formulas.routes.js';
 import { pool } from './db/pool.js';
 import turnosRoutes from './routes/turnos.routes.js';
@@ -30,8 +31,8 @@ app.use('/api/dispensacion', dispensacionRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/tarifas', tarifasRoutes);
-// Estado inicial de la pantalla pública (sin login; luego se actualiza por Socket.IO)
-app.get('/api/pantalla', async (req, res, next) => {
+// Estado inicial de la pantalla de la sala (con sesión de empleado; luego se actualiza por Socket.IO)
+app.get('/api/pantalla', exigirEmpleado(), async (req, res, next) => {
   try {
     res.json({ ok: true, ...(await estadoPantalla()) });
   } catch (error) {

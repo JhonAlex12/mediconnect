@@ -129,7 +129,6 @@ export default function SitioPublico({ children }) {
             ['/informacion#datos', 'Tratamiento de datos'],
             ['/informacion#derechos', 'Derechos y deberes'],
             ['/informacion#pqrs', 'PQRS'],
-            ['/pantalla', 'Pantalla de la sala de espera'],
           ]} />
           <div>
             <h2 className="font-bold text-white mb-3">Contacto</h2>

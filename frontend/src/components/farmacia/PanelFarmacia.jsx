@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { BarChart3, ListOrdered, LogOut, Package, UserCircle2, Users, Wallet } from 'lucide-react';
+import { BarChart3, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 import { TiempoRealProvider } from '../../lib/tiempoReal';
 import Encabezado, { useTitulo } from '../Encabezado';
@@ -54,6 +54,15 @@ export default function PanelFarmacia() {
       <Pagina
         derecha={
           <div className="flex items-center gap-4">
+            {/* La pantalla de la sala se abre en otra pestaña o ventana (para el televisor) con esta misma sesión */}
+            <button
+              type="button"
+              onClick={() => window.open('/pantalla', 'pantalla-sala')}
+              className="flex items-center gap-2 text-sm font-semibold bg-marca-verde hover:bg-marca-verde-oscuro px-3 py-2 rounded-lg transition cursor-pointer"
+            >
+              <MonitorPlay className="w-4 h-4" />
+              Pantalla de la sala
+            </button>
             <div className="flex items-center gap-2">
               <UserCircle2 className="w-7 h-7 text-slate-400" />
               <div className="leading-tight">

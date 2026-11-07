@@ -10,18 +10,14 @@ export function iniciarSockets(servidor) {
   io.use((socket, next) => {
     const { tipo, token } = socket.handshake.auth ?? {};
 
-    // La pantalla pública no necesita login: solo recibe números de turno
-    if (tipo === 'pantalla') {
-      socket.data.salas = ['pantalla'];
-      return next();
-    }
-
     try {
       const datos = jwt.verify(token, process.env.JWT_SECRET);
       if (datos.tipo === 'empleado') {
-        socket.data.salas = ['farmacia', 'pantalla'];
+        // La pantalla de la sala muestra el nombre de quien llaman: solo con sesión de empleado
+        socket.data.salas = tipo === 'pantalla' ? ['pantalla'] : ['farmacia', 'fila_publica'];
       } else if (datos.tipo === 'paciente_turno') {
-        socket.data.salas = [`turno:${datos.turno_id}`, 'pantalla'];
+        // Los pacientes solo reciben el aviso de que la fila cambió, sin nombres
+        socket.data.salas = [`turno:${datos.turno_id}`, 'fila_publica'];
       } else {
         throw new Error('tipo inválido');
       }

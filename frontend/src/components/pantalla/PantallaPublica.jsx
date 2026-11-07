@@ -1,58 +1,72 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
-import { Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
+import { Bell, Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
 import { useTitulo } from '../Encabezado';
+import { leerToken } from '../../lib/api';
 
-// Pantalla de la sala de espera: solo números de turno, nunca nombres
+// Pantalla de la sala de espera.
+// La abre un empleado desde el panel (usa su sesión): muestra el nombre corto de quien
+// están llamando ("María R."), lo anuncia con una campanada y por voz.
+// La lista de próximos turnos va sin nombres.
 export default function PantallaPublica() {
   useTitulo('Pantalla de la sala');
-  const [estado, setEstado] = useState({ llamando: null, proximos: [], en_pausa: [] });
+  const [token] = useState(leerToken);
+  const [estado, setEstado] = useState({ llamando: null, llamando_nombre: null, proximos: [], en_pausa: [] });
   const [conectado, setConectado] = useState(false);
+  const [sinSesion, setSinSesion] = useState(!token);
   const [ahora, setAhora] = useState(() => new Date());
-  const [conSonido, setConSonido] = useState(false);
+  const [iniciada, setIniciada] = useState(false);   // el navegador solo permite sonido tras un toque
+  const [conSonido, setConSonido] = useState(true);
   const [completa, setCompleta] = useState(false);
   const [destacar, setDestacar] = useState(false);
   const contenedor = useRef(null);
   const anterior = useRef(undefined);
-  const sonido = useRef(conSonido);
-  sonido.current = conSonido;
+  const sonido = useRef(false);
+  sonido.current = iniciada && conSonido;
 
-  // Estado inicial por HTTP y después en vivo por Socket.IO
+  // Estado inicial por HTTP y después en vivo por Socket.IO (ambos con la sesión del empleado)
   useEffect(() => {
+    if (!token) return undefined;
     const cargar = () =>
-      fetch('/api/pantalla')
-        .then((r) => r.json())
+      fetch('/api/pantalla', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => {
+          if (r.status === 401) setSinSesion(true);
+          return r.json();
+        })
         .then((d) => d.ok && setEstado(d))
         .catch(() => {});
     cargar();
-    const socket = io({ auth: { tipo: 'pantalla' } });
+    const socket = io({ auth: { tipo: 'pantalla', token } });
     socket.on('connect', () => {
       setConectado(true);
       cargar();
     });
     socket.on('disconnect', () => setConectado(false));
-    socket.on('connect_error', () => setConectado(false));
+    socket.on('connect_error', (e) => {
+      setConectado(false);
+      if (e.message === 'No autorizado') setSinSesion(true);
+    });
     socket.on('turno_actual', setEstado);
     return () => socket.disconnect();
-  }, []);
+  }, [token]);
 
   // Al cambiar el turno llamado: se resalta y, si el sonido está activo, se anuncia
   useEffect(() => {
     const numero = estado.llamando;
     if (anterior.current === undefined) {
       anterior.current = numero; // primera carga: no se anuncia
-      return;
+      return undefined;
     }
     if (!numero || numero === anterior.current) {
       anterior.current = numero;
-      return;
+      return undefined;
     }
     anterior.current = numero;
     setDestacar(true);
-    const t = setTimeout(() => setDestacar(false), 6000);
-    if (sonido.current) anunciar(numero);
+    const t = setTimeout(() => setDestacar(false), 8000);
+    if (sonido.current) anunciar(numero, estado.llamando_nombre);
     return () => clearTimeout(t);
-  }, [estado.llamando]);
+  }, [estado.llamando, estado.llamando_nombre]);
 
   useEffect(() => {
     const t = setInterval(() => setAhora(new Date()), 15000);
@@ -70,14 +84,37 @@ export default function PantallaPublica() {
     else contenedor.current?.requestFullscreen?.();
   };
 
+  // Primer toque: habilita el audio del navegador y pasa a pantalla completa
+  const iniciar = useCallback(() => {
+    desbloquearAudio();
+    setIniciada(true);
+    contenedor.current?.requestFullscreen?.().catch(() => {});
+  }, []);
+
+  if (sinSesion) {
+    return (
+      <div className="bg-slate-950 text-white min-h-screen flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <p className="text-3xl font-bold">Pantalla de la sala de espera</p>
+        <p className="text-slate-300 text-lg max-w-lg">
+          Esta pantalla la abre un empleado desde el panel de la farmacia, con su sesión iniciada.
+          Si la sesión venció, vuelve a abrirla desde el panel.
+        </p>
+        <a href="/farmacia" className="bg-emerald-600 hover:bg-emerald-500 font-bold px-6 py-3 rounded-lg">Ir al panel de la farmacia</a>
+      </div>
+    );
+  }
+
   return (
-    <div ref={contenedor} className="bg-slate-950 text-white min-h-screen flex flex-col">
+    <div ref={contenedor} className="bg-slate-950 text-white min-h-screen flex flex-col relative">
       <header className="flex items-center justify-between gap-4 px-8 py-4 border-b border-slate-800">
-        <div>
-          <p className="text-2xl font-black">Farmacia</p>
-          <p className="text-slate-400 capitalize">
-            {ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
-          </p>
+        <div className="flex items-center gap-3">
+          <img src="/img/logo-simbolo.png" alt="" className="w-12 h-12 object-contain" />
+          <div>
+            <p className="text-2xl font-black">Mediconnect · Farmacia</p>
+            <p className="text-slate-400 capitalize">
+              {ahora.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-4xl font-bold tabular-nums">
@@ -86,9 +123,14 @@ export default function PantallaPublica() {
           <span className={`w-3 h-3 rounded-full ${conectado ? 'bg-emerald-400' : 'bg-red-500'}`}
             title={conectado ? 'En vivo' : 'Sin conexión'} aria-label={conectado ? 'En vivo' : 'Sin conexión'} />
           <button type="button" onClick={() => setConSonido((v) => !v)}
-            aria-label={conSonido ? 'Silenciar anuncios' : 'Activar anuncios por voz'}
+            aria-label={conSonido ? 'Silenciar anuncios' : 'Activar anuncios'}
             className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
             {conSonido ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+          </button>
+          <button type="button" onClick={() => anunciar(estado.llamando ?? 'V-001', estado.llamando ? estado.llamando_nombre : 'Prueba de sonido')}
+            aria-label="Probar el anuncio" title="Probar el anuncio"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 cursor-pointer">
+            <Bell className="w-5 h-5" />
           </button>
           <button type="button" onClick={alternarPantallaCompleta}
             aria-label={completa ? 'Salir de pantalla completa' : 'Pantalla completa'}
@@ -99,11 +141,14 @@ export default function PantallaPublica() {
       </header>
 
       <div className="flex-1 grid lg:grid-cols-[3fr_2fr]">
-        <section className={`flex flex-col items-center justify-center p-10 transition-colors duration-700 ${
+        <section className={`flex flex-col items-center justify-center p-10 text-center transition-colors duration-700 ${
           destacar ? 'bg-emerald-600' : 'bg-slate-900'
         }`} aria-live="assertive">
           <p className="text-3xl font-semibold text-slate-300 uppercase tracking-widest">Turno</p>
           <p className="text-[9rem] leading-none font-black my-4 tabular-nums">{estado.llamando ?? '—'}</p>
+          {estado.llamando_nombre && (
+            <p className="text-6xl font-bold mb-4">{estado.llamando_nombre}</p>
+          )}
           <p className="text-3xl font-semibold">{estado.llamando ? 'Acérquese a la ventanilla' : 'Espere su turno'}</p>
         </section>
 
@@ -143,21 +188,88 @@ export default function PantallaPublica() {
           )}
         </section>
       </div>
+
+      {/* Primer toque: el navegador no deja reproducir sonido sin una interacción */}
+      {!iniciada && (
+        <button type="button" onClick={iniciar}
+          className="absolute inset-0 z-10 bg-slate-950/85 flex flex-col items-center justify-center gap-4 cursor-pointer">
+          <Volume2 className="w-20 h-20 text-emerald-400" />
+          <span className="text-4xl font-black">Toca para iniciar la pantalla</span>
+          <span className="text-xl text-slate-300">Se activan el sonido y la pantalla completa</span>
+        </button>
+      )}
     </div>
   );
 }
 
-// Anuncio por voz: "Turno V 0 0 5, acérquese a la ventanilla"
-function anunciar(numero) {
+// ============================================================
+// SONIDO: campanada de dos tonos (sin archivos) + anuncio por voz
+// ============================================================
+let contextoAudio = null;
+
+function desbloquearAudio() {
   try {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
-    const deletreado = numero.replace('-', ' ').split('').join(' ');
-    const frase = new SpeechSynthesisUtterance(`Turno ${deletreado}. Acérquese a la ventanilla.`);
-    frase.lang = 'es-CO';
-    synth.cancel();
-    synth.speak(frase);
+    contextoAudio ??= new (window.AudioContext || window.webkitAudioContext)();
+    contextoAudio.resume?.();
+    // Algunos navegadores solo cargan las voces después de una interacción
+    window.speechSynthesis?.getVoices();
   } catch {
-    // Sin voz disponible: queda el aviso visual
+    // Sin audio: queda el aviso visual
   }
+}
+
+// "Din-don": dos notas suaves que se apagan solas. Devuelve cuánto dura (ms).
+function campanada() {
+  try {
+    const ctx = contextoAudio;
+    if (!ctx) return 0;
+    const inicio = ctx.currentTime + 0.05;
+    [[880, 0], [660, 0.45]].forEach(([frecuencia, retraso]) => {
+      const osc = ctx.createOscillator();
+      const volumen = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = frecuencia;
+      volumen.gain.setValueAtTime(0.0001, inicio + retraso);
+      volumen.gain.exponentialRampToValueAtTime(0.4, inicio + retraso + 0.02);
+      volumen.gain.exponentialRampToValueAtTime(0.0001, inicio + retraso + 1.2);
+      osc.connect(volumen).connect(ctx.destination);
+      osc.start(inicio + retraso);
+      osc.stop(inicio + retraso + 1.3);
+    });
+    return 1500;
+  } catch {
+    return 0;
+  }
+}
+
+// Voz en español si el equipo tiene una (prefiere es-CO, luego cualquier español)
+function vozEspanol() {
+  const voces = window.speechSynthesis?.getVoices() ?? [];
+  return voces.find((v) => v.lang === 'es-CO')
+    ?? voces.find((v) => v.lang?.startsWith('es-4') || v.lang === 'es-MX' || v.lang === 'es-US')
+    ?? voces.find((v) => v.lang?.startsWith('es'));
+}
+
+// Campanada y luego: "Turno V 0 1 4. María R. Acérquese a la ventanilla." (se repite el turno)
+function anunciar(numero, nombre) {
+  const espera = campanada();
+  setTimeout(() => {
+    try {
+      const synth = window.speechSynthesis;
+      if (!synth) return;
+      const deletreado = numero.replace('-', ' ').split('').join(' ');
+      const texto = `Turno ${deletreado}.${nombre ? ` ${nombre.replace(/\.$/, '')}.` : ''} Acérquese a la ventanilla.`;
+      synth.cancel();
+      [texto, `Turno ${deletreado}.`].forEach((t) => {
+        const frase = new SpeechSynthesisUtterance(t);
+        frase.lang = 'es-CO';
+        const voz = vozEspanol();
+        if (voz) frase.voice = voz;
+        frase.rate = 0.9;
+        synth.speak(frase);
+      });
+    } catch {
+      // Sin voz disponible: queda la campanada y el aviso visual
+    }
+  }, espera);
 }

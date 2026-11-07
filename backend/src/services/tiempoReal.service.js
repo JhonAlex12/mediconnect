@@ -7,7 +7,8 @@ import { obtenerMiTurno } from './turnos.service.js';
 export async function publicarCambios(turnoIds = []) {
   try {
     emitir('farmacia', 'fila_actualizada', {});
-    emitir('pantalla', 'turno_actual', await estadoPantalla());
+    emitir('pantalla', 'turno_actual', await estadoPantalla());   // con nombre: solo empleados
+    emitir('fila_publica', 'turno_actual', {});                    // aviso sin datos para pacientes
 
     for (const id of new Set(turnoIds)) {
       emitir(`turno:${id}`, 'turno_actualizado', await obtenerMiTurno(id));
