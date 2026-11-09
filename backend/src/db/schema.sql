@@ -226,3 +226,72 @@ ALTER TABLE turnos ADD COLUMN IF NOT EXISTS caja SMALLINT CHECK (caja BETWEEN 1 
 CREATE UNIQUE INDEX IF NOT EXISTS un_llamado_por_caja
   ON turnos (fecha, caja)
   WHERE estado = 'llamado';
+
+-- ============================================================
+-- Cuentas de pacientes y domicilios
+-- ============================================================
+
+-- CUENTAS DE PACIENTES: el paciente se registra en el sitio con sus datos.
+-- Es una tabla aparte de "pacientes" (que llena la IPS): registrarse con un
+-- documento NO da acceso a sus fórmulas; cada fórmula se agrega a la cuenta
+-- escribiendo su código (ver cuenta_formulas).
+CREATE TABLE IF NOT EXISTS cuentas_pacientes (
+  id                 SERIAL PRIMARY KEY,
+  tipo_documento     VARCHAR(5)   NOT NULL CHECK (tipo_documento IN ('CC', 'TI', 'CE', 'PPT', 'PA', 'RC')),
+  documento          VARCHAR(20)  NOT NULL UNIQUE,
+  nombres            VARCHAR(80)  NOT NULL,
+  apellidos          VARCHAR(80)  NOT NULL,
+  fecha_nacimiento   DATE         NOT NULL,
+  sexo               CHAR(1)      CHECK (sexo IN ('F', 'M', 'O')),
+  celular            VARCHAR(15)  NOT NULL,
+  correo             VARCHAR(120) NOT NULL UNIQUE,
+  direccion          VARCHAR(150) NOT NULL,
+  barrio             VARCHAR(80),
+  ciudad             VARCHAR(80)  NOT NULL,
+  eps                VARCHAR(80),
+  regimen            VARCHAR(15)  CHECK (regimen IN ('contributivo', 'subsidiado')),
+  clave_hash         TEXT         NOT NULL,
+  consentimiento_en  TIMESTAMPTZ  NOT NULL,      -- aceptó el tratamiento de datos (Ley 1581)
+  activa             BOOLEAN      NOT NULL DEFAULT TRUE,
+  ultimo_ingreso     TIMESTAMPTZ,
+  creado_en          TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Fórmulas que el paciente agregó a su cuenta (con código + su documento)
+CREATE TABLE IF NOT EXISTS cuenta_formulas (
+  cuenta_id    INTEGER     NOT NULL REFERENCES cuentas_pacientes(id) ON DELETE CASCADE,
+  formula_id   INTEGER     NOT NULL REFERENCES formulas(id) ON DELETE CASCADE,
+  agregada_en  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (cuenta_id, formula_id)
+);
+
+-- DOMICILIOS: el paciente pide que le lleven los medicamentos de una fórmula.
+-- La farmacia lo gestiona desde el panel cambiando el estado.
+CREATE TABLE IF NOT EXISTS domicilios (
+  id              SERIAL PRIMARY KEY,
+  cuenta_id       INTEGER      NOT NULL REFERENCES cuentas_pacientes(id),
+  formula_id      INTEGER      NOT NULL REFERENCES formulas(id),
+  direccion       VARCHAR(150) NOT NULL,
+  barrio          VARCHAR(80),
+  ciudad          VARCHAR(80)  NOT NULL,
+  telefono        VARCHAR(15)  NOT NULL,
+  recibe          VARCHAR(120),                 -- quién recibe, si no es el paciente
+  indicaciones    VARCHAR(300),
+  estado          VARCHAR(20)  NOT NULL DEFAULT 'recibido'
+                  CHECK (estado IN ('recibido', 'en_preparacion', 'en_camino', 'entregado', 'cancelado')),
+  nota_farmacia   VARCHAR(300),                 -- mensaje de la farmacia al paciente
+  actualizado_por INTEGER      REFERENCES usuarios_farmacia(id),
+  creado_en       TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  actualizado_en  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Un solo domicilio activo por fórmula
+CREATE UNIQUE INDEX IF NOT EXISTS un_domicilio_activo_por_formula
+  ON domicilios (formula_id)
+  WHERE estado IN ('recibido', 'en_preparacion', 'en_camino');
+CREATE INDEX IF NOT EXISTS idx_domicilios_estado ON domicilios (estado, creado_en);
+CREATE INDEX IF NOT EXISTS idx_domicilios_cuenta ON domicilios (cuenta_id);
+
+-- Actividad de la cuenta del paciente en el mismo registro de accesos
+ALTER TABLE registro_accesos ADD COLUMN IF NOT EXISTS cuenta_id INTEGER REFERENCES cuentas_pacientes(id);
+CREATE INDEX IF NOT EXISTS idx_registro_cuenta ON registro_accesos (cuenta_id, fecha) WHERE cuenta_id IS NOT NULL;

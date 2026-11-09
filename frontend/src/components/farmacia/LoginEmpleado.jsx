@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { AlertCircle, LogIn, Lock } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 
-export default function LoginEmpleado() {
+// alEntrar: se llama después de un ingreso correcto (p. ej. para ir al panel)
+export default function LoginEmpleado({ alEntrar }) {
   const { iniciarSesion } = useSesion();
   const [usuario, setUsuario] = useState('');
   const [clave, setClave] = useState('');
@@ -19,6 +20,7 @@ export default function LoginEmpleado() {
     setEnviando(true);
     try {
       await iniciarSesion(usuario.trim(), clave);
+      alEntrar?.();
     } catch (err) {
       setError(err.message);
       setClave('');

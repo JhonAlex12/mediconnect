@@ -16,6 +16,8 @@ import { ErrorNegocio } from './services/formulas.service.js';
 import reportesRoutes from './routes/reportes.routes.js';
 import usuariosRoutes from './routes/usuarios.routes.js';
 import tarifasRoutes from './routes/tarifas.routes.js';
+import cuentaRoutes from './routes/cuenta.routes.js';
+import domiciliosRoutes from './routes/domicilios.routes.js';
 
 const app = express();
 
@@ -31,6 +33,8 @@ app.use('/api/dispensacion', dispensacionRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/tarifas', tarifasRoutes);
+app.use('/api/cuenta', cuentaRoutes);          // cuentas de pacientes
+app.use('/api/domicilios', domiciliosRoutes);  // gestión de domicilios (panel)
 // Estado inicial de la pantalla de la sala (con sesión de empleado; luego se actualiza por Socket.IO)
 app.get('/api/pantalla', exigirEmpleado(), async (req, res, next) => {
   try {

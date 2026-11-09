@@ -1,7 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, FileText, IdCard, Search, Ticket, Wallet } from 'lucide-react';
-import SitioPublico from '../components/SitioPublico';
+import {
+  ArrowRight, Bike, Clock, FileText, Home, IdCard, MapPin, Navigation, Phone, Search, Ticket, UserPlus, Wallet,
+} from 'lucide-react';
+import SitioPublico, { CONTACTO, useAbrirIngreso } from '../components/SitioPublico';
+import { useCuenta } from '../lib/cuenta';
 import Carrusel from '../components/Carrusel';
 import { useTitulo } from '../components/Encabezado';
 import { ARTICULOS } from '../lib/articulos';
@@ -10,6 +13,7 @@ import { TarjetaArticulo } from './SaludAlDia';
 const ACCESOS = [
   [Search, 'Consultar fórmula', 'Disponibilidad de tus medicamentos', 'bg-marca-azul', '/paciente'],
   [Ticket, 'Turno virtual', 'Pide tu turno desde el celular', 'bg-marca-verde-oscuro', '/paciente'],
+  [Bike, 'Domicilio', 'Recibe tus medicamentos en casa', 'bg-marca-azul-oscuro', '/#domicilio'],
   [Wallet, 'Cuota moderadora', 'Conoce cuánto debes pagar', 'bg-marca-noche', '/informacion#cuotas'],
 ];
 
@@ -30,7 +34,7 @@ export default function Inicio() {
 
       {/* Accesos rápidos en bloque de color, montados sobre el carrusel en computador */}
       <section className="max-w-6xl mx-auto px-4 mt-6 lg:-mt-10 relative z-20">
-        <div className="grid sm:grid-cols-3 shadow-xl rounded-lg overflow-hidden">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 shadow-xl rounded-lg overflow-hidden">
           {ACCESOS.map(([Icono, titulo, texto, color, a]) => (
             <Link key={titulo} to={a} className={`${color} text-white p-6 flex items-center gap-4 hover:brightness-110 transition`}>
               <Icono className="w-10 h-10 shrink-0 opacity-90" strokeWidth={1.5} />
@@ -76,6 +80,8 @@ export default function Inicio() {
         </div>
       </section>
 
+      <Domicilio />
+
       {/* Salud al día: los tres artículos más recientes */}
       <section className="bg-slate-50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 py-16">
@@ -106,6 +112,89 @@ export default function Inicio() {
           </Link>
         </div>
       </section>
+
+      <Ubicacion />
     </SitioPublico>
+  );
+}
+
+// Servicio de domicilio: cómo funciona y botón para pedirlo
+function Domicilio() {
+  const { cuenta } = useCuenta();
+  const abrirIngreso = useAbrirIngreso();
+  const pasos = [
+    [UserPlus, 'Crea tu cuenta', 'Con tus datos y tu dirección de entrega.'],
+    [FileText, 'Agrega tu fórmula', 'Con el código que te dio la IPS.'],
+    [Home, 'Recíbela en casa', 'Te llamamos para confirmar y pagas la cuota al recibir.'],
+  ];
+  return (
+    <section id="domicilio" className="bg-marca-noche text-white scroll-mt-28">
+      <div className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[2fr_3fr] gap-10 items-center">
+        <div>
+          <p className="text-marca-verde font-bold text-sm uppercase tracking-wider">Nuevo servicio</p>
+          <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold mt-2">Tus medicamentos a domicilio</h2>
+          <p className="text-blue-100 text-lg mt-4">
+            Sin filas ni desplazamientos: pide la entrega de tu fórmula y sigue el estado desde tu cuenta.
+          </p>
+          <div className="flex flex-wrap items-center gap-4 mt-6">
+            {cuenta ? (
+              <Link to="/mi-cuenta#formulas" className="inline-flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold px-6 py-3 rounded">
+                <Bike className="w-5 h-5" /> Pedir domicilio
+              </Link>
+            ) : (
+              <>
+                <Link to="/registro" className="inline-flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold px-6 py-3 rounded">
+                  <UserPlus className="w-5 h-5" /> Crear cuenta y pedir
+                </Link>
+                <button type="button" onClick={abrirIngreso} className="font-semibold text-white underline hover:text-marca-verde cursor-pointer">
+                  Ya tengo cuenta
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <ol className="grid sm:grid-cols-3 gap-4">
+          {pasos.map(([Icono, t, d], i) => (
+            <li key={t} className="bg-white/10 rounded-lg p-6">
+              <span className="flex items-center justify-between">
+                <Icono className="w-9 h-9 text-marca-verde" strokeWidth={1.5} />
+                <span className="font-titulo text-3xl font-extrabold text-white/25">{i + 1}</span>
+              </span>
+              <span className="block font-bold text-lg mt-4">{t}</span>
+              <span className="block text-blue-100 text-sm mt-1">{d}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+// Ubicación de la farmacia en el mapa (OpenStreetMap, sin clave de API)
+function Ubicacion() {
+  const { lat, lon } = CONTACTO.mapa;
+  const caja = [lon - 0.006, lat - 0.004, lon + 0.006, lat + 0.004].join(',');
+  const mapa = `https://www.openstreetmap.org/export/embed.html?bbox=${caja}&layer=mapnik&marker=${lat},${lon}`;
+  const comoLlegar = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+  return (
+    <section id="ubicacion" className="bg-marca-hielo border-t border-slate-200 scroll-mt-28">
+      <div className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[2fr_3fr] gap-8 items-stretch">
+        <div className="flex flex-col justify-center">
+          <h2 className="font-titulo text-3xl font-extrabold text-marca-noche">Nuestra ubicación</h2>
+          <ul className="mt-6 space-y-4 text-slate-700">
+            <li className="flex gap-3"><MapPin className="w-6 h-6 text-marca-verde shrink-0" />
+              <span><span className="block font-bold text-marca-noche">{CONTACTO.direccion}</span>{CONTACTO.ciudad}</span></li>
+            <li className="flex gap-3"><Clock className="w-6 h-6 text-marca-verde shrink-0" /> {CONTACTO.horario}</li>
+            <li className="flex gap-3"><Phone className="w-6 h-6 text-marca-verde shrink-0" /> {CONTACTO.telefono}</li>
+          </ul>
+          <a href={comoLlegar} target="_blank" rel="noopener noreferrer"
+            className="mt-6 self-start inline-flex items-center gap-2 bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-5 py-3 rounded">
+            <Navigation className="w-5 h-5" /> Cómo llegar
+          </a>
+        </div>
+        <iframe title="Mapa con la ubicación de la farmacia" src={mapa} loading="lazy"
+          className="w-full h-80 lg:h-96 rounded-lg border border-slate-300 shadow-sm bg-white" />
+      </div>
+    </section>
   );
 }

@@ -1,0 +1,453 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import {
+  Bike, CalendarClock, CheckCircle2, ClipboardList, FilePlus2, History, LogOut, Package, Save, Ticket, Truck,
+  UserRound, XCircle,
+} from 'lucide-react';
+import SitioPublico from '../components/SitioPublico';
+import { useTitulo } from '../components/Encabezado';
+import { Aviso, useAccion } from '../components/farmacia/comunes';
+import { CobroFormula, ESTADO_MEDICAMENTO, fechaLarga, pesos } from '../components/paciente/VistaPaciente';
+import CamposPersonales, { Campo, Seccion, claseInput, datosDesdeCuenta } from '../components/cuenta/CamposPersonales';
+import { useCuenta } from '../lib/cuenta';
+
+const PESTANAS = [
+  ['formulas', 'Mis fórmulas', ClipboardList],
+  ['domicilios', 'Domicilios', Truck],
+  ['datos', 'Mis datos', UserRound],
+  ['historial', 'Historial', History],
+];
+
+export const ESTADOS_DOMICILIO = {
+  recibido: { texto: 'Solicitud recibida', clase: 'bg-blue-100 text-blue-800' },
+  en_preparacion: { texto: 'En preparación', clase: 'bg-amber-100 text-amber-900' },
+  en_camino: { texto: 'En camino', clase: 'bg-marca-verde-claro text-marca-verde-oscuro' },
+  entregado: { texto: 'Entregado', clase: 'bg-emerald-100 text-emerald-800' },
+  cancelado: { texto: 'Cancelado', clase: 'bg-slate-200 text-slate-600' },
+};
+const PASOS = ['recibido', 'en_preparacion', 'en_camino', 'entregado'];
+const ACTIVOS = ['recibido', 'en_preparacion', 'en_camino'];
+
+const fechaHora = (iso) =>
+  new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+
+export default function MiCuenta() {
+  useTitulo('Mi cuenta');
+  const { cuenta, verificando, cerrarSesion, apiCuenta } = useCuenta();
+  const { hash } = useLocation();
+  const navegar = useNavigate();
+  const pestana = PESTANAS.some(([id]) => `#${id}` === hash) ? hash.slice(1) : 'formulas';
+
+  const [formulas, setFormulas] = useState(null);
+  const [domicilios, setDomicilios] = useState(null);
+  const [error, setError] = useState(null);
+
+  const cargar = useCallback(async () => {
+    try {
+      const [f, d] = await Promise.all([apiCuenta('/formulas'), apiCuenta('/domicilios')]);
+      setFormulas(f.formulas);
+      setDomicilios(d.domicilios);
+      setError(null);
+    } catch (err) {
+      setError({ tipo: 'error', texto: err.message });
+    }
+  }, [apiCuenta]);
+
+  useEffect(() => {
+    if (cuenta) cargar();
+  }, [cuenta, cargar]);
+
+  if (verificando) {
+    return <SitioPublico><p className="text-center text-slate-500 py-24">Cargando tu cuenta…</p></SitioPublico>;
+  }
+  if (!cuenta) return <Navigate to="/registro" replace />;
+
+  const salir = () => {
+    cerrarSesion();
+    navegar('/');
+  };
+
+  return (
+    <SitioPublico>
+      <section className="bg-marca-hielo border-b border-slate-200">
+        <div className="max-w-5xl mx-auto px-4 pt-8 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm text-slate-600">
+              <Link to="/" className="hover:text-marca-azul">Inicio</Link> <span aria-hidden="true">›</span> Mi cuenta
+            </p>
+            <h1 className="font-titulo text-3xl font-extrabold text-marca-noche">Hola, {cuenta.nombres.split(' ')[0]}</h1>
+            <p className="text-slate-600">{cuenta.tipo_documento} {cuenta.documento}</p>
+          </div>
+          <button type="button" onClick={salir}
+            className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-red-700 px-3 py-2 rounded cursor-pointer">
+            <LogOut className="w-4 h-4" /> Cerrar sesión
+          </button>
+        </div>
+        <nav className="max-w-5xl mx-auto px-4 mt-6 flex gap-1 overflow-x-auto" aria-label="Secciones de mi cuenta">
+          {PESTANAS.map(([id, texto, Icono]) => (
+            <Link key={id} to={`#${id}`} replace
+              className={`flex items-center gap-2 px-4 py-3 font-semibold text-[15px] border-b-4 whitespace-nowrap transition ${
+                pestana === id ? 'border-marca-azul text-marca-azul bg-white rounded-t' : 'border-transparent text-slate-600 hover:text-marca-azul'}`}>
+              <Icono className="w-4 h-4" /> {texto}
+            </Link>
+          ))}
+        </nav>
+      </section>
+
+      <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        <Aviso aviso={error} />
+        {pestana === 'formulas' && <MisFormulas formulas={formulas} domicilios={domicilios} recargar={cargar} />}
+        {pestana === 'domicilios' && <MisDomicilios domicilios={domicilios} recargar={cargar} />}
+        {pestana === 'datos' && <MisDatos />}
+        {pestana === 'historial' && <Historial />}
+      </div>
+    </SitioPublico>
+  );
+}
+
+// ============================================================
+// Mis fórmulas: agregar con el código, ver disponibilidad y pedir domicilio
+// ============================================================
+function MisFormulas({ formulas, domicilios, recargar }) {
+  const { apiCuenta } = useCuenta();
+  const [codigo, setCodigo] = useState('');
+  const [pidiendo, setPidiendo] = useState(null); // código de la fórmula con el formulario de domicilio abierto
+  const { ocupado, aviso, ejecutar } = useAccion(recargar);
+
+  const agregar = async (e) => {
+    e.preventDefault();
+    const ok = await ejecutar(
+      () => apiCuenta('/formulas', { metodo: 'POST', cuerpo: { codigo: codigo.trim().toUpperCase() } }),
+      (r) => `Fórmula ${r.formula.codigo} agregada a tu cuenta`
+    );
+    if (ok) setCodigo('');
+  };
+
+  return (
+    <>
+      <form onSubmit={agregar} className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
+        <h2 className="font-titulo text-xl font-extrabold text-marca-noche flex items-center gap-2">
+          <FilePlus2 className="w-5 h-5 text-marca-verde" /> Agregar una fórmula
+        </h2>
+        <p className="text-slate-600 text-sm mt-1">
+          Escribe el código que te entregó la IPS. Solo se pueden agregar fórmulas a nombre de tu documento.
+        </p>
+        <div className="mt-4 flex flex-col sm:flex-row gap-3">
+          <input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="F-2026-0001" required
+            aria-label="Código de la fórmula" className={`${claseInput} sm:max-w-xs uppercase`} />
+          <button type="submit" disabled={ocupado}
+            className="bg-marca-azul hover:bg-marca-azul-oscuro disabled:opacity-60 text-white font-bold px-6 py-2.5 rounded cursor-pointer">
+            {ocupado ? 'Agregando…' : 'Agregar'}
+          </button>
+        </div>
+        <div className="mt-3"><Aviso aviso={aviso} /></div>
+      </form>
+
+      {formulas === null ? (
+        <p className="text-slate-500">Cargando tus fórmulas…</p>
+      ) : formulas.length === 0 ? (
+        <p className="text-center text-slate-500 bg-white border border-dashed border-slate-300 rounded-lg p-8">
+          Aún no tienes fórmulas en tu cuenta. Agrega la primera con su código.
+        </p>
+      ) : (
+        formulas.map((f) => {
+          const domicilio = domicilios?.find((d) => d.codigo === f.codigo && ACTIVOS.includes(d.estado));
+          return (
+            <TarjetaFormula key={f.codigo} formula={f} domicilio={domicilio}
+              abierto={pidiendo === f.codigo}
+              alPedir={() => setPidiendo(pidiendo === f.codigo ? null : f.codigo)}
+              alTerminar={async () => { setPidiendo(null); await recargar(); }} />
+          );
+        })
+      )}
+    </>
+  );
+}
+
+function TarjetaFormula({ formula: f, domicilio, abierto, alPedir, alTerminar }) {
+  const { cuenta } = useCuenta();
+  const pendientes = f.medicamentos.filter((m) => m.cantidad_pendiente > 0);
+  const completa = pendientes.length === 0;
+  const puedePedir = !f.vencida && !completa && !domicilio && !pendientes.every((m) => m.estado === 'agotado');
+
+  return (
+    <article className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+      <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
+        <div>
+          <h3 className="font-titulo text-lg font-extrabold text-marca-noche">Fórmula {f.codigo}</h3>
+          <p className="text-sm text-slate-600 flex items-center gap-1.5">
+            <CalendarClock className="w-4 h-4" />
+            {f.vencida ? `Venció el ${fechaLarga(f.fecha_limite)}`
+              : `Reclamar hasta el ${fechaLarga(f.fecha_limite)} (${f.dias_restantes === 0 ? 'hoy' : `${f.dias_restantes} días`})`}
+          </p>
+        </div>
+        {completa ? (
+          <span className="text-sm font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800">Entregada completa</span>
+        ) : f.vencida ? (
+          <span className="text-sm font-bold px-3 py-1 rounded-full bg-red-100 text-red-800">Vencida</span>
+        ) : f.alerta ? (
+          <span className="text-sm font-bold px-3 py-1 rounded-full bg-amber-100 text-amber-900">Vence pronto</span>
+        ) : null}
+      </header>
+
+      <ul className="divide-y divide-slate-100">
+        {f.medicamentos.map((m) => {
+          const e = ESTADO_MEDICAMENTO[m.estado];
+          return (
+            <li key={m.medicamento_id} className="px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+              <span>
+                <span className="font-semibold text-slate-800">{m.nombre}</span>{' '}
+                <span className="text-slate-500 text-sm">{m.presentacion}</span>
+                <span className="block text-sm text-slate-500">
+                  {m.cantidad_pendiente > 0 ? `Pendiente: ${m.cantidad_pendiente} de ${m.cantidad_formulada}` : `${m.cantidad_formulada} entregadas`}
+                </span>
+              </span>
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${e.clase}`}>{e.texto}</span>
+            </li>
+          );
+        })}
+      </ul>
+
+      {!completa && !f.vencida && (
+        <div className="px-5 py-4 bg-slate-50 border-t border-slate-100 space-y-3">
+          <CobroFormula cobro={f.cobro} />
+          {domicilio ? (
+            <p className="flex items-center gap-2 text-sm font-semibold text-marca-verde-oscuro">
+              <Truck className="w-5 h-5" /> Domicilio en curso: {ESTADOS_DOMICILIO[domicilio.estado].texto}.{' '}
+              <Link to="#domicilios" className="underline">Ver seguimiento</Link>
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {puedePedir && (
+                <button type="button" onClick={alPedir}
+                  className="flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold px-4 py-2.5 rounded cursor-pointer">
+                  <Bike className="w-5 h-5" /> {abierto ? 'Cerrar' : 'Pedir a domicilio'}
+                </button>
+              )}
+              <Link to={`/paciente?codigo=${encodeURIComponent(f.codigo)}&documento=${encodeURIComponent(cuenta.documento)}`}
+                className="flex items-center gap-2 border-2 border-marca-azul text-marca-azul hover:bg-marca-hielo font-bold px-4 py-2 rounded">
+                <Ticket className="w-5 h-5" /> Reclamar en la farmacia (turno)
+              </Link>
+            </div>
+          )}
+          {abierto && <FormularioDomicilio formula={f} alTerminar={alTerminar} />}
+        </div>
+      )}
+    </article>
+  );
+}
+
+function FormularioDomicilio({ formula, alTerminar }) {
+  const { cuenta, apiCuenta } = useCuenta();
+  const [d, setD] = useState({
+    direccion: cuenta.direccion ?? '', barrio: cuenta.barrio ?? '', ciudad: cuenta.ciudad ?? '',
+    telefono: cuenta.celular ?? '', recibe: '', indicaciones: '',
+  });
+  const { ocupado, aviso, ejecutar } = useAccion();
+  const cambiar = (k) => (e) => setD((v) => ({ ...v, [k]: e.target.value }));
+  const cuota = formula.cobro?.valor > 0 && !formula.cobro?.pagado ? formula.cobro.valor : 0;
+
+  const enviar = async (e) => {
+    e.preventDefault();
+    const ok = await ejecutar(
+      () => apiCuenta('/domicilios', { metodo: 'POST', cuerpo: { codigo: formula.codigo, ...d } }),
+      'Solicitud enviada'
+    );
+    if (ok) await alTerminar();
+  };
+
+  return (
+    <form onSubmit={enviar} className="bg-white border border-slate-200 rounded p-4 space-y-4">
+      <p className="font-bold text-marca-noche">¿A dónde te llevamos los medicamentos?</p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Campo etiqueta="Dirección" id="dom-direccion" className="sm:col-span-2">
+          <input id="dom-direccion" value={d.direccion} onChange={cambiar('direccion')} required className={claseInput} />
+        </Campo>
+        <Campo etiqueta="Barrio" id="dom-barrio" opcional>
+          <input id="dom-barrio" value={d.barrio} onChange={cambiar('barrio')} className={claseInput} />
+        </Campo>
+        <Campo etiqueta="Ciudad" id="dom-ciudad">
+          <input id="dom-ciudad" value={d.ciudad} onChange={cambiar('ciudad')} required className={claseInput} />
+        </Campo>
+        <Campo etiqueta="Teléfono de contacto" id="dom-telefono">
+          <input id="dom-telefono" type="tel" inputMode="numeric" value={d.telefono} onChange={cambiar('telefono')} required className={claseInput} />
+        </Campo>
+        <Campo etiqueta="¿Quién recibe?" id="dom-recibe" opcional ayuda="Si no eres tú, debe presentar tu documento">
+          <input id="dom-recibe" value={d.recibe} onChange={cambiar('recibe')} className={claseInput} />
+        </Campo>
+        <Campo etiqueta="Indicaciones" id="dom-indicaciones" opcional className="sm:col-span-2">
+          <textarea id="dom-indicaciones" value={d.indicaciones} onChange={cambiar('indicaciones')} rows={2} maxLength={300}
+            placeholder="Torre, apartamento, punto de referencia…" className={claseInput} />
+        </Campo>
+      </div>
+      <p className="text-sm text-slate-600">
+        {cuota > 0
+          ? <>Pagas la cuota moderadora de <strong>{pesos(cuota)}</strong> al recibir. </>
+          : null}
+        La farmacia te llamará para confirmar la hora de entrega.
+      </p>
+      <Aviso aviso={aviso} />
+      <button type="submit" disabled={ocupado}
+        className="flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-60 text-white font-bold px-5 py-2.5 rounded cursor-pointer">
+        <CheckCircle2 className="w-5 h-5" /> {ocupado ? 'Enviando…' : 'Confirmar domicilio'}
+      </button>
+    </form>
+  );
+}
+
+// ============================================================
+// Domicilios: seguimiento del estado
+// ============================================================
+function MisDomicilios({ domicilios, recargar }) {
+  const { apiCuenta } = useCuenta();
+  const { ocupado, aviso, ejecutar } = useAccion(recargar);
+
+  if (domicilios === null) return <p className="text-slate-500">Cargando…</p>;
+  if (domicilios.length === 0) {
+    return (
+      <p className="text-center text-slate-500 bg-white border border-dashed border-slate-300 rounded-lg p-8">
+        No has pedido domicilios. Desde <Link to="#formulas" className="text-marca-azul font-semibold underline">Mis fórmulas</Link>{' '}
+        elige una fórmula y pulsa “Pedir a domicilio”.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <Aviso aviso={aviso} />
+      {domicilios.map((d) => {
+        const e = ESTADOS_DOMICILIO[d.estado];
+        const paso = PASOS.indexOf(d.estado);
+        return (
+          <article key={d.id} className="bg-white border border-slate-200 rounded-lg shadow-sm p-5 space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-titulo text-lg font-extrabold text-marca-noche">Fórmula {d.codigo}</h3>
+                <p className="text-sm text-slate-600">Pedido el {fechaHora(d.creado_en)} · {d.direccion}{d.barrio ? `, ${d.barrio}` : ''}, {d.ciudad}</p>
+              </div>
+              <span className={`text-sm font-bold px-3 py-1 rounded-full ${e.clase}`}>{e.texto}</span>
+            </div>
+
+            {d.estado !== 'cancelado' && (
+              <ol className="grid grid-cols-4 gap-1" aria-label="Avance del domicilio">
+                {PASOS.map((p, i) => (
+                  <li key={p} className="text-center">
+                    <span className={`block h-2 rounded-full ${i <= paso ? 'bg-marca-verde' : 'bg-slate-200'}`} />
+                    <span className={`block text-xs mt-1.5 ${i <= paso ? 'text-marca-noche font-semibold' : 'text-slate-400'}`}>
+                      {ESTADOS_DOMICILIO[p].texto}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {d.nota_farmacia && (
+              <p className="flex items-start gap-2 bg-marca-hielo rounded p-3 text-sm text-slate-700">
+                <Package className="w-4 h-4 mt-0.5 text-marca-azul shrink-0" />
+                <span><strong>Mensaje de la farmacia:</strong> {d.nota_farmacia}</span>
+              </p>
+            )}
+
+            {d.estado === 'recibido' && (
+              <button type="button" disabled={ocupado}
+                onClick={() => {
+                  if (window.confirm('¿Cancelar este domicilio?')) {
+                    ejecutar(() => apiCuenta(`/domicilios/${d.id}/cancelar`, { metodo: 'POST' }), 'Domicilio cancelado');
+                  }
+                }}
+                className="flex items-center gap-1.5 text-sm font-semibold text-red-700 hover:underline cursor-pointer disabled:opacity-50">
+                <XCircle className="w-4 h-4" /> Cancelar domicilio
+              </button>
+            )}
+          </article>
+        );
+      })}
+    </>
+  );
+}
+
+// ============================================================
+// Mis datos: editar datos personales y cambiar la contraseña
+// ============================================================
+function MisDatos() {
+  const { cuenta, setCuenta, apiCuenta } = useCuenta();
+  const [datos, setDatos] = useState(() => datosDesdeCuenta(cuenta));
+  const [claves, setClaves] = useState({ clave_actual: '', clave_nueva: '' });
+  const { ocupado, aviso, ejecutar } = useAccion();
+  const cambiar = (campo, valor) => setDatos((d) => ({ ...d, [campo]: valor }));
+
+  const guardar = async (e) => {
+    e.preventDefault();
+    const ok = await ejecutar(async () => {
+      const r = await apiCuenta('/yo', { metodo: 'PUT', cuerpo: { ...datos, ...(claves.clave_nueva ? claves : {}) } });
+      setCuenta(r.cuenta);
+      return r;
+    }, 'Tus datos quedaron guardados');
+    if (ok) setClaves({ clave_actual: '', clave_nueva: '' });
+  };
+
+  return (
+    <form onSubmit={guardar} className="bg-white border border-slate-200 rounded-lg shadow-sm p-6 sm:p-8 space-y-8">
+      <p className="text-sm text-slate-600">
+        El tipo y número de documento no se pueden cambiar. Si están errados, comunícate con la farmacia.
+      </p>
+      <CamposPersonales datos={datos} cambiar={cambiar} />
+      <Seccion titulo="Cambiar contraseña (opcional)">
+        <Campo etiqueta="Contraseña actual" id="clave_actual">
+          <input id="clave_actual" type="password" autoComplete="current-password" value={claves.clave_actual}
+            onChange={(e) => setClaves((c) => ({ ...c, clave_actual: e.target.value }))}
+            required={Boolean(claves.clave_nueva)} className={claseInput} />
+        </Campo>
+        <Campo etiqueta="Contraseña nueva" id="clave_nueva" ayuda="Mínimo 8 caracteres, con letras y números">
+          <input id="clave_nueva" type="password" autoComplete="new-password" value={claves.clave_nueva}
+            onChange={(e) => setClaves((c) => ({ ...c, clave_nueva: e.target.value }))} className={claseInput} />
+        </Campo>
+      </Seccion>
+      <Aviso aviso={aviso} />
+      <button type="submit" disabled={ocupado}
+        className="flex items-center gap-2 bg-marca-azul hover:bg-marca-azul-oscuro disabled:opacity-60 text-white font-bold px-6 py-3 rounded cursor-pointer">
+        <Save className="w-5 h-5" /> {ocupado ? 'Guardando…' : 'Guardar cambios'}
+      </button>
+    </form>
+  );
+}
+
+// ============================================================
+// Historial: actividad de la cuenta
+// ============================================================
+const ACCIONES = {
+  crear_cuenta: 'Creaste tu cuenta',
+  iniciar_sesion: 'Iniciaste sesión',
+  agregar_formula: 'Agregaste la fórmula',
+  solicitar_domicilio: 'Pediste domicilio de la fórmula',
+  cancelar_domicilio: 'Cancelaste un domicilio',
+  cambiar_datos: 'Actualizaste tus datos',
+  cambiar_datos_y_clave: 'Actualizaste tus datos y tu contraseña',
+};
+
+function Historial() {
+  const { apiCuenta } = useCuenta();
+  const [filas, setFilas] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    apiCuenta('/historial').then((d) => setFilas(d.historial)).catch((e) => setError({ tipo: 'error', texto: e.message }));
+  }, [apiCuenta]);
+
+  if (error) return <Aviso aviso={error} />;
+  if (!filas) return <p className="text-slate-500">Cargando…</p>;
+
+  return (
+    <ul className="bg-white border border-slate-200 rounded-lg shadow-sm divide-y divide-slate-100">
+      {filas.map((h, i) => (
+        <li key={i} className="px-5 py-3 flex flex-wrap justify-between gap-2">
+          <span className="text-slate-800">
+            {ACCIONES[h.accion] ?? h.accion}
+            {h.detalle && h.accion !== 'cancelar_domicilio' ? <strong> {h.detalle}</strong> : null}
+          </span>
+          <span className="text-sm text-slate-500">{fechaHora(h.fecha)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}

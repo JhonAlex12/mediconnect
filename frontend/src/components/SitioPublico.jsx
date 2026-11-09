@@ -1,7 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Clock, Mail, MapPin, Menu, Phone, X } from 'lucide-react';
+import { Clock, LayoutDashboard, LogIn, Mail, MapPin, Menu, Phone, UserRound, X } from 'lucide-react';
 import { Logo } from './Encabezado';
+import VentanaIngreso from './cuenta/VentanaIngreso';
+import { useSesion } from '../lib/sesion';
+import { useCuenta } from '../lib/cuenta';
 
 // Datos de contacto: reemplazar por los reales de la farmacia
 export const CONTACTO = {
@@ -9,12 +12,20 @@ export const CONTACTO = {
   correo: 'contacto@ejemplo.com',
   direccion: 'Dirección de la farmacia',
   horario: 'Lun a sáb · 7:00 a. m. – 7:00 p. m.',
+  // Ubicación en el mapa (PROVISIONAL: centro de Bogotá). Reemplazar por la de la farmacia.
+  ciudad: 'Bogotá',
+  mapa: { lat: 4.5981, lon: -74.0758 },
 };
+
+// Permite abrir la ventana de ingreso desde cualquier página pública
+const ContextoIngreso = createContext(() => {});
+export const useAbrirIngreso = () => useContext(ContextoIngreso);
 
 const MENU = [
   { a: '/', texto: 'Inicio', fin: true },
   { a: '/paciente', texto: 'Mi fórmula' },
   { a: '/informacion', texto: 'Información al paciente' },
+  { a: '/#domicilio', texto: 'Domicilios', ancla: true },
   { a: '/salud-al-dia', texto: 'Salud al día' },
   { a: '/#contacto', texto: 'Contáctenos', ancla: true },
 ];
@@ -40,11 +51,31 @@ const claseMenu = (activo) =>
 // Estructura de las páginas públicas: franja superior, encabezado, contenido y pie de página
 export default function SitioPublico({ children }) {
   const [abierto, setAbierto] = useState(false);
+  const [ingresando, setIngresando] = useState(false);
   const { pathname } = useLocation();
+  const { usuario } = useSesion();
+  const { cuenta } = useCuenta();
   useDesplazarAAncla();
 
   // El menú del celular se cierra al cambiar de página
   useEffect(() => setAbierto(false), [pathname]);
+
+  // Con sesión abierta, el botón lleva a la cuenta del paciente o al panel; sin sesión, abre el ingreso
+  const claseAcceso = 'flex items-center justify-center gap-2 border-2 border-marca-azul text-marca-azul hover:bg-marca-hielo font-bold px-4 py-2 rounded transition';
+  const accesoPanel = cuenta ? (
+    <Link to="/mi-cuenta" className={claseAcceso}>
+      <UserRound className="w-5 h-5" /> Mi cuenta
+    </Link>
+  ) : usuario ? (
+    <Link to="/farmacia" className={claseAcceso}>
+      <LayoutDashboard className="w-5 h-5" /> Ir al panel
+    </Link>
+  ) : (
+    <button type="button" onClick={() => { setAbierto(false); setIngresando(true); }}
+      className="flex items-center justify-center gap-2 border-2 border-marca-azul text-marca-azul hover:bg-marca-hielo font-bold px-4 py-2 rounded transition cursor-pointer">
+      <LogIn className="w-5 h-5" /> Iniciar sesión
+    </button>
+  );
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -72,6 +103,7 @@ export default function SitioPublico({ children }) {
           <span aria-hidden="true" />
           <Logo subtitulo="Tu farmacia conectada" />
           <div className="flex items-center justify-end gap-2">
+            <div className="hidden sm:block">{accesoPanel}</div>
             <Link to="/paciente" className="hidden sm:block bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-5 py-2.5 rounded transition">
               Pedir turno
             </Link>
@@ -105,11 +137,16 @@ export default function SitioPublico({ children }) {
             <Link to="/paciente" className="block text-center bg-marca-azul text-white font-bold px-5 py-3 rounded mt-2">
               Pedir turno
             </Link>
+            <div className="sm:hidden mt-2">{accesoPanel}</div>
           </nav>
         )}
       </header>
 
-      <main className="flex-1">{children}</main>
+      <main className="flex-1">
+        <ContextoIngreso.Provider value={() => setIngresando(true)}>{children}</ContextoIngreso.Provider>
+      </main>
+
+      {ingresando && <VentanaIngreso alCerrar={() => setIngresando(false)} />}
 
       {/* Pie de página */}
       <footer id="contacto" className="bg-marca-noche text-blue-100 scroll-mt-24">
@@ -121,6 +158,7 @@ export default function SitioPublico({ children }) {
           <PieColumna titulo="Pacientes" enlaces={[
             ['/paciente', 'Consultar mi fórmula'],
             ['/paciente', 'Pedir turno virtual'],
+            ['/#domicilio', 'Medicamentos a domicilio'],
             ['/informacion#cuotas', 'Cuotas moderadoras'],
             ['/salud-al-dia', 'Salud al día'],
           ]} />

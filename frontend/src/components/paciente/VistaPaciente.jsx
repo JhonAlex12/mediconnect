@@ -8,10 +8,10 @@ import { Aviso, claseCampo } from '../farmacia/comunes';
 import { useTitulo } from '../Encabezado';
 import SitioPublico, { TituloPagina } from '../SitioPublico';
 
-const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
+export const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
 
 // Cuánto paga el paciente al reclamar (cuota moderadora)
-function CobroFormula({ cobro }) {
+export function CobroFormula({ cobro }) {
   if (!cobro) return null;
   if (cobro.valor > 0 && cobro.pagado) {
     return (
@@ -69,7 +69,7 @@ const PRIORIDADES = {
   discapacidad: 'Persona con discapacidad',
 };
 
-const ESTADO_MEDICAMENTO = {
+export const ESTADO_MEDICAMENTO = {
   disponible: { texto: 'Disponible', clase: 'bg-emerald-100 text-emerald-800' },
   pocas_unidades: { texto: 'Pocas unidades', clase: 'bg-amber-100 text-amber-900' },
   agotado: { texto: 'Agotado', clase: 'bg-red-100 text-red-800' },
@@ -77,7 +77,7 @@ const ESTADO_MEDICAMENTO = {
 };
 
 // "2026-11-30" → "30 de noviembre" (sin pasar por zonas horarias)
-const fechaLarga = (iso) => {
+export const fechaLarga = (iso) => {
   if (!iso) return '—';
   const [a, m, d] = String(iso).slice(0, 10).split('-').map(Number);
   return new Date(a, m - 1, d).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' });

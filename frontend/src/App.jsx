@@ -4,6 +4,9 @@ import PanelFarmacia from './components/farmacia/PanelFarmacia';
 import VistaPaciente from './components/paciente/VistaPaciente';
 import PantallaPublica from './components/pantalla/PantallaPublica';
 import { SesionProvider } from './lib/sesion';
+import { CuentaProvider } from './lib/cuenta';
+import Registro from './paginas/Registro';
+import MiCuenta from './paginas/MiCuenta';
 import Inicio from './paginas/Inicio';
 import NoEncontrada from './paginas/NoEncontrada';
 import Informacion from './paginas/Informacion';
@@ -12,16 +15,17 @@ import SaludAlDia from './paginas/SaludAlDia';
 // Cada módulo es una página independiente con su propia dirección
 export default function App() {
   return (
+    // Las sesiones (empleado y paciente) son de todo el sitio: se inician desde el encabezado público
+    <SesionProvider>
+    <CuentaProvider>
     <Routes>
       <Route path="/" element={<Inicio />} />
       <Route path="/paciente" element={<PaginaPaciente />} />
+      <Route path="/registro" element={<Registro />} />
+      <Route path="/mi-cuenta" element={<MiCuenta />} />
       <Route
         path="/farmacia/*"
-        element={
-          <SesionProvider>
-            <PanelFarmacia />
-          </SesionProvider>
-        }
+        element={<PanelFarmacia />}
       />
       <Route path="/pantalla" element={<PantallaPublica />} />
       <Route path="/informacion" element={<Informacion />} />
@@ -31,6 +35,8 @@ export default function App() {
       <Route path="/ips" element={<IrA destino="/ips/" />} />
       <Route path="*" element={<NoEncontrada />} />
     </Routes>
+    </CuentaProvider>
+    </SesionProvider>
   );
 }
 
