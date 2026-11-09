@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Clock, LayoutDashboard, LogIn, Mail, MapPin, Menu, Phone, UserRound, X } from 'lucide-react';
 import { Logo } from './Encabezado';
 import VentanaIngreso from './cuenta/VentanaIngreso';
+import ChatBot from './ChatBot';
 import { useSesion } from '../lib/sesion';
 import { useCuenta } from '../lib/cuenta';
 
@@ -12,9 +13,9 @@ export const CONTACTO = {
   correo: 'contacto@ejemplo.com',
   direccion: 'Dirección de la farmacia',
   horario: 'Lun a sáb · 7:00 a. m. – 7:00 p. m.',
-  // Ubicación en el mapa (PROVISIONAL: centro de Bogotá). Reemplazar por la de la farmacia.
-  ciudad: 'Bogotá',
-  mapa: { lat: 4.5981, lon: -74.0758 },
+  // Ubicación en el mapa (PROVISIONAL: centro de Cúcuta). Reemplazar por la de la farmacia.
+  ciudad: 'Cúcuta, Norte de Santander',
+  mapa: { lat: 7.8835, lon: -72.5050 },
 };
 
 // Permite abrir la ventana de ingreso desde cualquier página pública
@@ -147,6 +148,7 @@ export default function SitioPublico({ children }) {
       </main>
 
       {ingresando && <VentanaIngreso alCerrar={() => setIngresando(false)} />}
+      <ChatBot />
 
       {/* Pie de página */}
       <footer id="contacto" className="bg-marca-noche text-blue-100 scroll-mt-24">

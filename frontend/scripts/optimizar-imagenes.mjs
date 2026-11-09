@@ -25,3 +25,12 @@ console.log('✔ símbolo y favicon');
 // Color de fondo del banner (borde izquierdo), para rellenar a los lados en pantallas anchas
 const { dominant } = await sharp(banner).extract({ left: 0, top: 300, width: 60, height: 800 }).stats();
 console.log('Color de fondo del banner:', dominant);
+
+// Mediconnect Bot: el ícono (burbuja con el robot, sin el nombre) para el botón del chat
+const bot = new URL('../imagenes-originales/mediconnect-bot.png', import.meta.url).pathname;
+const burbuja = sharp(bot).extract({ left: 130, top: 250, width: 1790, height: 1540 });
+for (const ancho of [96, 192]) {
+  await burbuja.clone().resize(ancho, ancho, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .webp({ quality: 85 }).toFile(`${salida}bot-${ancho}.webp`);
+}
+console.log('✔ ícono del bot');

@@ -123,7 +123,7 @@ function Domicilio() {
   const { cuenta } = useCuenta();
   const abrirIngreso = useAbrirIngreso();
   const pasos = [
-    [UserPlus, 'Crea tu cuenta', 'Con tus datos y tu dirección de entrega.'],
+    [UserPlus, 'Crea tu cuenta', 'Con tus datos, y confirma tu correo.'],
     [FileText, 'Agrega tu fórmula', 'Con el código que te dio la IPS.'],
     [Home, 'Recíbela en casa', 'Te llamamos para confirmar y pagas la cuota al recibir.'],
   ];
@@ -135,6 +135,9 @@ function Domicilio() {
           <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold mt-2">Tus medicamentos a domicilio</h2>
           <p className="text-blue-100 text-lg mt-4">
             Sin filas ni desplazamientos: pide la entrega de tu fórmula y sigue el estado desde tu cuenta.
+          </p>
+          <p className="inline-flex items-center gap-2 mt-4 bg-white/10 rounded px-3 py-1.5 text-sm font-semibold">
+            <MapPin className="w-4 h-4 text-marca-verde" /> Disponible solo en Cúcuta
           </p>
           <div className="flex flex-wrap items-center gap-4 mt-6">
             {cuenta ? (

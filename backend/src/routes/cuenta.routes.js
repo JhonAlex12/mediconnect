@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { exigirCuenta } from '../middleware/cuentaPaciente.js';
 import {
   registrarCuenta, iniciarSesionCuenta, verCuenta, actualizarCuenta,
-  agregarFormula, listarFormulas, listarDomicilios, solicitarDomicilio, cancelarDomicilio, historial,
+  agregarFormula, listarFormulas, confirmarCorreo, reenviarConfirmacion, listarDomicilios, solicitarDomicilio, cancelarDomicilio, historial,
 } from '../services/cuentas.service.js';
 
 const router = Router();
@@ -30,7 +30,16 @@ const responder = (fn) => async (req, res, next) => {
 router.post('/registro', limitadorRegistro, responder((req) => registrarCuenta(req.body ?? {})));
 router.post('/login', limitadorLogin, responder((req) => iniciarSesionCuenta(req.body?.documento, req.body?.clave)));
 
+// Enlace del correo de confirmación (no necesita sesión: puede abrirse en otro dispositivo)
+router.post('/confirmar-correo', limitadorFormulas, responder((req) => confirmarCorreo(req.body?.token)));
+
 router.use(exigirCuenta);
+// Reenviar el correo: máximo 5 cada 15 minutos
+router.post('/reenviar-confirmacion', limitar(5, 'Ya te enviamos varios correos. Espera unos minutos.'),
+  responder(async (req) => {
+    await reenviarConfirmacion(req.cuentaId);
+    return {};
+  }));
 router.get('/yo', responder(async (req) => ({ cuenta: await verCuenta(req.cuentaId) })));
 router.put('/yo', responder(async (req) => ({ cuenta: await actualizarCuenta(req.cuentaId, req.body ?? {}) })));
 router.get('/formulas', responder(async (req) => ({ formulas: await listarFormulas(req.cuentaId) })));

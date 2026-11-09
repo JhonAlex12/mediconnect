@@ -295,3 +295,8 @@ CREATE INDEX IF NOT EXISTS idx_domicilios_cuenta ON domicilios (cuenta_id);
 -- Actividad de la cuenta del paciente en el mismo registro de accesos
 ALTER TABLE registro_accesos ADD COLUMN IF NOT EXISTS cuenta_id INTEGER REFERENCES cuentas_pacientes(id);
 CREATE INDEX IF NOT EXISTS idx_registro_cuenta ON registro_accesos (cuenta_id, fecha) WHERE cuenta_id IS NOT NULL;
+
+-- Confirmación del correo de la cuenta (enlace que se envía por correo)
+ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS correo_verificado_en TIMESTAMPTZ;
+ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS token_correo_hash TEXT;   -- solo el hash, nunca el token
+ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS token_correo_vence TIMESTAMPTZ;

@@ -1,8 +1,11 @@
+import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
+import { CIUDADES_DOMICILIO, HORAS_ENLACE_CORREO } from '../config/negocio.js';
 import { ErrorNegocio } from './formulas.service.js';
 import { consultarFormula } from './disponibilidad.service.js';
+import { URL_SITIO, correoConfirmacion, enviarCorreo } from './correo.service.js';
 
 // Cuentas de pacientes: registro, ingreso, datos personales, fórmulas y domicilios
 
@@ -68,7 +71,71 @@ function validarClave(clave, errores) {
 
 const COLUMNAS_PERFIL = `id, tipo_documento, documento, nombres, apellidos,
   to_char(fecha_nacimiento, 'YYYY-MM-DD') AS fecha_nacimiento, sexo, celular, correo,
-  direccion, barrio, ciudad, eps, regimen, creado_en`;
+  direccion, barrio, ciudad, eps, regimen, creado_en,
+  (correo_verificado_en IS NOT NULL) AS correo_verificado`;
+
+// "San José de Cúcuta", "cucuta" → "cucuta": compara ciudades sin tildes ni mayúsculas
+const normalizar = (v) => texto(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ');
+export function ciudadConDomicilio(ciudad) {
+  const n = normalizar(ciudad).replace(/^san jose de /, '');
+  return CIUDADES_DOMICILIO.find((c) => normalizar(c) === n) ?? null;
+}
+
+// ---------- Confirmación del correo ----------
+
+const hashToken = (t) => createHash('sha256').update(t).digest('hex');
+
+// Genera un enlace nuevo (invalida el anterior) y lo envía al correo de la cuenta
+async function enviarConfirmacion(cuentaId) {
+  const token = randomBytes(32).toString('hex');
+  const { rows: [c] } = await pool.query(
+    `UPDATE cuentas_pacientes
+        SET token_correo_hash = $2, token_correo_vence = now() + make_interval(hours => $3)
+      WHERE id = $1 AND correo_verificado_en IS NULL
+      RETURNING nombres, correo`,
+    [cuentaId, hashToken(token), HORAS_ENLACE_CORREO]
+  );
+  if (!c) return false; // ya estaba confirmado
+  const enlace = `${URL_SITIO}/confirmar-correo?token=${token}`;
+  const { asunto, texto: cuerpo, html } = correoConfirmacion({
+    nombre: c.nombres.split(' ')[0], enlace, horas: HORAS_ENLACE_CORREO,
+  });
+  try {
+    await enviarCorreo({ para: c.correo, asunto, texto: cuerpo, html });
+  } catch (error) {
+    // La cuenta queda creada; el paciente puede pedir el reenvío desde "Mi cuenta"
+    console.error('No se pudo enviar el correo de confirmación:', error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function reenviarConfirmacion(cuentaId) {
+  const enviado = await enviarConfirmacion(cuentaId);
+  if (!enviado) {
+    const c = await verCuenta(cuentaId);
+    if (c.correo_verificado) throw new ErrorNegocio('Tu correo ya está confirmado', 409);
+    throw new ErrorNegocio('No pudimos enviar el correo. Intenta más tarde.', 502);
+  }
+  await registrarActividad(cuentaId, 'reenviar_confirmacion');
+}
+
+// Público (sin sesión): se abre desde el enlace del correo
+export async function confirmarCorreo(token) {
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) {
+    throw new ErrorNegocio('El enlace no es válido', 400);
+  }
+  const { rows: [c] } = await pool.query(
+    `UPDATE cuentas_pacientes
+        SET correo_verificado_en = now(), token_correo_hash = NULL, token_correo_vence = NULL
+      WHERE token_correo_hash = $1 AND token_correo_vence > now()
+      RETURNING id, correo`,
+    [hashToken(token)]
+  );
+  if (!c) throw new ErrorNegocio('El enlace venció o ya se usó. Pide uno nuevo desde "Mi cuenta".', 410);
+  await registrarActividad(c.id, 'confirmar_correo', c.correo);
+  return { correo: c.correo };
+}
 
 const firmar = (cuenta) =>
   jwt.sign({ tipo: 'paciente_cuenta', id: cuenta.id }, process.env.JWT_SECRET, { expiresIn: '7d' });
@@ -97,7 +164,8 @@ export async function registrarCuenta(d = {}) {
         datos.celular, datos.correo, datos.direccion, datos.barrio, datos.ciudad, datos.eps, datos.regimen, claveHash]
     );
     await registrarActividad(cuenta.id, 'crear_cuenta');
-    return { token: firmar(cuenta), cuenta };
+    const correoEnviado = await enviarConfirmacion(cuenta.id);
+    return { token: firmar(cuenta), cuenta, correo_enviado: correoEnviado };
   } catch (error) {
     if (error.code === '23505') {
       const campo = error.constraint?.includes('correo') ? 'correo' : 'documento';
@@ -150,10 +218,14 @@ export async function actualizarCuenta(id, d = {}) {
     }
   }
 
+  // Si cambia el correo, hay que confirmarlo de nuevo
+  const { rows: [antes] } = await pool.query('SELECT correo FROM cuentas_pacientes WHERE id = $1', [id]);
+  const cambiaCorreo = antes.correo !== datos.correo;
+
   try {
     await pool.query(
       `UPDATE cuentas_pacientes
-          SET nombres=$2, apellidos=$3, fecha_nacimiento=$4, sexo=$5, celular=$6, correo=$7,
+          SET ${cambiaCorreo ? 'correo_verificado_en = NULL,' : ''} nombres=$2, apellidos=$3, fecha_nacimiento=$4, sexo=$5, celular=$6, correo=$7,
               direccion=$8, barrio=$9, ciudad=$10, eps=$11, regimen=$12
               ${cambiaClave ? ', clave_hash = $13' : ''}
         WHERE id = $1`,
@@ -166,6 +238,10 @@ export async function actualizarCuenta(id, d = {}) {
     throw error;
   }
   await registrarActividad(id, cambiaClave ? 'cambiar_datos_y_clave' : 'cambiar_datos');
+  if (cambiaCorreo) {
+    await registrarActividad(id, 'cambiar_correo', datos.correo);
+    await enviarConfirmacion(id);
+  }
   return verCuenta(id);
 }
 
@@ -216,10 +292,13 @@ export async function solicitarDomicilio(cuentaId, d = {}) {
   const errores = [];
   const direccion = texto(d.direccion);
   if (direccion.length < 5 || direccion.length > 150) errores.push('Dirección: obligatoria');
-  const ciudad = texto(d.ciudad);
-  if (ciudad.length < 2 || ciudad.length > 80) errores.push('Ciudad: obligatoria');
+  if (!cuenta.correo_verificado) {
+    throw new ErrorNegocio('Confirma tu correo antes de pedir un domicilio. Revisa tu bandeja de entrada.', 403);
+  }
+  const ciudad = ciudadConDomicilio(d.ciudad);
+  if (!ciudad) errores.push(`Por ahora solo hacemos domicilios en ${CIUDADES_DOMICILIO.join(', ')}`);
   const barrio = opcional(d.barrio);
-  if (barrio && barrio.length > 80) errores.push('Barrio: máximo 80 caracteres');
+  if (!barrio || barrio.length > 80) errores.push('Barrio: obligatorio para ubicar la entrega');
   const telefono = texto(d.telefono).replace(/\s/g, '');
   if (!/^\d{7,10}$/.test(telefono)) errores.push('Teléfono: entre 7 y 10 dígitos');
   const recibe = opcional(d.recibe);

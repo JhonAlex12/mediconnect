@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Bike, CalendarClock, CheckCircle2, ClipboardList, FilePlus2, History, LogOut, Package, Save, Ticket, Truck,
+  Bike, CalendarClock, CheckCircle2, ClipboardList, FilePlus2, History, LogOut, MailWarning, MapPin, Package, Save, Ticket, Truck,
   UserRound, XCircle,
 } from 'lucide-react';
 import SitioPublico from '../components/SitioPublico';
@@ -25,6 +25,11 @@ export const ESTADOS_DOMICILIO = {
   entregado: { texto: 'Entregado', clase: 'bg-emerald-100 text-emerald-800' },
   cancelado: { texto: 'Cancelado', clase: 'bg-slate-200 text-slate-600' },
 };
+// Por ahora los domicilios solo se entregan en Cúcuta (el backend también lo valida)
+export const CIUDAD_DOMICILIO = 'Cúcuta';
+const esCucuta = (c) => /^(san jose de )?cucuta$/.test(
+  (c ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim());
+
 const PASOS = ['recibido', 'en_preparacion', 'en_camino', 'entregado'];
 const ACTIVOS = ['recibido', 'en_preparacion', 'en_camino'];
 
@@ -95,6 +100,7 @@ export default function MiCuenta() {
       </section>
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        {!cuenta.correo_verificado && <ConfirmaTuCorreo correo={cuenta.correo} />}
         <Aviso aviso={error} />
         {pestana === 'formulas' && <MisFormulas formulas={formulas} domicilios={domicilios} recargar={cargar} />}
         {pestana === 'domicilios' && <MisDomicilios domicilios={domicilios} recargar={cargar} />}
@@ -102,6 +108,32 @@ export default function MiCuenta() {
         {pestana === 'historial' && <Historial />}
       </div>
     </SitioPublico>
+  );
+}
+
+// Aviso mientras el correo no esté confirmado, con opción de reenviar el enlace
+function ConfirmaTuCorreo({ correo }) {
+  const { apiCuenta } = useCuenta();
+  const { ocupado, aviso, ejecutar } = useAccion();
+  return (
+    <div className="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <MailWarning className="w-6 h-6 text-amber-600 shrink-0" />
+        <div>
+          <p className="font-bold text-marca-noche">Confirma tu correo</p>
+          <p className="text-sm text-slate-700">
+            Te enviamos un enlace a <strong>{correo}</strong>. Ábrelo para activar los domicilios.
+            Si no lo ves, revisa la carpeta de spam.
+          </p>
+        </div>
+      </div>
+      <button type="button" disabled={ocupado}
+        onClick={() => ejecutar(() => apiCuenta('/reenviar-confirmacion', { metodo: 'POST' }), `Enviamos un enlace nuevo a ${correo}`)}
+        className="ml-9 text-sm font-bold text-marca-azul hover:underline cursor-pointer disabled:opacity-50">
+        {ocupado ? 'Enviando…' : 'Reenviar el correo'}
+      </button>
+      <div className="ml-9"><Aviso aviso={aviso} /></div>
+    </div>
   );
 }
 
@@ -218,7 +250,12 @@ function TarjetaFormula({ formula: f, domicilio, abierto, alPedir, alTerminar })
             </p>
           ) : (
             <div className="flex flex-wrap gap-3">
-              {puedePedir && (
+              {puedePedir && !cuenta.correo_verificado && (
+                <p className="w-full text-sm text-slate-600 flex items-center gap-1.5">
+                  <MailWarning className="w-4 h-4 text-amber-600" /> Confirma tu correo para pedir esta fórmula a domicilio.
+                </p>
+              )}
+              {puedePedir && cuenta.correo_verificado && (
                 <button type="button" onClick={alPedir}
                   className="flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold px-4 py-2.5 rounded cursor-pointer">
                   <Bike className="w-5 h-5" /> {abierto ? 'Cerrar' : 'Pedir a domicilio'}
@@ -239,9 +276,11 @@ function TarjetaFormula({ formula: f, domicilio, abierto, alPedir, alTerminar })
 
 function FormularioDomicilio({ formula, alTerminar }) {
   const { cuenta, apiCuenta } = useCuenta();
+  // Si la dirección de la cuenta es de Cúcuta se propone; si no, se escribe una nueva
+  const vivoEnCucuta = esCucuta(cuenta.ciudad);
   const [d, setD] = useState({
-    direccion: cuenta.direccion ?? '', barrio: cuenta.barrio ?? '', ciudad: cuenta.ciudad ?? '',
-    telefono: cuenta.celular ?? '', recibe: '', indicaciones: '',
+    direccion: vivoEnCucuta ? cuenta.direccion ?? '' : '', barrio: vivoEnCucuta ? cuenta.barrio ?? '' : '',
+    ciudad: CIUDAD_DOMICILIO, telefono: cuenta.celular ?? '', recibe: '', indicaciones: '',
   });
   const { ocupado, aviso, ejecutar } = useAccion();
   const cambiar = (k) => (e) => setD((v) => ({ ...v, [k]: e.target.value }));
@@ -259,15 +298,19 @@ function FormularioDomicilio({ formula, alTerminar }) {
   return (
     <form onSubmit={enviar} className="bg-white border border-slate-200 rounded p-4 space-y-4">
       <p className="font-bold text-marca-noche">¿A dónde te llevamos los medicamentos?</p>
+      <p className="flex items-start gap-2 text-sm bg-marca-hielo rounded p-3 text-slate-700">
+        <MapPin className="w-4 h-4 mt-0.5 text-marca-azul shrink-0" />
+        Por ahora hacemos domicilios únicamente en {CIUDAD_DOMICILIO}.
+      </p>
       <div className="grid sm:grid-cols-2 gap-4">
         <Campo etiqueta="Dirección" id="dom-direccion" className="sm:col-span-2">
           <input id="dom-direccion" value={d.direccion} onChange={cambiar('direccion')} required className={claseInput} />
         </Campo>
-        <Campo etiqueta="Barrio" id="dom-barrio" opcional>
-          <input id="dom-barrio" value={d.barrio} onChange={cambiar('barrio')} className={claseInput} />
+        <Campo etiqueta="Barrio" id="dom-barrio">
+          <input id="dom-barrio" value={d.barrio} onChange={cambiar('barrio')} required className={claseInput} />
         </Campo>
         <Campo etiqueta="Ciudad" id="dom-ciudad">
-          <input id="dom-ciudad" value={d.ciudad} onChange={cambiar('ciudad')} required className={claseInput} />
+          <input id="dom-ciudad" value={d.ciudad} readOnly className={`${claseInput} bg-slate-100 text-slate-600`} />
         </Campo>
         <Campo etiqueta="Teléfono de contacto" id="dom-telefono">
           <input id="dom-telefono" type="tel" inputMode="numeric" value={d.telefono} onChange={cambiar('telefono')} required className={claseInput} />
@@ -423,6 +466,9 @@ const ACCIONES = {
   cancelar_domicilio: 'Cancelaste un domicilio',
   cambiar_datos: 'Actualizaste tus datos',
   cambiar_datos_y_clave: 'Actualizaste tus datos y tu contraseña',
+  cambiar_correo: 'Cambiaste tu correo a',
+  confirmar_correo: 'Confirmaste tu correo',
+  reenviar_confirmacion: 'Pediste un nuevo enlace de confirmación',
 };
 
 function Historial() {

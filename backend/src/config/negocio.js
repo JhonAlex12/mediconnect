@@ -51,3 +51,9 @@ export const MEDIOS_PAGO = ['efectivo', 'transferencia', 'datafono'];
 // 1 a 5: generales. 6: preferencial (adultos mayores, embarazadas y personas con discapacidad)
 export const CAJAS = [1, 2, 3, 4, 5, 6];
 export const CAJA_PREFERENCIAL = 6;
+
+// Domicilios: solo se entregan en estas ciudades (se comparan sin tildes ni mayúsculas)
+export const CIUDADES_DOMICILIO = ['Cúcuta'];
+
+// Horas que dura vigente el enlace para confirmar el correo
+export const HORAS_ENLACE_CORREO = 24;

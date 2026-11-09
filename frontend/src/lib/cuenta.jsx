@@ -60,6 +60,13 @@ export function CuentaProvider({ children }) {
     };
   }, [token, cuenta, cerrarSesion]);
 
+  // Vuelve a leer la cuenta (p. ej. después de confirmar el correo)
+  const recargarCuenta = useCallback(async () => {
+    if (!token) return;
+    const d = await api('/cuenta/yo', { token });
+    setCuenta(d.cuenta);
+  }, [token]);
+
   const entrar = (d) => {
     guardar(d.token);
     setToken(d.token);
@@ -76,7 +83,7 @@ export function CuentaProvider({ children }) {
 
   return (
     <ContextoCuenta.Provider
-      value={{ token, cuenta, setCuenta, verificando, iniciarSesion, registrar, cerrarSesion, apiCuenta }}
+      value={{ token, cuenta, setCuenta, recargarCuenta, verificando, iniciarSesion, registrar, cerrarSesion, apiCuenta }}
     >
       {children}
     </ContextoCuenta.Provider>
