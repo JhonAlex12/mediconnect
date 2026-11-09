@@ -317,3 +317,70 @@ ON CONFLICT (clave) DO NOTHING;
 
 -- Costo de envío del momento en que se pidió (no cambia si después cambia la tarifa)
 ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS costo_envio INTEGER NOT NULL DEFAULT 0 CHECK (costo_envio >= 0);
+
+-- ============================================================
+-- Contenido del sitio editable por el administrador
+-- ============================================================
+
+-- IMÁGENES subidas desde el panel. Se guardan en la base de datos (no en disco)
+-- para que no se pierdan al publicar en servidores sin disco permanente.
+-- "datos" = versión grande (hasta 1600 px); "datos_movil" = versión para celular (900 px).
+CREATE TABLE IF NOT EXISTS imagenes (
+  id           SERIAL PRIMARY KEY,
+  tipo         VARCHAR(20) NOT NULL DEFAULT 'image/webp',
+  datos        BYTEA       NOT NULL,
+  datos_movil  BYTEA,
+  ancho        INTEGER,
+  alto         INTEGER,
+  subida_por   INTEGER     REFERENCES usuarios_farmacia(id),
+  creado_en    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- SLIDES del carrusel de la página principal
+CREATE TABLE IF NOT EXISTS slides (
+  id              SERIAL PRIMARY KEY,
+  nombre          VARCHAR(80)  NOT NULL,              -- nombre corto (accesibilidad y panel)
+  texto_alt       VARCHAR(300) NOT NULL,              -- lo que dice la imagen, para lectores de pantalla
+  imagen          VARCHAR(200) NOT NULL,              -- /img/... o /api/contenido/imagenes/ID
+  imagen_movil    VARCHAR(200),
+  enlace          VARCHAR(200),                       -- a dónde lleva al hacer clic (opcional)
+  fondo           VARCHAR(200),                       -- color o degradado de los lados; vacío = banner
+  orden           INTEGER      NOT NULL DEFAULT 0,
+  activo          BOOLEAN      NOT NULL DEFAULT TRUE,
+  actualizado_en  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- ARTÍCULOS de "Salud al día". El contenido usa un formato de texto sencillo
+-- (párrafos, "## subtítulos", "- listas", **negrita**, [botón](/ruta)).
+CREATE TABLE IF NOT EXISTS articulos (
+  id               SERIAL PRIMARY KEY,
+  slug             VARCHAR(120) NOT NULL UNIQUE,
+  titulo           VARCHAR(160) NOT NULL,
+  tema             VARCHAR(60)  NOT NULL,
+  resumen          VARCHAR(300) NOT NULL,
+  contenido        TEXT         NOT NULL,
+  imagen           VARCHAR(200),
+  fecha            DATE         NOT NULL DEFAULT CURRENT_DATE,
+  publicado        BOOLEAN      NOT NULL DEFAULT TRUE,
+  actualizado_por  INTEGER      REFERENCES usuarios_farmacia(id),
+  actualizado_en   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- SECCIONES de la página "Información al paciente"
+CREATE TABLE IF NOT EXISTS secciones_informacion (
+  id               SERIAL PRIMARY KEY,
+  ancla            VARCHAR(40)  NOT NULL UNIQUE,      -- /informacion#ancla
+  titulo           VARCHAR(120) NOT NULL,
+  contenido        TEXT         NOT NULL,
+  orden            INTEGER      NOT NULL DEFAULT 0,
+  visible          BOOLEAN      NOT NULL DEFAULT TRUE,
+  actualizado_en   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- AJUSTES generales del sitio (datos de contacto, ubicación del mapa...)
+CREATE TABLE IF NOT EXISTS ajustes_sitio (
+  clave            VARCHAR(40) PRIMARY KEY,
+  datos            JSONB       NOT NULL,
+  actualizado_por  INTEGER     REFERENCES usuarios_farmacia(id),
+  actualizado_en   TIMESTAMPTZ NOT NULL DEFAULT now()
+);

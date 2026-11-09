@@ -6,17 +6,7 @@ import VentanaIngreso from './cuenta/VentanaIngreso';
 import ChatBot from './ChatBot';
 import { useSesion } from '../lib/sesion';
 import { useCuenta } from '../lib/cuenta';
-
-// Datos de contacto: reemplazar por los reales de la farmacia
-export const CONTACTO = {
-  telefono: '(000) 000 0000',
-  correo: 'contacto@ejemplo.com',
-  direccion: 'Dirección de la farmacia',
-  horario: 'Lun a sáb · 7:00 a. m. – 7:00 p. m.',
-  // Ubicación en el mapa (PROVISIONAL: centro de Cúcuta). Reemplazar por la de la farmacia.
-  ciudad: 'Cúcuta, Norte de Santander',
-  mapa: { lat: 7.8835, lon: -72.5050 },
-};
+import { useContacto } from '../lib/contenido';
 
 // Permite abrir la ventana de ingreso desde cualquier página pública
 const ContextoIngreso = createContext(() => {});
@@ -56,6 +46,7 @@ export default function SitioPublico({ children }) {
   const { pathname } = useLocation();
   const { usuario } = useSesion();
   const { cuenta } = useCuenta();
+  const CONTACTO = useContacto();
   useDesplazarAAncla();
 
   // El menú del celular se cierra al cambiar de página
@@ -84,7 +75,7 @@ export default function SitioPublico({ children }) {
       <div className="bg-marca-verde-oscuro text-white text-sm">
         <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-4">
           <div className="hidden md:flex items-center gap-5">
-            <a href={`tel:${CONTACTO.telefono.replace(/\D/g, '')}`} className="flex items-center gap-1.5 hover:underline">
+            <a href={`tel:${(CONTACTO.telefono ?? '').replace(/\D/g, '')}`} className="flex items-center gap-1.5 hover:underline">
               <Phone className="w-4 h-4" /> Línea de atención {CONTACTO.telefono}
             </a>
             <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {CONTACTO.horario}</span>

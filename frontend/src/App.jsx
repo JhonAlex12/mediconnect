@@ -5,6 +5,7 @@ import VistaPaciente from './components/paciente/VistaPaciente';
 import PantallaPublica from './components/pantalla/PantallaPublica';
 import { SesionProvider } from './lib/sesion';
 import { CuentaProvider } from './lib/cuenta';
+import { ContenidoProvider } from './lib/contenido';
 import Registro from './paginas/Registro';
 import MiCuenta from './paginas/MiCuenta';
 import ConfirmarCorreo from './paginas/ConfirmarCorreo';
@@ -17,6 +18,7 @@ import SaludAlDia from './paginas/SaludAlDia';
 export default function App() {
   return (
     // Las sesiones (empleado y paciente) son de todo el sitio: se inician desde el encabezado público
+    <ContenidoProvider>
     <SesionProvider>
     <CuentaProvider>
     <Routes>
@@ -39,6 +41,7 @@ export default function App() {
     </Routes>
     </CuentaProvider>
     </SesionProvider>
+    </ContenidoProvider>
   );
 }
 

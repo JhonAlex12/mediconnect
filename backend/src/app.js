@@ -18,12 +18,16 @@ import usuariosRoutes from './routes/usuarios.routes.js';
 import tarifasRoutes from './routes/tarifas.routes.js';
 import cuentaRoutes from './routes/cuenta.routes.js';
 import domiciliosRoutes from './routes/domicilios.routes.js';
+import contenidoRoutes from './routes/contenido.routes.js';
 
 const app = express();
 
 app.use(helmet());        // cabeceras de seguridad
 app.use(cors());          // permite peticiones desde el frontend
-app.use(express.json()); 
+// Subida de imágenes del panel: admite cuerpos grandes (la imagen viaja en base64).
+// Va antes del límite general; express.json no vuelve a leer un cuerpo ya leído.
+app.use('/api/contenido/admin/imagenes', exigirEmpleado('administrador'), express.json({ limit: '15mb' }));
+app.use(express.json());
 app.use('/api/formulas', formulasRoutes); // entiende cuerpos de petición en JSON
 app.use('/api/turnos', turnosRoutes);
 app.use('/api/auth', authRoutes);
@@ -35,6 +39,7 @@ app.use('/api/usuarios', usuariosRoutes);
 app.use('/api/tarifas', tarifasRoutes);
 app.use('/api/cuenta', cuentaRoutes);          // cuentas de pacientes
 app.use('/api/domicilios', domiciliosRoutes);  // gestión de domicilios (panel)
+app.use('/api/contenido', contenidoRoutes);    // contenido del sitio (público y administración)
 // Estado inicial de la pantalla de la sala (con sesión de empleado; luego se actualiza por Socket.IO)
 app.get('/api/pantalla', exigirEmpleado(), async (req, res, next) => {
   try {

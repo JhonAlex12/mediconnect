@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight, Bike, Clock, FileText, Home, IdCard, MapPin, Navigation, Phone, Search, Ticket, UserPlus, Wallet,
 } from 'lucide-react';
-import SitioPublico, { CONTACTO, useAbrirIngreso } from '../components/SitioPublico';
+import SitioPublico, { useAbrirIngreso } from '../components/SitioPublico';
+import { useContacto } from '../lib/contenido';
 import { useCuenta } from '../lib/cuenta';
 import { useCostoEnvio } from '../lib/costoEnvio';
 import Carrusel from '../components/Carrusel';
 import { useTitulo } from '../components/Encabezado';
-import { ARTICULOS } from '../lib/articulos';
+import { useArticulos } from '../lib/articulos';
 import { TarjetaArticulo } from './SaludAlDia';
 
 const ACCESOS = [
@@ -28,6 +29,7 @@ const INFORMACION = [
 
 export default function Inicio() {
   useTitulo(null);
+  const articulos = useArticulos();
 
   return (
     <SitioPublico>
@@ -83,7 +85,8 @@ export default function Inicio() {
 
       <Domicilio />
 
-      {/* Salud al día: los tres artículos más recientes */}
+      {/* Salud al día: los tres artículos más recientes (si hay publicados) */}
+      {articulos?.length !== 0 && (
       <section className="bg-slate-50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 py-16">
           <div className="flex items-end justify-between gap-4 mb-8">
@@ -91,10 +94,11 @@ export default function Inicio() {
             <Link to="/salud-al-dia" className="font-semibold text-marca-azul hover:underline">Ver todos los artículos</Link>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
-            {ARTICULOS.slice(0, 3).map((a) => <TarjetaArticulo key={a.slug} articulo={a} />)}
+            {articulos?.slice(0, 3).map((a) => <TarjetaArticulo key={a.slug} articulo={a} />)}
           </div>
         </div>
       </section>
+      )}
 
       {/* Quiénes somos */}
       <section id="quienes-somos" className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[3fr_2fr] gap-10 items-center scroll-mt-28">
@@ -178,7 +182,8 @@ function Domicilio() {
 
 // Ubicación de la farmacia en el mapa (OpenStreetMap, sin clave de API)
 function Ubicacion() {
-  const { lat, lon } = CONTACTO.mapa;
+  const CONTACTO = useContacto();
+  const { lat, lon } = CONTACTO;
   const caja = [lon - 0.006, lat - 0.004, lon + 0.006, lat + 0.004].join(',');
   const mapa = `https://www.openstreetmap.org/export/embed.html?bbox=${caja}&layer=mapnik&marker=${lat},${lon}`;
   const comoLlegar = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
