@@ -14,7 +14,7 @@ export async function iniciarSesion(usuario, clave) {
   }
 
   const { rows: [u] } = await pool.query(
-    `SELECT id, nombre, usuario, clave_hash, rol, activo
+    `SELECT id, nombre, usuario, clave_hash, rol, caja, activo
        FROM usuarios_farmacia
       WHERE usuario = $1`,
     [usuario.trim().toLowerCase()]
@@ -38,6 +38,6 @@ export async function iniciarSesion(usuario, clave) {
 
   return {
     token,
-    usuario: { id: u.id, nombre: u.nombre, usuario: u.usuario, rol: u.rol },
+    usuario: { id: u.id, nombre: u.nombre, usuario: u.usuario, rol: u.rol, caja: u.caja },
   };
 }

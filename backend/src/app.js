@@ -41,7 +41,7 @@ app.use('/api/cuenta', cuentaRoutes);          // cuentas de pacientes
 app.use('/api/domicilios', domiciliosRoutes);  // gestión de domicilios (panel)
 app.use('/api/contenido', contenidoRoutes);    // contenido del sitio (público y administración)
 // Estado inicial de la pantalla de la sala (con sesión de empleado; luego se actualiza por Socket.IO)
-app.get('/api/pantalla', exigirEmpleado(), async (req, res, next) => {
+app.get('/api/pantalla', exigirEmpleado('administrador', 'auxiliar'), async (req, res, next) => {
   try {
     res.json({ ok: true, ...(await estadoPantalla()) });
   } catch (error) {

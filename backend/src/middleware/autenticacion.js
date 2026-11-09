@@ -20,7 +20,7 @@ export function exigirEmpleado(...rolesPermitidos) {
     // 2. ¿El usuario sigue activo y qué rol tiene hoy? (se lee de la base de datos)
     try {
       const { rows: [u] } = await pool.query(
-        `SELECT id, nombre, usuario, rol, activo FROM usuarios_farmacia WHERE id = $1`,
+        `SELECT id, nombre, usuario, rol, caja, activo FROM usuarios_farmacia WHERE id = $1`,
         [datos.id]
       );
       if (!u || !u.activo) {

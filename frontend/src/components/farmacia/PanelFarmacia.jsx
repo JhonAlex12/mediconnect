@@ -13,13 +13,14 @@ import TarifasFarmacia from './TarifasFarmacia';
 import DomiciliosFarmacia from './DomiciliosFarmacia';
 import ContenidoFarmacia from './ContenidoFarmacia';
 
-const ROLES = { auxiliar: 'Auxiliar', administrador: 'Administrador' };
+const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador' };
 
 // Cada sección es una página: /farmacia/fila, /farmacia/inventario...
+// "roles": quién la ve (si no se indica, administradores y auxiliares). El backend también lo exige.
 const SECCIONES = [
   { ruta: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia },
   { ruta: 'inventario', texto: 'Inventario', icono: Package, componente: InventarioFarmacia },
-  { ruta: 'domicilios', texto: 'Domicilios', icono: Bike, componente: DomiciliosFarmacia },
+  { ruta: 'domicilios', texto: 'Domicilios', icono: Bike, componente: DomiciliosFarmacia, roles: ['administrador', 'auxiliar', 'domicilios'] },
   // Reportes y usuarios: solo administradores (el backend también lo exige)
   { ruta: 'reportes', texto: 'Reportes', icono: BarChart3, componente: ReportesFarmacia, soloAdmin: true },
   { ruta: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
@@ -51,7 +52,10 @@ export default function PanelFarmacia() {
     );
   }
 
-  const permitidas = SECCIONES.filter((s) => !s.soloAdmin || usuario.rol === 'administrador');
+  const permitidas = SECCIONES.filter((s) =>
+    s.soloAdmin ? usuario.rol === 'administrador' : (s.roles ?? ['administrador', 'auxiliar']).includes(usuario.rol));
+  const inicio = permitidas[0]?.ruta ?? 'fila';
+  const atiendeFila = usuario.rol !== 'domicilios';
 
   return (
     <TiempoRealProvider>
@@ -59,6 +63,7 @@ export default function PanelFarmacia() {
         derecha={
           <div className="flex items-center gap-4">
             {/* La pantalla de la sala se abre en otra pestaña o ventana (para el televisor) con esta misma sesión */}
+            {atiendeFila && (
             <button
               type="button"
               onClick={() => window.open('/pantalla', 'pantalla-sala')}
@@ -67,11 +72,15 @@ export default function PanelFarmacia() {
               <MonitorPlay className="w-4 h-4" />
               Pantalla de la sala
             </button>
+            )}
             <div className="flex items-center gap-2">
               <UserCircle2 className="w-7 h-7 text-slate-400" />
               <div className="leading-tight">
                 <p className="font-semibold text-sm">{usuario.nombre}</p>
-                <p className="text-xs text-slate-400">{ROLES[usuario.rol] ?? usuario.rol}</p>
+                <p className="text-xs text-slate-400">
+                  {ROLES[usuario.rol] ?? usuario.rol}
+                  {usuario.caja ? ` · ${usuario.caja === 6 ? 'Caja 6 preferencial' : `Caja ${usuario.caja}`}` : ''}
+                </p>
               </div>
             </div>
             <button
@@ -108,12 +117,12 @@ export default function PanelFarmacia() {
         }
       >
         <Routes>
-          <Route index element={<Navigate to="fila" replace />} />
+          <Route index element={<Navigate to={inicio} replace />} />
           {permitidas.map((s) => (
             <Route key={s.ruta} path={s.ruta} element={<Seccion titulo={s.texto} componente={s.componente} />} />
           ))}
-          {/* Sección inexistente o sin permiso: a la fila */}
-          <Route path="*" element={<Navigate to="fila" replace />} />
+          {/* Sección inexistente o sin permiso: a la primera permitida */}
+          <Route path="*" element={<Navigate to={inicio} replace />} />
         </Routes>
       </Pagina>
     </TiempoRealProvider>

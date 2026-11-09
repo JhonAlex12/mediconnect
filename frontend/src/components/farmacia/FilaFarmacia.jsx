@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { CheckCircle2, ClipboardList, Megaphone, PauseCircle, SkipForward, Undo2, UserPlus, Users } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useSesion } from '../../lib/sesion';
 import { useEventoEnVivo } from '../../lib/tiempoReal';
 import { Aviso, BotonAccion, IndicadorEnVivo, claseCampo, useAccion } from './comunes';
 import DispensarTurno from './DispensarTurno';
@@ -47,7 +48,11 @@ export default function FilaFarmacia() {
   const [datos, setDatos] = useState({ turno_actual: null, presentes: 0, fila: [] });
   const [cargando, setCargando] = useState(true);
   const [dispensando, setDispensando] = useState(null); // id del turno con la entrega abierta
-  const [caja, setCaja] = useState(leerCaja);
+  // Con caja asignada en su usuario, el trabajador siempre atiende en esa
+  const { usuario } = useSesion();
+  const cajaFija = usuario?.caja ?? null;
+  const [cajaElegida, setCaja] = useState(leerCaja);
+  const caja = cajaFija ?? cajaElegida;
   const elegirCaja = (c) => {
     setCaja(c);
     setDispensando(null);
@@ -98,6 +103,9 @@ export default function FilaFarmacia() {
       {/* Caja en la que trabaja este auxiliar */}
       <section className="bg-white rounded-xl border border-slate-300 p-4 flex items-center gap-3 flex-wrap">
         <p className="font-bold text-slate-800">Estoy atendiendo en:</p>
+        {cajaFija ? (
+          <span className="px-3 py-1.5 rounded-lg text-sm font-bold bg-marca-azul text-white">{nombreCaja(cajaFija)}</span>
+        ) : (
         <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Mi caja">
           {CAJAS.map((c) => (
             <button key={c} type="button" role="radio" aria-checked={caja === c} onClick={() => elegirCaja(c)}
@@ -108,6 +116,7 @@ export default function FilaFarmacia() {
             </button>
           ))}
         </div>
+        )}
         {otrasCajas.length > 0 && (
           <p className="text-sm text-slate-500 w-full">
             En otras cajas: {otrasCajas.map((t) => `${t.numero} (caja ${t.caja ?? '?'})`).join(' · ')}

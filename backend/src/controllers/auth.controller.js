@@ -12,6 +12,6 @@ export async function login(req, res, next) {
 
 // GET /api/auth/yo  → quién soy (lo usará el panel al cargar)
 export function yo(req, res) {
-  const { id, nombre, usuario, rol } = req.empleado;
-  res.json({ ok: true, usuario: { id, nombre, usuario, rol } });
+  const { id, nombre, usuario, rol, caja } = req.empleado;
+  res.json({ ok: true, usuario: { id, nombre, usuario, rol, caja } });
 }

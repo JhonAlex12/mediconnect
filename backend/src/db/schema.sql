@@ -384,3 +384,16 @@ CREATE TABLE IF NOT EXISTS ajustes_sitio (
   actualizado_por  INTEGER     REFERENCES usuarios_farmacia(id),
   actualizado_en   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ============================================================
+-- Caja fija por trabajador y rol de pedidos/domicilios
+-- ============================================================
+-- Rol "domicilios": solo gestiona los pedidos a domicilio
+ALTER TABLE usuarios_farmacia DROP CONSTRAINT IF EXISTS usuarios_farmacia_rol_check;
+ALTER TABLE usuarios_farmacia ADD CONSTRAINT usuarios_farmacia_rol_check
+  CHECK (rol IN ('administrador', 'auxiliar', 'domicilios'));
+
+-- Caja asignada al auxiliar (1 a 5 generales, 6 preferencial). Nula = elige la caja en su equipo.
+ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS caja SMALLINT CHECK (caja BETWEEN 1 AND 6);
+-- Una caja tiene un solo trabajador activo asignado
+CREATE UNIQUE INDEX IF NOT EXISTS una_persona_por_caja ON usuarios_farmacia (caja) WHERE activo AND caja IS NOT NULL;

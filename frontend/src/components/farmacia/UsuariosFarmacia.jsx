@@ -4,7 +4,9 @@ import { api } from '../../lib/api';
 import { useSesion } from '../../lib/sesion';
 import { Aviso, BotonAccion, claseCampo, useAccion } from './comunes';
 
-const ROLES = { auxiliar: 'Auxiliar', administrador: 'Administrador' };
+const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador' };
+const CAJAS = [1, 2, 3, 4, 5, 6];
+const nombreCaja = (c) => (c ? (c === 6 ? 'Caja 6 · Preferencial' : `Caja ${c}`) : '—');
 
 // Misma regla que el backend
 const claveValida = (c) => c.length >= 10 && /[a-zA-Z]/.test(c) && /\d/.test(c);
@@ -84,6 +86,7 @@ export default function UsuariosFarmacia() {
                   <th className="px-5 py-2 font-semibold">Nombre</th>
                   <th className="px-3 py-2 font-semibold">Usuario</th>
                   <th className="px-3 py-2 font-semibold">Rol</th>
+                  <th className="px-3 py-2 font-semibold">Caja</th>
                   <th className="px-3 py-2 font-semibold">Estado</th>
                   <th className="px-3 py-2 font-semibold">Creado</th>
                   <th className="px-5 py-2 font-semibold sr-only">Acciones</th>
@@ -100,6 +103,7 @@ export default function UsuariosFarmacia() {
                       </td>
                       <td className="px-3 py-3 font-mono text-sm">{u.usuario}</td>
                       <td className="px-3 py-3">{ROLES[u.rol] ?? u.rol}</td>
+                      <td className="px-3 py-3 text-sm">{nombreCaja(u.caja)}</td>
                       <td className="px-3 py-3">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                           u.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
@@ -166,16 +170,28 @@ function SelectorRol({ id, valor, onChange, disabled }) {
   );
 }
 
+// Caja fija del auxiliar ("" = elige la caja en su equipo)
+function SelectorCaja({ id, valor, onChange, disabled }) {
+  return (
+    <select id={id} value={valor ?? ''} onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+      disabled={disabled} className={`${claseCampo} disabled:bg-slate-100`}>
+      <option value="">Sin caja fija</option>
+      {CAJAS.map((c) => <option key={c} value={c}>{nombreCaja(c)}</option>)}
+    </select>
+  );
+}
+
 function NuevoUsuario({ ocupado, ejecutar, alCerrar }) {
   const [nombre, setNombre] = useState('');
   const [usuario, setUsuario] = useState('');
   const [clave, setClave] = useState('');
   const [rol, setRol] = useState('auxiliar');
+  const [caja, setCaja] = useState(null);
 
   const enviar = async (e) => {
     e.preventDefault();
     const ok = await ejecutar(
-      () => api('/usuarios', { metodo: 'POST', cuerpo: { nombre, usuario, clave, rol } }),
+      () => api('/usuarios', { metodo: 'POST', cuerpo: { nombre, usuario, clave, rol, caja: rol === 'auxiliar' ? caja : null } }),
       (r) => `Usuario ${r.usuario.usuario} creado`
     );
     if (ok) alCerrar();
@@ -183,7 +199,7 @@ function NuevoUsuario({ ocupado, ejecutar, alCerrar }) {
 
   return (
     <Tarjeta titulo="Nuevo usuario" icono={UserPlus} alCerrar={alCerrar}>
-      <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_12rem_1fr_10rem_auto] lg:items-start">
+      <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_11rem_1fr_11rem_11rem_auto] lg:items-start">
         <div>
           <label htmlFor="nu-nombre" className="block text-sm font-bold text-slate-800 mb-1">Nombre completo</label>
           <input id="nu-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3}
@@ -206,6 +222,10 @@ function NuevoUsuario({ ocupado, ejecutar, alCerrar }) {
           <label htmlFor="nu-rol" className="block text-sm font-bold text-slate-800 mb-1">Rol</label>
           <SelectorRol id="nu-rol" valor={rol} onChange={setRol} />
         </div>
+        <div>
+          <label htmlFor="nu-caja" className="block text-sm font-bold text-slate-800 mb-1">Caja</label>
+          <SelectorCaja id="nu-caja" valor={rol === 'auxiliar' ? caja : null} onChange={setCaja} disabled={rol !== 'auxiliar'} />
+        </div>
         <div className="lg:pt-6">
           <BotonAccion type="submit" color="oscuro" ocupado={ocupado || !claveValida(clave)}>
             Crear
@@ -219,6 +239,7 @@ function NuevoUsuario({ ocupado, ejecutar, alCerrar }) {
 function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
   const [nombre, setNombre] = useState(u.nombre);
   const [rol, setRol] = useState(u.rol);
+  const [caja, setCaja] = useState(u.caja);
   const [clave, setClave] = useState('');
   const [confirmacion, setConfirmacion] = useState('');
 
@@ -233,6 +254,8 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
       cuerpo = {};
       if (nombre.trim() !== u.nombre) cuerpo.nombre = nombre.trim();
       if (rol !== u.rol) cuerpo.rol = rol;
+      const cajaFinal = rol === 'auxiliar' ? caja : null;
+      if (cajaFinal !== u.caja) cuerpo.caja = cajaFinal;
       exito = `${nombre.trim()} actualizado`;
     }
     const ok = await ejecutar(() => api(`/usuarios/${u.id}`, { metodo: 'PATCH', cuerpo }), exito);
@@ -266,10 +289,10 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
     );
   }
 
-  const sinCambios = nombre.trim() === u.nombre && rol === u.rol;
+  const sinCambios = nombre.trim() === u.nombre && rol === u.rol && (rol === 'auxiliar' ? caja : null) === u.caja;
   return (
     <Tarjeta titulo={`Editar: ${u.nombre}`} icono={Pencil} alCerrar={alCerrar}>
-      <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-[1fr_12rem_auto] sm:items-start">
+      <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-[1fr_12rem_12rem_auto] sm:items-start">
         <div>
           <label htmlFor="eu-nombre" className="block text-sm font-bold text-slate-800 mb-1">Nombre completo</label>
           <input id="eu-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3}
@@ -279,6 +302,10 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
           <label htmlFor="eu-rol" className="block text-sm font-bold text-slate-800 mb-1">Rol</label>
           <SelectorRol id="eu-rol" valor={rol} onChange={setRol} disabled={esYo} />
           {esYo && <p className="text-xs mt-1 text-slate-500">No puedes quitarte el rol de administrador.</p>}
+        </div>
+        <div>
+          <label htmlFor="eu-caja" className="block text-sm font-bold text-slate-800 mb-1">Caja</label>
+          <SelectorCaja id="eu-caja" valor={rol === 'auxiliar' ? caja : null} onChange={setCaja} disabled={rol !== 'auxiliar'} />
         </div>
         <div className="sm:pt-6">
           <BotonAccion type="submit" color="oscuro" ocupado={ocupado || sinCambios || nombre.trim().length < 3}>
