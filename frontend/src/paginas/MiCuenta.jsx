@@ -10,6 +10,7 @@ import { Aviso, useAccion } from '../components/farmacia/comunes';
 import { CobroFormula, ESTADO_MEDICAMENTO, fechaLarga, pesos } from '../components/paciente/VistaPaciente';
 import CamposPersonales, { Campo, Seccion, claseInput, datosDesdeCuenta } from '../components/cuenta/CamposPersonales';
 import { useCuenta } from '../lib/cuenta';
+import { totalDomicilio, useCostoEnvio } from '../lib/costoEnvio';
 
 const PESTANAS = [
   ['formulas', 'Mis fórmulas', ClipboardList],
@@ -285,6 +286,7 @@ function FormularioDomicilio({ formula, alTerminar }) {
   const { ocupado, aviso, ejecutar } = useAccion();
   const cambiar = (k) => (e) => setD((v) => ({ ...v, [k]: e.target.value }));
   const cuota = formula.cobro?.valor > 0 && !formula.cobro?.pagado ? formula.cobro.valor : 0;
+  const envio = useCostoEnvio();
 
   const enviar = async (e) => {
     e.preventDefault();
@@ -323,12 +325,22 @@ function FormularioDomicilio({ formula, alTerminar }) {
             placeholder="Torre, apartamento, punto de referencia…" className={claseInput} />
         </Campo>
       </div>
-      <p className="text-sm text-slate-600">
-        {cuota > 0
-          ? <>Pagas la cuota moderadora de <strong>{pesos(cuota)}</strong> al recibir. </>
-          : null}
-        La farmacia te llamará para confirmar la hora de entrega.
-      </p>
+      {envio !== null && (
+        <div className="bg-slate-50 border border-slate-200 rounded p-4 text-sm">
+          <p className="font-bold text-marca-noche mb-2">Pagas al recibir</p>
+          <dl className="space-y-1">
+            {cuota > 0 && (
+              <div className="flex justify-between"><dt className="text-slate-600">Cuota moderadora</dt><dd>{pesos(cuota)}</dd></div>
+            )}
+            <div className="flex justify-between"><dt className="text-slate-600">Costo de envío</dt><dd>{pesos(envio)}</dd></div>
+            <div className="flex justify-between border-t border-slate-200 pt-1 mt-1 font-bold text-marca-noche">
+              <dt>Total</dt><dd>{pesos(cuota + envio)}</dd>
+            </div>
+          </dl>
+          <p className="text-slate-500 mt-2">En efectivo, transferencia o datáfono.</p>
+        </div>
+      )}
+      <p className="text-sm text-slate-600">La farmacia te llamará para confirmar la hora de entrega.</p>
       <Aviso aviso={aviso} />
       <button type="submit" disabled={ocupado}
         className="flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-60 text-white font-bold px-5 py-2.5 rounded cursor-pointer">
@@ -382,6 +394,15 @@ function MisDomicilios({ domicilios, recargar }) {
                   </li>
                 ))}
               </ol>
+            )}
+
+            {!['entregado', 'cancelado'].includes(d.estado) && (
+              <p className="text-sm text-slate-700">
+                Pagas al recibir: <strong>{pesos(totalDomicilio(d).total)}</strong>
+                <span className="text-slate-500">
+                  {' '}({totalDomicilio(d).cuota > 0 ? `cuota ${pesos(totalDomicilio(d).cuota)} + ` : ''}envío {pesos(d.costo_envio)})
+                </span>
+              </p>
             )}
 
             {d.nota_farmacia && (

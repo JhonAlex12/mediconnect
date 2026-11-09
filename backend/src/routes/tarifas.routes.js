@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { exigirEmpleado } from '../middleware/autenticacion.js';
 import { listarTarifas, guardarTarifas } from '../services/cobros.service.js';
+import { costoEnvio, guardarCostoEnvio } from '../services/cuentas.service.js';
 
 const router = Router();
 
@@ -14,6 +15,15 @@ router.get('/vigentes', async (req, res, next) => {
   }
 });
 
+// Pública: costo de envío de los domicilios
+router.get('/domicilio', async (req, res, next) => {
+  try {
+    res.json({ ok: true, costo_envio: await costoEnvio() });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Lo demás, solo administradores: valores de la cuota moderadora por año
 router.use(exigirEmpleado('administrador'));
 
@@ -21,6 +31,15 @@ router.use(exigirEmpleado('administrador'));
 router.get('/', async (req, res, next) => {
   try {
     res.json({ ok: true, tarifas: await listarTarifas() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/tarifas/domicilio  { "valor": 6000 }  (antes de /:anio para que no se confunda con un año)
+router.put('/domicilio', async (req, res, next) => {
+  try {
+    res.json({ ok: true, costo_envio: await guardarCostoEnvio(req.empleado.id, req.body?.valor) });
   } catch (error) {
     next(error);
   }

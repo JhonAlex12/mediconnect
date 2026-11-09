@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import SitioPublico, { CONTACTO, useAbrirIngreso } from '../components/SitioPublico';
 import { useCuenta } from '../lib/cuenta';
+import { useCostoEnvio } from '../lib/costoEnvio';
 import Carrusel from '../components/Carrusel';
 import { useTitulo } from '../components/Encabezado';
 import { ARTICULOS } from '../lib/articulos';
@@ -122,10 +123,11 @@ export default function Inicio() {
 function Domicilio() {
   const { cuenta } = useCuenta();
   const abrirIngreso = useAbrirIngreso();
+  const envio = useCostoEnvio();
   const pasos = [
     [UserPlus, 'Crea tu cuenta', 'Con tus datos, y confirma tu correo.'],
     [FileText, 'Agrega tu fórmula', 'Con el código que te dio la IPS.'],
-    [Home, 'Recíbela en casa', 'Te llamamos para confirmar y pagas la cuota al recibir.'],
+    [Home, 'Recíbela en casa', 'Te llamamos para confirmar y pagas el envío y la cuota al recibir.'],
   ];
   return (
     <section id="domicilio" className="bg-marca-noche text-white scroll-mt-28">
@@ -138,6 +140,7 @@ function Domicilio() {
           </p>
           <p className="inline-flex items-center gap-2 mt-4 bg-white/10 rounded px-3 py-1.5 text-sm font-semibold">
             <MapPin className="w-4 h-4 text-marca-verde" /> Disponible solo en Cúcuta
+            {envio !== null && <> · Envío ${envio.toLocaleString('es-CO')}</>}
           </p>
           <div className="flex flex-wrap items-center gap-4 mt-6">
             {cuenta ? (

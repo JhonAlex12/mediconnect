@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Save, Wallet } from 'lucide-react';
+import { Bike, Save, Wallet } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Aviso, BotonAccion, claseCampo, useAccion } from './comunes';
 
@@ -96,6 +96,8 @@ export default function TarifasFarmacia() {
         <Aviso aviso={aviso} />
       </form>
 
+      <CostoEnvio />
+
       <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
         <h3 className="px-5 py-3 border-b border-slate-200 font-bold text-slate-800">Historial por año</h3>
         {tarifas.length === 0 ? (
@@ -120,5 +122,52 @@ export default function TarifasFarmacia() {
         )}
       </section>
     </div>
+  );
+}
+
+// Costo de envío de los domicilios. Cada domicilio guarda el valor del momento en que se pidió.
+function CostoEnvio() {
+  const [valor, setValor] = useState('');
+  const [error, setError] = useState(null);
+  const { ocupado, aviso, ejecutar } = useAccion();
+
+  useEffect(() => {
+    api('/tarifas/domicilio')
+      .then((d) => setValor(String(d.costo_envio)))
+      .catch((err) => setError(err.message));
+  }, []);
+
+  const guardar = (e) => {
+    e.preventDefault();
+    ejecutar(
+      () => api('/tarifas/domicilio', { metodo: 'PUT', cuerpo: { valor: Number(valor) } }),
+      (r) => `Costo de envío guardado: ${pesos(r.costo_envio)}`
+    );
+  };
+
+  return (
+    <form onSubmit={guardar} className="bg-white rounded-xl border border-slate-300 p-5 space-y-4">
+      <div>
+        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <Bike className="w-5 h-5 text-slate-600" /> Costo de envío de domicilios
+        </h3>
+        <p className="text-sm text-slate-600 mt-1">
+          Lo paga el paciente al recibir, junto con la cuota moderadora si le corresponde.
+          Los domicilios ya pedidos conservan el valor con el que se pidieron.
+        </p>
+      </div>
+      {error && <Aviso aviso={{ tipo: 'error', texto: error }} />}
+      <div className="flex items-end gap-4 flex-wrap">
+        <div className="w-48">
+          <label htmlFor="costo-envio" className="block text-sm font-bold text-slate-800 mb-1">Valor (pesos)</label>
+          <input id="costo-envio" type="number" min={0} step={100} inputMode="numeric" value={valor}
+            onChange={(e) => setValor(e.target.value)} className={claseCampo} />
+        </div>
+        <BotonAccion type="submit" color="verde" icono={Save} ocupado={ocupado || !/^\d+$/.test(valor)}>
+          Guardar costo de envío
+        </BotonAccion>
+      </div>
+      <Aviso aviso={aviso} />
+    </form>
   );
 }

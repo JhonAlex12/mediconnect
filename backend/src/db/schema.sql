@@ -300,3 +300,20 @@ CREATE INDEX IF NOT EXISTS idx_registro_cuenta ON registro_accesos (cuenta_id, f
 ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS correo_verificado_en TIMESTAMPTZ;
 ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS token_correo_hash TEXT;   -- solo el hash, nunca el token
 ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS token_correo_vence TIMESTAMPTZ;
+
+-- ============================================================
+-- Costo de envío de los domicilios
+-- ============================================================
+-- Valores generales editables por el administrador
+CREATE TABLE IF NOT EXISTS configuracion (
+  clave            VARCHAR(40) PRIMARY KEY,
+  valor            INTEGER     NOT NULL CHECK (valor >= 0),
+  actualizado_por  INTEGER     REFERENCES usuarios_farmacia(id),
+  actualizado_en   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Valor inicial PROVISIONAL: el administrador lo ajusta en Tarifas
+INSERT INTO configuracion (clave, valor) VALUES ('costo_envio_domicilio', 5000)
+ON CONFLICT (clave) DO NOTHING;
+
+-- Costo de envío del momento en que se pidió (no cambia si después cambia la tarifa)
+ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS costo_envio INTEGER NOT NULL DEFAULT 0 CHECK (costo_envio >= 0);

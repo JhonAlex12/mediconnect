@@ -274,8 +274,32 @@ export async function listarFormulas(cuentaId) {
 
 // ---------- Domicilios ----------
 
+// ---------- Costo de envío ----------
+
+export async function costoEnvio() {
+  const { rows: [c] } = await pool.query(`SELECT valor FROM configuracion WHERE clave = 'costo_envio_domicilio'`);
+  return c?.valor ?? 0;
+}
+
+export async function guardarCostoEnvio(empleadoId, valor) {
+  if (!Number.isInteger(valor) || valor < 0 || valor > 1000000) {
+    throw new ErrorNegocio('El costo de envío debe ser un valor entre $0 y $1.000.000', 400);
+  }
+  await pool.query(
+    `INSERT INTO configuracion (clave, valor, actualizado_por) VALUES ('costo_envio_domicilio', $1, $2)
+     ON CONFLICT (clave) DO UPDATE SET valor = $1, actualizado_por = $2, actualizado_en = now()`,
+    [valor, empleadoId]
+  );
+  await pool.query(
+    `INSERT INTO registro_accesos (usuario_id, accion, detalle) VALUES ($1, 'costo_envio', $2)`,
+    [empleadoId, String(valor)]
+  );
+  return valor;
+}
+
 const COLUMNAS_DOMICILIO = `d.id, f.codigo, d.direccion, d.barrio, d.ciudad, d.telefono, d.recibe,
-  d.indicaciones, d.estado, d.nota_farmacia, d.creado_en, d.actualizado_en`;
+  d.indicaciones, d.estado, d.costo_envio, f.cuota_moderadora,
+  EXISTS (SELECT 1 FROM pagos pg WHERE pg.formula_id = f.id) AS cuota_pagada, d.nota_farmacia, d.creado_en, d.actualizado_en`;
 
 export async function listarDomicilios(cuentaId) {
   const { rows } = await pool.query(
@@ -325,9 +349,9 @@ export async function solicitarDomicilio(cuentaId, d = {}) {
 
   try {
     const { rows: [nuevo] } = await pool.query(
-      `INSERT INTO domicilios (cuenta_id, formula_id, direccion, barrio, ciudad, telefono, recibe, indicaciones)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-      [cuentaId, vinculo.id, direccion, barrio, ciudad, telefono, recibe, indicaciones]
+      `INSERT INTO domicilios (cuenta_id, formula_id, direccion, barrio, ciudad, telefono, recibe, indicaciones, costo_envio)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, costo_envio`,
+      [cuentaId, vinculo.id, direccion, barrio, ciudad, telefono, recibe, indicaciones, await costoEnvio()]
     );
     await registrarActividad(cuentaId, 'solicitar_domicilio', vinculo.codigo);
     return nuevo;
@@ -380,8 +404,6 @@ export async function domiciliosFarmacia({ estado } = {}) {
   const { rows } = await pool.query(
     `SELECT ${COLUMNAS_DOMICILIO},
             c.tipo_documento, c.documento, c.nombres || ' ' || c.apellidos AS paciente, c.celular,
-            f.cuota_moderadora,
-            EXISTS (SELECT 1 FROM pagos pg WHERE pg.formula_id = f.id) AS cuota_pagada,
             (SELECT json_agg(json_build_object(
                       'nombre', m.nombre, 'presentacion', m.presentacion,
                       'pendiente', fi.cantidad_formulada - fi.cantidad_entregada) ORDER BY fi.id)

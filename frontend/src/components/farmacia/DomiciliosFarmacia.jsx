@@ -3,6 +3,7 @@ import { Bike, CheckCircle2, MapPin, Phone, RefreshCw, User, XCircle } from 'luc
 import { api } from '../../lib/api';
 import { Aviso, BotonAccion, claseCampo, useAccion } from './comunes';
 import { ESTADOS_DOMICILIO } from '../../paginas/MiCuenta';
+import { totalDomicilio } from '../../lib/costoEnvio';
 
 const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
 const fechaHora = (iso) =>
@@ -83,6 +84,7 @@ function TarjetaDomicilio({ d, recargar }) {
   const { ocupado, aviso, ejecutar } = useAccion(recargar);
   const e = ESTADOS_DOMICILIO[d.estado];
   const siguiente = SIGUIENTE[d.estado];
+  const cobro = totalDomicilio(d);
 
   const cambiar = (estado, texto) =>
     ejecutar(() => api(`/domicilios/${d.id}`, { metodo: 'PATCH', cuerpo: { estado, nota: nota.trim() || undefined } }), texto);
@@ -113,9 +115,14 @@ function TarjetaDomicilio({ d, recargar }) {
           ))}
         </ul>
       )}
-      <p className="text-sm font-semibold text-slate-700">
-        {d.cuota_moderadora > 0 && !d.cuota_pagada ? `Cobrar cuota moderadora al entregar: ${pesos(d.cuota_moderadora)}` : 'Sin cobro'}
-      </p>
+      <div className="text-sm border border-slate-200 rounded-lg p-3">
+        <p className="font-bold text-slate-800">
+          {d.estado === 'entregado' ? 'Cobrado al entregar' : 'Cobrar al entregar'}: {pesos(cobro.total)}
+        </p>
+        <p className="text-slate-500">
+          {cobro.cuota > 0 ? `Cuota moderadora ${pesos(cobro.cuota)} + ` : 'Sin cuota moderadora · '}envío {pesos(cobro.envio)}
+        </p>
+      </div>
       {d.nota_farmacia && <p className="text-sm text-slate-600">Nota al paciente: {d.nota_farmacia}</p>}
 
       {siguiente && (
