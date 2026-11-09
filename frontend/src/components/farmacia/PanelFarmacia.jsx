@@ -20,7 +20,7 @@ const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', admini
 const SECCIONES = [
   { ruta: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia },
   { ruta: 'inventario', texto: 'Inventario', icono: Package, componente: InventarioFarmacia },
-  { ruta: 'domicilios', texto: 'Domicilios', icono: Bike, componente: DomiciliosFarmacia, roles: ['administrador', 'auxiliar', 'domicilios'] },
+  { ruta: 'domicilios', texto: 'Domicilios', icono: Bike, componente: DomiciliosFarmacia, roles: ['administrador', 'domicilios'] },
   // Reportes y usuarios: solo administradores (el backend también lo exige)
   { ruta: 'reportes', texto: 'Reportes', icono: BarChart3, componente: ReportesFarmacia, soloAdmin: true },
   { ruta: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
