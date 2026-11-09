@@ -7,6 +7,8 @@ pg.types.setTypeParser(1082, (valor) => valor);
 
 // El "pool" mantiene varias conexiones abiertas a PostgreSQL
 // y las reparte entre las peticiones, para que sea rápido.
+// DATABASE_SSL=true cuando la base de datos está en otro servidor (p. ej. la URL externa de Render)
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
 });

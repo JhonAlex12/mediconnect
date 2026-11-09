@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -22,8 +24,35 @@ import contenidoRoutes from './routes/contenido.routes.js';
 
 const app = express();
 
-app.use(helmet());        // cabeceras de seguridad
-app.use(cors());          // permite peticiones desde el frontend
+// Dirección pública del sitio (en Render la da RENDER_EXTERNAL_URL automáticamente)
+const URL_PUBLICA = process.env.URL_SITIO || process.env.RENDER_EXTERNAL_URL || null;
+
+// Detrás del proxy de Render: así se ve la IP real de cada visitante (límites de intentos)
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+
+// Cabeceras de seguridad. La política de contenido solo permite lo que usa el sitio:
+// fuentes de Google, el mapa de OpenStreetMap y la conexión en vivo (Socket.IO).
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'blob:'],
+      mediaSrc: ["'self'", 'data:', 'blob:'],
+      connectSrc: ["'self'", 'wss:', 'ws:'],
+      frameSrc: ['https://www.openstreetmap.org'],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+      upgradeInsecureRequests: process.env.NODE_ENV === 'production' ? [] : null,
+    },
+  },
+}));
+// En producción el sitio y la API comparten dominio; solo se admite ese origen
+app.use(cors(URL_PUBLICA ? { origin: URL_PUBLICA } : undefined));
 // Subida de imágenes del panel: admite cuerpos grandes (la imagen viaja en base64).
 // Va antes del límite general; express.json no vuelve a leer un cuerpo ya leído.
 app.use('/api/contenido/admin/imagenes', exigirEmpleado('administrador'), express.json({ limit: '15mb' }));
@@ -62,6 +91,21 @@ app.get('/api/salud', async (req, res) => {
 // Entrada de fórmulas desde la IPS
 app.use('/api/ips', ipsRoutes);
 app.use('/api/simulador', simuladorRoutes); // solo con MODO_DEMO=true
+
+// Sitio web (producción): el backend entrega también la página construida con "npm run build"
+const DIST = fileURLToPath(new URL('../../frontend/dist/', import.meta.url));
+if (existsSync(DIST)) {
+  // Los archivos de /assets llevan un código en el nombre: se pueden guardar en caché un año
+  app.use('/assets', express.static(`${DIST}assets`, { immutable: true, maxAge: '1y' }));
+  app.use(express.static(DIST, { index: false, maxAge: '1h' }));
+  // Cualquier otra dirección (/, /farmacia/fila, /salud-al-dia/...) la resuelve React
+  app.get(/^(?!\/api\/|\/socket\.io\/).*/, (req, res) => {
+    const pagina = req.path.startsWith('/ips') ? 'ips/index.html' : 'index.html';
+    res.set('Cache-Control', 'no-cache').sendFile(`${DIST}${pagina}`);
+  });
+}
+// Ruta de la API que no existe
+app.use('/api', (req, res) => res.status(404).json({ ok: false, mensaje: 'Ruta no encontrada' }));
 
 // Manejador de errores: convierte los errores en respuestas ordenadas
 app.use((error, req, res, next) => {

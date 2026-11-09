@@ -14,10 +14,10 @@ const transporte = process.env.SMTP_HOST
     })
   : null;
 
-const REMITENTE = process.env.CORREO_REMITENTE ?? 'Mediconnect <no-responder@mediconnect.local>';
+const REMITENTE = process.env.CORREO_REMITENTE || 'Mediconnect <no-responder@mediconnect.local>';
 
 // Dirección pública del sitio, para armar los enlaces de los correos
-export const URL_SITIO = (process.env.URL_SITIO ?? 'http://localhost:5173').replace(/\/$/, '');
+export const URL_SITIO = (process.env.URL_SITIO || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173').replace(/\/$/, '');
 
 export async function enviarCorreo({ para, asunto, texto, html }) {
   if (!transporte) {

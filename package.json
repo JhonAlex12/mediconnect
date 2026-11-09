@@ -1,0 +1,12 @@
+{
+  "name": "mediconect",
+  "private": true,
+  "description": "Mediconnect: sitio, panel de la farmacia y API (un solo servicio para publicar)",
+  "scripts": {
+    "build": "npm ci --prefix backend && npm ci --prefix frontend --include=dev && npm run build --prefix frontend",
+    "start": "npm run db:migrate --prefix backend && npm run db:seed --prefix backend && node backend/src/server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
