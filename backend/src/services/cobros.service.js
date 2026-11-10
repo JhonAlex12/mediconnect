@@ -89,15 +89,15 @@ export function validarPago(pago, valor) {
 }
 
 // Registra el pago dentro de la transacción de la entrega
-export async function registrarPago(cliente, { formulaId, turnoId, valor, pago, empleado }) {
+export async function registrarPago(cliente, { formulaId, turnoId = null, domicilioId = null, valor, pago, empleado }) {
   const { rows: [p] } = await cliente.query(
-    `INSERT INTO pagos (formula_id, turno_id, valor, medio, recibido, referencia, usuario_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO pagos (formula_id, turno_id, valor, medio, recibido, referencia, usuario_id, domicilio_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, valor, medio, recibido, referencia, fecha`,
     [formulaId, turnoId, valor, pago.medio,
      pago.medio === 'efectivo' ? pago.recibido : null,
      pago.medio === 'efectivo' ? null : pago.referencia.trim(),
-     empleado.id]
+     empleado.id, domicilioId]
   );
   return { ...p, cambio: p.recibido != null ? p.recibido - p.valor : null };
 }

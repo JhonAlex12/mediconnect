@@ -6,8 +6,8 @@ import { obtenerMiTurno } from './turnos.service.js';
 // el cambio ya quedó guardado y los clientes se ponen al día en la siguiente señal.
 export async function publicarCambios(turnoIds = []) {
   try {
-    emitir('farmacia', 'fila_actualizada', {});
-    emitir('pantalla', 'turno_actual', await estadoPantalla());   // con nombre: solo empleados
+    await emitir('farmacia', 'fila_actualizada', {});
+    await emitir('pantalla', 'turno_actual', await estadoPantalla());   // con nombre: solo empleados autorizados
     emitir('fila_publica', 'turno_actual', {});                    // aviso sin datos para pacientes
 
     for (const id of new Set(turnoIds)) {
@@ -21,5 +21,6 @@ export async function publicarCambios(turnoIds = []) {
 
 // Avisa al panel que el inventario cambió (el panel vuelve a pedirlo con su sesión)
 export function publicarInventario() {
-  emitir('farmacia', 'inventario_actualizado', {});
+  return emitir('farmacia', 'inventario_actualizado', {})
+    .catch((error) => console.error('Error al publicar inventario:', error.message));
 }

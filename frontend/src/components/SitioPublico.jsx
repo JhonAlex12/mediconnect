@@ -36,7 +36,7 @@ function useDesplazarAAncla() {
 }
 
 const claseMenu = (activo) =>
-  `px-4 py-2.5 font-semibold text-[15px] border-b-2 transition ${
+  `px-3 py-2.5 font-semibold text-[15px] whitespace-nowrap border-b-2 transition ${
     activo ? 'text-marca-azul border-marca-azul' : 'text-slate-700 border-transparent hover:text-marca-azul'}`;
 
 // Estructura de las páginas públicas: franja superior, encabezado, contenido y pie de página
@@ -49,11 +49,20 @@ export default function SitioPublico({ children }) {
   const CONTACTO = useContacto();
   useDesplazarAAncla();
 
+  // Al bajar por la página el encabezado fijo muestra una sombra para separarse del contenido
+  const [bajo, setBajo] = useState(false);
+  useEffect(() => {
+    const revisar = () => setBajo(window.scrollY > 40);
+    revisar();
+    window.addEventListener('scroll', revisar, { passive: true });
+    return () => window.removeEventListener('scroll', revisar);
+  }, []);
+
   // El menú del celular se cierra al cambiar de página
   useEffect(() => setAbierto(false), [pathname]);
 
   // Con sesión abierta, el botón lleva a la cuenta del paciente o al panel; sin sesión, abre el ingreso
-  const claseAcceso = 'flex items-center justify-center gap-2 border-2 border-marca-azul text-marca-azul hover:bg-marca-hielo font-bold px-4 py-2 rounded transition';
+  const claseAcceso = 'flex items-center justify-center gap-1.5 text-marca-azul hover:underline font-bold px-2 py-2 whitespace-nowrap cursor-pointer';
   const accesoPanel = cuenta ? (
     <Link to="/mi-cuenta" className={claseAcceso}>
       <UserRound className="w-5 h-5" /> Mi cuenta
@@ -64,7 +73,7 @@ export default function SitioPublico({ children }) {
     </Link>
   ) : (
     <button type="button" onClick={() => { setAbierto(false); setIngresando(true); }}
-      className="flex items-center justify-center gap-2 border-2 border-marca-azul text-marca-azul hover:bg-marca-hielo font-bold px-4 py-2 rounded transition cursor-pointer">
+      className={claseAcceso}>
       <LogIn className="w-5 h-5" /> Iniciar sesión
     </button>
   );
@@ -89,37 +98,34 @@ export default function SitioPublico({ children }) {
       </div>
 
       {/* Encabezado */}
-      <header className="border-b-4 border-marca-azul sticky top-0 bg-white z-40">
-        {/* Fila 1: logo centrado; a la derecha, "Pedir turno" y el botón del menú en celular */}
-        <div className="max-w-7xl mx-auto px-4 py-3 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-          <span aria-hidden="true" />
+      <header className={`border-b-4 border-marca-azul sticky top-0 bg-white z-40 transition-shadow duration-300 ${bajo ? 'shadow-lg' : ''}`}>
+        {/* Una sola fila: logo a la izquierda, menú en el centro (computador) y botones a la derecha */}
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between gap-6">
           <Logo subtitulo="Tu farmacia conectada" />
+          <nav className="hidden xl:flex items-center" aria-label="Menú principal">
+            {MENU.map(({ a, texto, fin, ancla }) =>
+              ancla ? (
+                <Link key={a} to={a} className={claseMenu(false)}>{texto}</Link>
+              ) : (
+                <NavLink key={a} to={a} end={fin} className={({ isActive }) => claseMenu(isActive)}>{texto}</NavLink>
+              )
+            )}
+          </nav>
           <div className="flex items-center justify-end gap-2">
             <div className="hidden sm:block">{accesoPanel}</div>
-            <Link to="/paciente" className="hidden sm:block bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-5 py-2.5 rounded transition">
+            <Link to="/paciente" className="hidden sm:block whitespace-nowrap bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-5 py-2.5 rounded transition">
               Pedir turno
             </Link>
             <button type="button" onClick={() => setAbierto((v) => !v)}
               aria-expanded={abierto} aria-label={abierto ? 'Cerrar menú' : 'Abrir menú'}
-              className="lg:hidden p-2 rounded text-marca-noche hover:bg-slate-100 cursor-pointer">
+              className="xl:hidden p-2 rounded text-marca-noche hover:bg-slate-100 cursor-pointer">
               {abierto ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
           </div>
         </div>
 
-        {/* Fila 2: menú centrado (computador) */}
-        <nav className="hidden lg:flex justify-center border-t border-slate-100" aria-label="Menú principal">
-          {MENU.map(({ a, texto, fin, ancla }) =>
-            ancla ? (
-              <Link key={a} to={a} className={claseMenu(false)}>{texto}</Link>
-            ) : (
-              <NavLink key={a} to={a} end={fin} className={({ isActive }) => claseMenu(isActive)}>{texto}</NavLink>
-            )
-          )}
-        </nav>
-
         {abierto && (
-          <nav className="lg:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1" aria-label="Menú principal">
+          <nav className="xl:hidden border-t border-slate-200 bg-white px-4 py-3 space-y-1" aria-label="Menú principal">
             {MENU.map(({ a, texto }) => (
               <Link key={a} to={a} onClick={() => setAbierto(false)}
                 className="block px-3 py-2.5 rounded font-semibold text-slate-800 hover:bg-marca-hielo">
@@ -129,12 +135,12 @@ export default function SitioPublico({ children }) {
             <Link to="/paciente" className="block text-center bg-marca-azul text-white font-bold px-5 py-3 rounded mt-2">
               Pedir turno
             </Link>
-            <div className="sm:hidden mt-2">{accesoPanel}</div>
+            <div className="sm:hidden mt-2 border-2 border-marca-azul rounded">{accesoPanel}</div>
           </nav>
         )}
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-clip">
         <ContextoIngreso.Provider value={() => setIngresando(true)}>{children}</ContextoIngreso.Provider>
       </main>
 

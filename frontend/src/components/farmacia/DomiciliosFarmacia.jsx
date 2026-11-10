@@ -18,7 +18,7 @@ const FILTROS = [
 // Siguiente paso de cada estado (el backend valida lo mismo)
 const SIGUIENTE = {
   recibido: ['en_preparacion', 'Empezar a preparar', 'ambar'],
-  en_preparacion: ['en_camino', 'Salió a entregar', 'oscuro'],
+  en_preparacion: ['en_camino', 'Despachar', 'oscuro'],
   en_camino: ['entregado', 'Marcar entregado', 'verde'],
 };
 
@@ -81,13 +81,39 @@ export default function DomiciliosFarmacia() {
 
 function TarjetaDomicilio({ d, recargar }) {
   const [nota, setNota] = useState('');
+  const [cantidades, setCantidades] = useState({});
+  const [medio, setMedio] = useState('efectivo');
+  const [recibido, setRecibido] = useState('');
+  const [referencia, setReferencia] = useState('');
   const { ocupado, aviso, ejecutar } = useAccion(recargar);
   const e = ESTADOS_DOMICILIO[d.estado];
   const siguiente = SIGUIENTE[d.estado];
-  const cobro = totalDomicilio(d);
+  const cobro = d.cobro ?? totalDomicilio(d);
+
+  // Al despachar se elige cuánto sale (por defecto, lo pendiente que haya disponible);
+  // al entregar, cuánto recibió el paciente (por defecto, todo lo despachado)
+  const despachando = d.estado === 'en_preparacion';
+  const entregando = d.estado === 'en_camino';
+  const filas = despachando ? (d.medicamentos ?? []).map((m) => ({ ...m, maximo: Math.min(m.pendiente, m.disponible) }))
+    : (d.despacho ?? []).map((m) => ({ ...m, maximo: m.despachada }));
+  const cantidad = (m) => {
+    const v = cantidades[m.formula_item_id];
+    return v === undefined ? m.maximo : v === '' ? 0 : Number(v);
+  };
+  const enviados = filas.map((m) => ({ formula_item_id: m.formula_item_id, cantidad: cantidad(m) }));
+  const cantidadesValidas = filas.every((m) => Number.isInteger(cantidad(m)) && cantidad(m) >= 0 && cantidad(m) <= m.maximo);
+  const algo = enviados.some((it) => it.cantidad > 0);
+  const devueltas = entregando ? filas.reduce((s, m) => s + m.maximo - cantidad(m), 0) : 0;
 
   const cambiar = (estado, texto) =>
-    ejecutar(() => api(`/domicilios/${d.id}`, { metodo: 'PATCH', cuerpo: { estado, nota: nota.trim() || undefined } }), texto);
+    ejecutar(() => api(`/domicilios/${d.id}`, { metodo: 'PATCH', cuerpo: {
+      estado, nota: nota.trim() || undefined,
+      ...(estado === 'en_camino' ? { items: enviados.filter((it) => it.cantidad > 0) } : {}),
+      ...(estado === 'entregado' ? {
+        items: enviados,
+        pago: { medio, recibido: recibido === '' ? null : Number(recibido), referencia },
+      } : {}),
+    } }), texto);
 
   return (
     <article className="bg-white border border-slate-300 rounded-xl shadow-sm p-4 space-y-3">
@@ -108,21 +134,90 @@ function TarjetaDomicilio({ d, recargar }) {
         {d.indicaciones && <p className="text-slate-500 italic">“{d.indicaciones}”</p>}
       </div>
 
-      {d.medicamentos?.length > 0 && (
+      {(despachando || entregando) && filas.length > 0 ? (
+        <div className="text-sm bg-slate-50 rounded-lg p-3 space-y-1.5">
+          <p className="font-bold text-slate-800">
+            {despachando ? 'Unidades que salen (se descuentan del inventario al despachar)' : 'Unidades que recibió el paciente'}
+          </p>
+          <ul className="space-y-1.5">
+            {filas.map((m) => (
+              <li key={m.formula_item_id} className="flex flex-wrap items-center gap-2">
+                <span>
+                  {m.nombre} {m.presentacion}
+                  <span className="block text-xs text-slate-500">
+                    {despachando
+                      ? `Pendientes ${m.pendiente} · disponibles ${m.disponible}`
+                      : `Despachadas ${m.despachada}`}
+                  </span>
+                </span>
+                <input type="number" min="0" max={m.maximo} step="1" disabled={ocupado}
+                  aria-label={`${despachando ? 'Unidades a despachar' : 'Unidades entregadas'} de ${m.nombre} ${m.presentacion}`}
+                  value={cantidades[m.formula_item_id] ?? m.maximo}
+                  onChange={(ev) => setCantidades((prev) => ({ ...prev, [m.formula_item_id]: ev.target.value }))}
+                  className={`${claseCampo} w-24 ml-auto`} />
+              </li>
+            ))}
+          </ul>
+          {!cantidadesValidas && <p className="text-red-700">Revisa las cantidades: no pueden superar el máximo indicado.</p>}
+          {despachando && cantidadesValidas && !algo && <p className="text-red-700">No hay unidades disponibles para despachar.</p>}
+          {entregando && devueltas > 0 && cantidadesValidas && (
+            <p className="text-amber-800">{devueltas} {devueltas === 1 ? 'unidad vuelve' : 'unidades vuelven'} al inventario.</p>
+          )}
+        </div>
+      ) : d.despacho?.length > 0 ? (
+        <ul className="text-sm bg-slate-50 rounded-lg p-3 space-y-0.5">
+          {d.despacho.map((m) => {
+            const devuelto = m.despachada - (m.entregada ?? m.despachada);
+            return (
+              <li key={m.formula_item_id}>
+                <strong>{d.estado === 'cancelado' ? m.despachada : m.entregada ?? m.despachada}</strong> × {m.nombre} {m.presentacion}
+                {d.estado === 'cancelado' ? ' · devueltas al inventario' : devuelto > 0 ? ` · ${devuelto} devueltas al inventario` : ''}
+              </li>
+            );
+          })}
+        </ul>
+      ) : d.medicamentos?.length > 0 && (
         <ul className="text-sm bg-slate-50 rounded-lg p-3 space-y-0.5">
           {d.medicamentos.map((m) => (
-            <li key={m.nombre + m.presentacion}><strong>{m.pendiente}</strong> × {m.nombre} {m.presentacion}</li>
+            <li key={m.formula_item_id}>
+              <strong>{m.pendiente}</strong> × {m.nombre} {m.presentacion}
+              {m.disponible < m.pendiente && <span className="text-amber-800"> · solo {m.disponible} disponibles</span>}
+            </li>
           ))}
         </ul>
       )}
       <div className="text-sm border border-slate-200 rounded-lg p-3">
         <p className="font-bold text-slate-800">
-          {d.estado === 'entregado' ? 'Cobrado al entregar' : 'Cobrar al entregar'}: {pesos(cobro.total)}
+          {d.estado === 'entregado' ? (d.cobro ? 'Cobrado al entregar' : 'Sin recibo registrado · valor estimado') : 'Cobrar al entregar'}: {pesos(cobro.total)}
         </p>
         <p className="text-slate-500">
           {cobro.cuota > 0 ? `Cuota moderadora ${pesos(cobro.cuota)} + ` : 'Sin cuota moderadora · '}envío {pesos(cobro.envio)}
         </p>
       </div>
+      {d.estado === 'en_camino' && cobro.total > 0 && (
+        <fieldset disabled={ocupado} className="space-y-2 border border-slate-200 rounded-lg p-3 text-sm">
+          <legend className="font-bold">Pago recibido al entregar</legend>
+          <label className="block">Medio de pago
+            <select value={medio} onChange={(ev) => setMedio(ev.target.value)} className={claseCampo}>
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="datafono">Tarjeta (datáfono)</option>
+            </select>
+          </label>
+          {medio === 'efectivo' ? (
+            <label className="block">Efectivo recibido
+              <input type="number" min={cobro.total} step="1" value={recibido}
+                onChange={(ev) => setRecibido(ev.target.value)} className={claseCampo} />
+            </label>
+          ) : (
+            <label className="block">Referencia de transferencia o voucher
+              <input value={referencia} minLength={3} maxLength={40}
+                onChange={(ev) => setReferencia(ev.target.value)} className={claseCampo} />
+            </label>
+          )}
+          {medio === 'efectivo' && Number(recibido) >= cobro.total && <p>Cambio: {pesos(Number(recibido) - cobro.total)}</p>}
+        </fieldset>
+      )}
       {d.nota_farmacia && <p className="text-sm text-slate-600">Nota al paciente: {d.nota_farmacia}</p>}
 
       {siguiente && (
@@ -131,12 +226,15 @@ function TarjetaDomicilio({ d, recargar }) {
             placeholder="Mensaje para el paciente (opcional), ej.: llega entre 2 y 4 p. m."
             className={`${claseCampo} text-sm`} />
           <div className="flex flex-wrap gap-2">
-            <BotonAccion color={siguiente[2]} ocupado={ocupado} icono={siguiente[0] === 'entregado' ? CheckCircle2 : Bike}
+            <BotonAccion color={siguiente[2]} icono={siguiente[0] === 'entregado' ? CheckCircle2 : Bike}
+              ocupado={ocupado || ((despachando || entregando) && (!cantidadesValidas || !algo))}
               onClick={() => cambiar(siguiente[0], `Domicilio: ${ESTADOS_DOMICILIO[siguiente[0]].texto.toLowerCase()}`)}>
               {siguiente[1]}
             </BotonAccion>
             <BotonAccion color="gris" ocupado={ocupado} icono={XCircle}
-              onClick={() => window.confirm('¿Cancelar este domicilio?') && cambiar('cancelado', 'Domicilio cancelado')}>
+              onClick={() => window.confirm(entregando
+                ? '¿Cancelar este domicilio? Los medicamentos despachados volverán al inventario.'
+                : '¿Cancelar este domicilio?') && cambiar('cancelado', 'Domicilio cancelado')}>
               Cancelar
             </BotonAccion>
           </div>

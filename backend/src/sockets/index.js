@@ -1,26 +1,15 @@
 import { Server } from 'socket.io';
-import jwt from 'jsonwebtoken';
 import { setIo } from './emisor.js';
+import { autorizarConexion } from './acceso.js';
 
 export function iniciarSockets(servidor) {
-  // Más adelante, "origin" se limita al dominio real del frontend
-  const io = new Server(servidor, { cors: { origin: '*' } });
+  const origen = process.env.URL_SITIO || process.env.RENDER_EXTERNAL_URL;
+  const io = new Server(servidor, { cors: { origin: origen || '*' } });
 
   // Se ejecuta antes de aceptar cada conexión
-  io.use((socket, next) => {
-    const { tipo, token } = socket.handshake.auth ?? {};
-
+  io.use(async (socket, next) => {
     try {
-      const datos = jwt.verify(token, process.env.JWT_SECRET);
-      if (datos.tipo === 'empleado') {
-        // La pantalla de la sala muestra el nombre de quien llaman: solo con sesión de empleado
-        socket.data.salas = tipo === 'pantalla' ? ['pantalla'] : ['farmacia', 'fila_publica'];
-      } else if (datos.tipo === 'paciente_turno') {
-        // Los pacientes solo reciben el aviso de que la fila cambió, sin nombres
-        socket.data.salas = [`turno:${datos.turno_id}`, 'fila_publica'];
-      } else {
-        throw new Error('tipo inválido');
-      }
+      Object.assign(socket.data, await autorizarConexion(socket.handshake.auth));
       next();
     } catch {
       next(new Error('No autorizado'));
@@ -28,8 +17,15 @@ export function iniciarSockets(servidor) {
   });
 
   io.on('connection', (socket) => {
+    if (socket.data.exp * 1000 <= Date.now()) return socket.disconnect(true);
     socket.join(socket.data.salas);
+    // Un socket abierto tampoco puede sobrevivir al vencimiento del JWT.
+    const vencimiento = setTimeout(() => socket.disconnect(true),
+      Math.min(socket.data.exp * 1000 - Date.now(), 2_147_483_647));
+    vencimiento.unref();
+    socket.on('disconnect', () => clearTimeout(vencimiento));
   });
 
   setIo(io);
+  return io;
 }

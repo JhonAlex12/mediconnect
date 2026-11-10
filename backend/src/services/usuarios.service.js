@@ -2,6 +2,7 @@ import bcrypt from 'bcrypt';
 import { pool } from '../db/pool.js';
 import { ErrorNegocio } from './formulas.service.js';
 import { registrarAcceso } from './auditoria.service.js';
+import { desconectarEmpleado } from '../sockets/emisor.js';
 
 const ROLES = ['administrador', 'auxiliar', 'domicilios'];
 const CAJAS = [1, 2, 3, 4, 5, 6];
@@ -148,6 +149,7 @@ export async function editarUsuario(id, cambios = {}, admin) {
     await registrarAcceso({ usuarioId: admin.id, accion: 'editar_usuario', detalle: `${u.usuario}: ${detalle}` }, cliente);
 
     await cliente.query('COMMIT');
+    if (rol !== undefined || activo !== undefined || clave !== undefined) desconectarEmpleado(id);
     return u;
   } catch (error) {
     await cliente.query('ROLLBACK');

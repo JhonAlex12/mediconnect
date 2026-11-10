@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { KeyRound, Pencil, Power, UserPlus, Users, X } from 'lucide-react';
+import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import { KeyRound, Pencil, Power, Search, UserPlus, Users, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useSesion } from '../../lib/sesion';
 import { Aviso, BotonAccion, claseCampo, useAccion } from './comunes';
@@ -12,6 +12,9 @@ const nombreCaja = (c) => (c ? (c === 6 ? 'Caja 6 · Preferencial' : `Caja ${c}`
 const claveValida = (c) => c.length >= 10 && /[a-zA-Z]/.test(c) && /\d/.test(c);
 const AYUDA_CLAVE = 'Mínimo 10 caracteres, con letras y números.';
 
+// Sin tildes ni mayúsculas, para que "maria" encuentre a "María"
+const normalizar = (t) => (t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
 const fecha = (iso) =>
   iso ? new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
@@ -21,6 +24,10 @@ export default function UsuariosFarmacia() {
   const [cargando, setCargando] = useState(true);
   const [creando, setCreando] = useState(false);
   const [editando, setEditando] = useState(null); // { id, modo: 'datos' | 'clave' }
+  const [resaltado, setResaltado] = useState(null); // fila recién guardada, se ilumina un momento
+  const [busqueda, setBusqueda] = useState('');
+  const [filtroRol, setFiltroRol] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState('');
 
   const cargar = useCallback(async () => {
     try {
@@ -45,7 +52,30 @@ export default function UsuariosFarmacia() {
       `${u.nombre} ${u.activo ? 'desactivado: ya no puede iniciar sesión' : 'activado'}`
     );
 
-  const enEdicion = usuarios.find((u) => u.id === editando?.id);
+  // Búsqueda por nombre, usuario, rol o caja, más los filtros de rol y estado
+  const palabras = normalizar(busqueda).split(/\s+/).filter(Boolean);
+  const visibles = usuarios.filter((u) => {
+    if (filtroRol && u.rol !== filtroRol) return false;
+    if (filtroEstado && u.activo !== (filtroEstado === 'activos')) return false;
+    const texto = normalizar(`${u.nombre} ${u.usuario} ${ROLES[u.rol] ?? u.rol} ${nombreCaja(u.caja)}`);
+    return palabras.every((p) => texto.includes(p));
+  });
+  const hayFiltros = busqueda || filtroRol || filtroEstado;
+  const limpiarFiltros = () => { setBusqueda(''); setFiltroRol(''); setFiltroEstado(''); };
+
+  // Abre el formulario debajo de la fila; si ya estaba abierto en el mismo modo, lo cierra
+  const alternar = (id, modo) =>
+    setEditando((e) => (e?.id === id && e.modo === modo ? null : { id, modo }));
+
+  const alGuardar = (id) => {
+    setEditando(null);
+    setResaltado(id);
+  };
+  useEffect(() => {
+    if (!resaltado) return;
+    const t = setTimeout(() => setResaltado(null), 2500);
+    return () => clearTimeout(t);
+  }, [resaltado]);
 
   return (
     <div className="space-y-6">
@@ -63,19 +93,36 @@ export default function UsuariosFarmacia() {
 
       {creando && <NuevoUsuario ocupado={ocupado} ejecutar={ejecutar} alCerrar={() => setCreando(false)} />}
 
-      {enEdicion && (
-        <EditarUsuario
-          key={`${enEdicion.id}-${editando.modo}`}
-          u={enEdicion}
-          modo={editando.modo}
-          esYo={enEdicion.id === yo.id}
-          ocupado={ocupado}
-          ejecutar={ejecutar}
-          alCerrar={() => setEditando(null)}
-        />
-      )}
-
       <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-200 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-56 max-w-md">
+            <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input type="search" value={busqueda} onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre, usuario o caja" aria-label="Buscar usuarios"
+              className={`${claseCampo} pl-10`} />
+          </div>
+          <select value={filtroRol} onChange={(e) => setFiltroRol(e.target.value)} aria-label="Filtrar por rol"
+            className={claseCampo.replace('w-full ', '')}>
+            <option value="">Todos los roles</option>
+            {Object.entries(ROLES).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
+          </select>
+          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} aria-label="Filtrar por estado"
+            className={claseCampo.replace('w-full ', '')}>
+            <option value="">Activos e inactivos</option>
+            <option value="activos">Solo activos</option>
+            <option value="inactivos">Solo inactivos</option>
+          </select>
+          {hayFiltros && (
+            <button type="button" onClick={limpiarFiltros} className="text-sm font-semibold text-sky-700 hover:underline cursor-pointer">
+              Limpiar filtros
+            </button>
+          )}
+          {!cargando && (
+            <span className="ml-auto text-sm text-slate-500">
+              {hayFiltros ? `${visibles.length} de ${usuarios.length}` : usuarios.length} usuarios
+            </span>
+          )}
+        </div>
         {cargando ? (
           <p className="p-6 text-slate-500">Cargando usuarios…</p>
         ) : (
@@ -93,10 +140,20 @@ export default function UsuariosFarmacia() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {usuarios.map((u) => {
+                {visibles.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-8 text-center text-slate-500">
+                      Ningún usuario coincide con la búsqueda.
+                    </td>
+                  </tr>
+                )}
+                {visibles.map((u) => {
                   const esYo = u.id === yo.id;
+                  const abierto = editando?.id === u.id;
+                  const fondo = abierto ? 'bg-sky-50' : resaltado === u.id ? 'bg-emerald-100' : '';
                   return (
-                    <tr key={u.id} className={u.activo ? undefined : 'text-slate-400'}>
+                    <Fragment key={u.id}>
+                    <tr className={`transition-colors duration-700 ${fondo} ${u.activo ? '' : 'text-slate-400'}`}>
                       <td className="px-5 py-3 font-semibold">
                         <span className={u.activo ? 'text-slate-900' : ''}>{u.nombre}</span>
                         {esYo && <span className="ml-2 text-xs font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">Tú</span>}
@@ -115,11 +172,11 @@ export default function UsuariosFarmacia() {
                       <td className="px-5 py-3">
                         <div className="flex gap-2 justify-end flex-wrap">
                           <BotonAccion color="gris" icono={Pencil} ocupado={ocupado}
-                            onClick={() => setEditando({ id: u.id, modo: 'datos' })}>
+                            onClick={() => alternar(u.id, 'datos')}>
                             Editar
                           </BotonAccion>
                           <BotonAccion color="gris" icono={KeyRound} ocupado={ocupado}
-                            onClick={() => setEditando({ id: u.id, modo: 'clave' })}>
+                            onClick={() => alternar(u.id, 'clave')}>
                             Clave
                           </BotonAccion>
                           {!esYo && (
@@ -131,6 +188,23 @@ export default function UsuariosFarmacia() {
                         </div>
                       </td>
                     </tr>
+                    {abierto && (
+                      <tr className="bg-sky-50">
+                        <td colSpan={7} className="px-5 pb-4">
+                          <EditarUsuario
+                            key={editando.modo}
+                            u={u}
+                            modo={editando.modo}
+                            esYo={esYo}
+                            ocupado={ocupado}
+                            ejecutar={ejecutar}
+                            alCerrar={() => setEditando(null)}
+                            alGuardar={() => alGuardar(u.id)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -142,9 +216,16 @@ export default function UsuariosFarmacia() {
   );
 }
 
-function Tarjeta({ titulo, icono: Icono, alCerrar, children }) {
+function Tarjeta({ titulo, icono: Icono, alCerrar, embebida = false, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (embebida) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [embebida]);
   return (
-    <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+    <section ref={ref} onKeyDown={(e) => e.key === 'Escape' && alCerrar()}
+      className={`bg-white overflow-hidden ${embebida
+        ? 'rounded-lg border-2 border-sky-300 shadow-sm'
+        : 'rounded-xl shadow-md border border-slate-300'}`}>
       <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
         <h3 className="font-bold text-slate-800 flex items-center gap-2">
           <Icono className="w-5 h-5 text-slate-600" />
@@ -236,7 +317,7 @@ function NuevoUsuario({ ocupado, ejecutar, alCerrar }) {
   );
 }
 
-function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
+function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar, alGuardar }) {
   const [nombre, setNombre] = useState(u.nombre);
   const [rol, setRol] = useState(u.rol);
   const [caja, setCaja] = useState(u.caja);
@@ -259,18 +340,18 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
       exito = `${nombre.trim()} actualizado`;
     }
     const ok = await ejecutar(() => api(`/usuarios/${u.id}`, { metodo: 'PATCH', cuerpo }), exito);
-    if (ok) alCerrar();
+    if (ok) alGuardar();
   };
 
   if (modo === 'clave') {
     const coinciden = clave === confirmacion;
     return (
-      <Tarjeta titulo={`Cambiar contraseña: ${u.nombre}`} icono={KeyRound} alCerrar={alCerrar}>
+      <Tarjeta titulo={`Cambiar contraseña: ${u.nombre}`} icono={KeyRound} alCerrar={alCerrar} embebida>
         <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
           <div>
             <label htmlFor="ec-clave" className="block text-sm font-bold text-slate-800 mb-1">Nueva contraseña</label>
             <input id="ec-clave" type="password" value={clave} onChange={(e) => setClave(e.target.value)} required
-              autoComplete="new-password" className={claseCampo} />
+              autoComplete="new-password" autoFocus className={claseCampo} />
             <p className={`text-xs mt-1 ${clave && !claveValida(clave) ? 'text-red-700' : 'text-slate-500'}`}>{AYUDA_CLAVE}</p>
           </div>
           <div>
@@ -291,12 +372,12 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar }) {
 
   const sinCambios = nombre.trim() === u.nombre && rol === u.rol && (rol === 'auxiliar' ? caja : null) === u.caja;
   return (
-    <Tarjeta titulo={`Editar: ${u.nombre}`} icono={Pencil} alCerrar={alCerrar}>
+    <Tarjeta titulo={`Editar: ${u.nombre}`} icono={Pencil} alCerrar={alCerrar} embebida>
       <form onSubmit={enviar} className="p-5 grid gap-4 sm:grid-cols-[1fr_12rem_12rem_auto] sm:items-start">
         <div>
           <label htmlFor="eu-nombre" className="block text-sm font-bold text-slate-800 mb-1">Nombre completo</label>
           <input id="eu-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required minLength={3}
-            className={claseCampo} />
+            autoFocus className={claseCampo} />
         </div>
         <div>
           <label htmlFor="eu-rol" className="block text-sm font-bold text-slate-800 mb-1">Rol</label>

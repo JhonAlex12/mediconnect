@@ -18,3 +18,17 @@
 html {
   font-size: 16px;
 }
+
+/* Animación al bajar por la página (componente Revelar). Quien pide menos movimiento en su equipo ve todo quieto */
+@media (prefers-reduced-motion: no-preference) {
+  .revelar {
+    opacity: 0;
+    transition: opacity 0.7s ease, transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition-delay: var(--retraso, 0ms);
+  }
+  .revelar[data-efecto='arriba'] { transform: translateY(32px); }
+  .revelar[data-efecto='izquierda'] { transform: translateX(-48px); }
+  .revelar[data-efecto='derecha'] { transform: translateX(48px); }
+  .revelar[data-efecto='zoom'] { transform: scale(0.94); }
+  .revelar.visible { opacity: 1; transform: none; }
+}

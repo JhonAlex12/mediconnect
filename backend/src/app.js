@@ -43,7 +43,7 @@ app.use(helmet({
       imgSrc: ["'self'", 'data:', 'blob:'],
       mediaSrc: ["'self'", 'data:', 'blob:'],
       connectSrc: ["'self'", 'wss:', 'ws:'],
-      frameSrc: ['https://www.openstreetmap.org'],
+      frameSrc: ['https://www.google.com', 'https://maps.google.com'],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],

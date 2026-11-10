@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { BarChart3, Download, RefreshCw } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Aviso, BotonAccion, claseCampo } from './comunes';
+import { BarrasHorizontales, COLOR, Columnas, Leyenda } from './Graficas';
 
 // "2026-11-05" → "5 nov 2026" (sin pasar por zonas horarias)
 const fechaCorta = (iso) => {
@@ -67,6 +68,134 @@ const REPORTES = {
     ],
   },
 };
+
+// "2026-11-05" → "5 nov" para los rótulos de las gráficas
+const diaCorto = (iso) => {
+  const [a, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  return new Date(a, m - 1, d).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }).replace('.', '');
+};
+const plural = (n, uno, varios) => `${n.toLocaleString('es-CO')} ${n === 1 ? uno : varios}`;
+
+const SERIES_ASISTENCIA = [
+  { clave: 'atendidos', nombre: 'Atendidos', color: COLOR.azul },
+  { clave: 'cancelados', nombre: 'Cancelados', color: COLOR.verde },
+  { clave: 'no_presentados', nombre: 'No se presentó', color: COLOR.naranja },
+];
+
+// Gráfica de cada reporte, encima de su tabla
+function GraficaReporte({ r }) {
+  const datos = r.datos;
+  let titulo;
+  let contenido;
+
+  if (r.tipo === 'faltantes') {
+    const top = datos.slice(0, 10);
+    titulo = datos.length > 10 ? `Los 10 medicamentos con más unidades pendientes (de ${datos.length})` : 'Unidades pendientes por medicamento';
+    contenido = (
+      <BarrasHorizontales ancho="w-56" filas={top.map((f) => ({
+        etiqueta: `${f.nombre} ${f.presentacion}`,
+        valor: f.cantidad_pendiente,
+        texto: f.cantidad_pendiente.toLocaleString('es-CO'),
+        detalle: [`${f.nombre} ${f.presentacion}`, plural(f.cantidad_pendiente, 'unidad pendiente', 'unidades pendientes'),
+          plural(f.formulas_afectadas, 'fórmula afectada', 'fórmulas afectadas'), `Stock actual: ${f.stock_actual}`],
+      }))} />
+    );
+  } else if (r.tipo === 'espera') {
+    titulo = 'Espera promedio en minutos, por tipo de turno';
+    contenido = (
+      <BarrasHorizontales ancho="w-24" filas={datos.map((f) => {
+        const nombre = f.tipo === 'fisico' ? 'Físico' : 'Virtual';
+        return {
+          etiqueta: nombre,
+          valor: f.minutos_promedio,
+          texto: `${f.minutos_promedio.toLocaleString('es-CO')} min`,
+          detalle: [`Turno ${nombre.toLowerCase()}`, `Promedio: ${f.minutos_promedio} min`, `Máximo: ${f.minutos_maximo} min`,
+            plural(f.atendidos, 'turno atendido', 'turnos atendidos')],
+        };
+      })} />
+    );
+  } else if (r.tipo === 'horas-pico') {
+    // Todas las horas entre la primera y la última con turnos, aunque alguna quede en cero
+    const porHora = new Map(datos.map((f) => [f.hora, f.turnos]));
+    const horas = datos.map((f) => f.hora);
+    const pico = datos.reduce((a, b) => (b.turnos > a.turnos ? b : a));
+    const columnas = [];
+    for (let h = Math.min(...horas); h <= Math.max(...horas); h++) {
+      const turnos = porHora.get(h) ?? 0;
+      const esPico = h === pico.hora;
+      columnas.push({
+        clave: h,
+        etiqueta: `${dosDigitos(h)}:00`,
+        segmentos: [{ valor: turnos, color: esPico ? COLOR.azul : COLOR.gris }],
+        rotulo: esPico ? String(turnos) : null,
+        detalle: [`${dosDigitos(h)}:00 – ${dosDigitos(h + 1)}:00`, plural(turnos, 'turno', 'turnos')],
+      });
+    }
+    titulo = `Turnos por hora del día · la hora pico es de ${dosDigitos(pico.hora)}:00 a ${dosDigitos(pico.hora + 1)}:00`;
+    contenido = <Columnas columnas={columnas} />;
+  } else if (r.tipo === 'faltas') {
+    titulo = 'Resultado de los turnos por día';
+    contenido = (
+      <>
+        <div className="mb-3"><Leyenda series={SERIES_ASISTENCIA} /></div>
+        <Columnas columnas={datos.map((f) => ({
+          clave: String(f.fecha).slice(0, 10),
+          etiqueta: diaCorto(f.fecha),
+          segmentos: SERIES_ASISTENCIA.map((s) => ({ valor: f[s.clave], color: s.color })),
+          detalle: [fechaCorta(f.fecha), `${f.total} turnos en total`,
+            ...SERIES_ASISTENCIA.map((s) => `${s.nombre}: ${f[s.clave]}`)],
+        }))} />
+      </>
+    );
+  } else if (r.tipo === 'caja') {
+    // Recaudo por día (de la fecha más antigua a la más reciente) y por medio de pago
+    const porDia = new Map();
+    const porMedio = new Map();
+    for (const f of datos) {
+      const dia = String(f.fecha).slice(0, 10);
+      const d = porDia.get(dia) ?? { total: 0, pagos: 0 };
+      porDia.set(dia, { total: d.total + f.total, pagos: d.pagos + f.pagos });
+      const m = porMedio.get(f.medio) ?? { total: 0, pagos: 0 };
+      porMedio.set(f.medio, { total: m.total + f.total, pagos: m.pagos + f.pagos });
+    }
+    const dias = [...porDia.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const mayor = Math.max(...dias.map(([, d]) => d.total));
+    titulo = null;
+    contenido = (
+      <div className="grid gap-8 lg:grid-cols-[3fr_2fr]">
+        <div>
+          <h4 className="font-semibold text-slate-800 mb-1">Recaudo por día</h4>
+          <Columnas formato={(v) => (v >= 1000 ? `$${(v / 1000).toLocaleString('es-CO')} mil` : `$${v}`)}
+            columnas={dias.map(([dia, d]) => ({
+              clave: dia,
+              etiqueta: diaCorto(dia),
+              segmentos: [{ valor: d.total, color: COLOR.azul }],
+              rotulo: d.total === mayor && dias.length > 1 ? pesos(d.total) : null,
+              detalle: [fechaCorta(dia), pesos(d.total), plural(d.pagos, 'pago', 'pagos')],
+            }))} />
+        </div>
+        <div>
+          <h4 className="font-semibold text-slate-800 mb-3">Por medio de pago</h4>
+          <BarrasHorizontales ancho="w-36" filas={[...porMedio.entries()].sort(([, a], [, b]) => b.total - a.total).map(([medio, m]) => ({
+            etiqueta: MEDIOS[medio] ?? medio,
+            valor: m.total,
+            texto: pesos(m.total),
+            detalle: [MEDIOS[medio] ?? medio, pesos(m.total), plural(m.pagos, 'pago', 'pagos')],
+          }))} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!contenido) return null;
+  return (
+    <div className="px-5 py-5 border-b border-slate-200">
+      {titulo && <h4 className="font-semibold text-slate-800 mb-3">{titulo}</h4>}
+      {contenido}
+      <p className="text-xs text-slate-500 mt-3">Pasa el mouse sobre una barra para ver el detalle. Los valores exactos están en la tabla.</p>
+    </div>
+  );
+}
 
 const textoCelda = (col, fila) => (col.valor ? col.valor(fila) : fila[col.clave] ?? '—');
 
@@ -181,7 +310,7 @@ export default function ReportesFarmacia() {
 
       <Aviso aviso={aviso} />
 
-      <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
+      <section className="bg-white rounded-xl shadow-md border border-slate-300">
         <div className="px-5 py-3 border-b border-slate-200">
           <h3 className="font-bold text-slate-800">{def.titulo}</h3>
           <p className="text-sm text-slate-500">
@@ -195,6 +324,8 @@ export default function ReportesFarmacia() {
         ) : vigente.sin_datos ? (
           <p className="p-6 text-slate-500">No hay datos en este rango de fechas.</p>
         ) : (
+          <>
+          <GraficaReporte r={vigente} />
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-slate-50 text-sm text-slate-600">
@@ -217,6 +348,7 @@ export default function ReportesFarmacia() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {vigente?.tipo === 'caja' && (

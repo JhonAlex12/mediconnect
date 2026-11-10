@@ -5,6 +5,7 @@ import { pool } from '../db/pool.js';
 import { CIUDADES_DOMICILIO, HORAS_ENLACE_CORREO } from '../config/negocio.js';
 import { ErrorNegocio } from './formulas.service.js';
 import { consultarFormula } from './disponibilidad.service.js';
+import { despacharDomicilio, devolverDespacho, entregarDomicilio } from './entregaDomicilio.service.js';
 import { URL_SITIO, correoConfirmacion, correoRestablecer, enviarCorreo } from './correo.service.js';
 
 // Cuentas de pacientes: registro, ingreso, datos personales, fórmulas y domicilios
@@ -349,6 +350,9 @@ export async function guardarCostoEnvio(empleadoId, valor) {
 
 const COLUMNAS_DOMICILIO = `d.id, f.codigo, d.direccion, d.barrio, d.ciudad, d.telefono, d.recibe,
   d.indicaciones, d.estado, d.costo_envio, f.cuota_moderadora,
+  (SELECT json_build_object('cuota', cd.cuota, 'envio', cd.envio, 'total', cd.cuota + cd.envio,
+     'medio', cd.medio, 'recibido', cd.recibido, 'referencia', cd.referencia, 'fecha', cd.fecha)
+   FROM cobros_domicilio cd WHERE cd.domicilio_id = d.id) AS cobro,
   EXISTS (SELECT 1 FROM pagos pg WHERE pg.formula_id = f.id) AS cuota_pagada, d.nota_farmacia, d.creado_en, d.actualizado_en`;
 
 export async function listarDomicilios(cuentaId) {
@@ -397,17 +401,30 @@ export async function solicitarDomicilio(cuentaId, d = {}) {
     throw new ErrorNegocio('Los medicamentos pendientes están agotados. Te avisaremos cuando lleguen.', 409);
   }
 
+  const cliente = await pool.connect();
   try {
-    const { rows: [nuevo] } = await pool.query(
+    await cliente.query('BEGIN');
+    await cliente.query('SELECT id FROM formulas WHERE id = $1 FOR UPDATE', [vinculo.id]);
+    const { rows: [pendiente] } = await cliente.query(
+      `SELECT COUNT(*)::int AS cantidad FROM formula_items
+        WHERE formula_id = $1 AND cantidad_entregada < cantidad_formulada`, [vinculo.id]);
+    if (!pendiente.cantidad) throw new ErrorNegocio('Esta fórmula ya fue entregada completa', 409);
+    const { rows: [nuevo] } = await cliente.query(
       `INSERT INTO domicilios (cuenta_id, formula_id, direccion, barrio, ciudad, telefono, recibe, indicaciones, costo_envio)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, costo_envio`,
       [cuentaId, vinculo.id, direccion, barrio, ciudad, telefono, recibe, indicaciones, await costoEnvio()]
     );
-    await registrarActividad(cuentaId, 'solicitar_domicilio', vinculo.codigo);
+    await cliente.query(
+      `INSERT INTO registro_accesos (cuenta_id, accion, detalle) VALUES ($1, 'cuenta:solicitar_domicilio', $2)`,
+      [cuentaId, vinculo.codigo]);
+    await cliente.query('COMMIT');
     return nuevo;
   } catch (error) {
+    await cliente.query('ROLLBACK');
     if (error.code === '23505') throw new ErrorNegocio('Ya hay un domicilio en curso para esa fórmula', 409);
     throw error;
+  } finally {
+    cliente.release();
   }
 }
 
@@ -454,11 +471,24 @@ export async function domiciliosFarmacia({ estado } = {}) {
   const { rows } = await pool.query(
     `SELECT ${COLUMNAS_DOMICILIO},
             c.tipo_documento, c.documento, c.nombres || ' ' || c.apellidos AS paciente, c.celular,
+            -- Lo que falta por entregar en la fórmula y cuánto hay libre para despacharlo
             (SELECT json_agg(json_build_object(
-                      'nombre', m.nombre, 'presentacion', m.presentacion,
-                      'pendiente', fi.cantidad_formulada - fi.cantidad_entregada) ORDER BY fi.id)
+                      'formula_item_id', fi.id, 'nombre', m.nombre, 'presentacion', m.presentacion,
+                      'pendiente', fi.cantidad_formulada - fi.cantidad_entregada,
+                      'disponible', GREATEST(0, m.stock_actual - COALESCE((
+                         SELECT SUM(r.cantidad) FROM reservas r
+                          WHERE r.medicamento_id = m.id AND NOT r.liberada AND r.vence_en > now()), 0))::int
+                    ) ORDER BY fi.id)
                FROM formula_items fi JOIN medicamentos m ON m.id = fi.medicamento_id
-              WHERE fi.formula_id = f.id AND fi.cantidad_formulada > fi.cantidad_entregada) AS medicamentos
+              WHERE fi.formula_id = f.id AND fi.cantidad_formulada > fi.cantidad_entregada) AS medicamentos,
+            -- Lo que salió con este domicilio y, al cerrarlo, cuánto se entregó
+            (SELECT json_agg(json_build_object(
+                      'formula_item_id', di.formula_item_id, 'nombre', m.nombre, 'presentacion', m.presentacion,
+                      'despachada', di.despachada, 'entregada', di.entregada) ORDER BY di.formula_item_id)
+               FROM domicilio_items di
+               JOIN formula_items fi ON fi.id = di.formula_item_id
+               JOIN medicamentos m ON m.id = fi.medicamento_id
+              WHERE di.domicilio_id = d.id) AS despacho
        FROM domicilios d
        JOIN formulas f ON f.id = d.formula_id
        JOIN cuentas_pacientes c ON c.id = d.cuenta_id
@@ -476,15 +506,16 @@ const SIGUIENTE = {
   en_camino: ['entregado', 'cancelado'],
 };
 
-export async function cambiarEstadoDomicilio(empleadoId, id, { estado, nota } = {}) {
+export async function cambiarEstadoDomicilio(empleadoId, id, { estado, nota, items, pago } = {}) {
   const notaLimpia = opcional(nota);
   if (notaLimpia && notaLimpia.length > 300) throw new ErrorNegocio('La nota admite máximo 300 caracteres', 400);
 
   const cliente = await pool.connect();
   try {
     await cliente.query('BEGIN');
+    let resultado = { turnosAvisados: [] };
     const { rows: [d] } = await cliente.query(
-      `SELECT d.estado, c.documento FROM domicilios d JOIN cuentas_pacientes c ON c.id = d.cuenta_id
+      `SELECT d.id, d.estado, d.formula_id, d.costo_envio, c.documento FROM domicilios d JOIN cuentas_pacientes c ON c.id = d.cuenta_id
         WHERE d.id = $1 FOR UPDATE OF d`,
       [id]
     );
@@ -492,6 +523,10 @@ export async function cambiarEstadoDomicilio(empleadoId, id, { estado, nota } = 
     if (!SIGUIENTE[d.estado]?.includes(estado)) {
       throw new ErrorNegocio(`No se puede pasar de "${d.estado}" a "${estado}"`, 409);
     }
+    // El stock baja al despachar; al entregar o cancelar, lo que no llegó al paciente vuelve al inventario
+    if (estado === 'en_camino') resultado = await despacharDomicilio(cliente, d, items, empleadoId);
+    else if (estado === 'entregado') resultado = await entregarDomicilio(cliente, d, items, pago, empleadoId);
+    else if (estado === 'cancelado' && d.estado === 'en_camino') resultado = await devolverDespacho(cliente, d, empleadoId);
     await cliente.query(
       `UPDATE domicilios
           SET estado = $2, nota_farmacia = COALESCE($3, nota_farmacia),
@@ -504,6 +539,7 @@ export async function cambiarEstadoDomicilio(empleadoId, id, { estado, nota } = 
       [empleadoId, `${id}: ${d.estado} → ${estado}`]
     );
     await cliente.query('COMMIT');
+    return resultado;
   } catch (error) {
     await cliente.query('ROLLBACK');
     throw error;

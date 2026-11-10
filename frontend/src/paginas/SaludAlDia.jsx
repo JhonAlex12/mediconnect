@@ -5,6 +5,7 @@ import SitioPublico, { TituloPagina } from '../components/SitioPublico';
 import { useTitulo } from '../components/Encabezado';
 import { fechaArticulo, useArticulo, useArticulos } from '../lib/articulos';
 import TextoEnriquecido from '../components/TextoEnriquecido';
+import Revelar from '../components/Revelar';
 import NoEncontrada from './NoEncontrada';
 
 // Imagen de cada artículo: un degradado de la marca con un ícono según el tema
@@ -63,7 +64,9 @@ function Listado() {
       <section className="max-w-7xl mx-auto px-4 py-12 grid md:grid-cols-3 gap-6">
         {articulos === null && <p className="text-slate-500">Cargando artículos…</p>}
         {articulos?.length === 0 && <p className="text-slate-500">Aún no hay artículos publicados.</p>}
-        {articulos?.map((a) => <TarjetaArticulo key={a.slug} articulo={a} />)}
+        {articulos?.map((a, i) => (
+          <Revelar key={a.slug} retraso={(i % 3) * 150} className="grid"><TarjetaArticulo articulo={a} /></Revelar>
+        ))}
       </section>
     </SitioPublico>
   );

@@ -401,3 +401,43 @@ CREATE UNIQUE INDEX IF NOT EXISTS una_persona_por_caja ON usuarios_farmacia (caj
 -- Recuperar la contraseña de la cuenta del paciente (enlace de un solo uso por correo)
 ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS token_clave_hash TEXT;   -- solo el hash, nunca el token
 ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS token_clave_vence TIMESTAMPTZ;
+
+-- Entregas a domicilio: comparten el historial de dispensaciones y cuotas,
+-- sin inventar un turno de ventanilla para cada envío.
+ALTER TABLE dispensaciones ALTER COLUMN turno_id DROP NOT NULL;
+ALTER TABLE dispensaciones ADD COLUMN IF NOT EXISTS domicilio_id INTEGER REFERENCES domicilios(id);
+ALTER TABLE dispensaciones DROP CONSTRAINT IF EXISTS dispensacion_origen;
+ALTER TABLE dispensaciones ADD CONSTRAINT dispensacion_origen
+  CHECK (num_nonnulls(turno_id, domicilio_id) = 1);
+CREATE INDEX IF NOT EXISTS idx_dispensaciones_domicilio
+  ON dispensaciones (domicilio_id, formula_item_id) WHERE domicilio_id IS NOT NULL;
+ALTER TABLE pagos ALTER COLUMN turno_id DROP NOT NULL;
+ALTER TABLE pagos ADD COLUMN IF NOT EXISTS domicilio_id INTEGER REFERENCES domicilios(id);
+ALTER TABLE pagos DROP CONSTRAINT IF EXISTS pago_origen;
+ALTER TABLE pagos ADD CONSTRAINT pago_origen CHECK (num_nonnulls(turno_id, domicilio_id) = 1);
+
+-- Recibo del envío y de la cuota efectivamente cobrada en esta entrega.
+CREATE TABLE IF NOT EXISTS cobros_domicilio (
+  domicilio_id INTEGER PRIMARY KEY REFERENCES domicilios(id),
+  cuota INTEGER NOT NULL CHECK (cuota >= 0),
+  envio INTEGER NOT NULL CHECK (envio >= 0),
+  medio VARCHAR(20) CHECK (medio IN ('efectivo', 'transferencia', 'datafono')),
+  recibido INTEGER CHECK (recibido IS NULL OR recibido >= cuota + envio),
+  referencia VARCHAR(40),
+  usuario_id INTEGER NOT NULL REFERENCES usuarios_farmacia(id),
+  fecha TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (cuota + envio = 0 OR medio IS NOT NULL)
+);
+
+-- Despacho de domicilios: el stock baja cuando el pedido sale ("en camino").
+-- "entregada" se llena al confirmar la entrega; lo no entregado vuelve al inventario como devolución.
+CREATE TABLE IF NOT EXISTS domicilio_items (
+  domicilio_id     INTEGER NOT NULL REFERENCES domicilios(id),
+  formula_item_id  INTEGER NOT NULL REFERENCES formula_items(id),
+  despachada       INTEGER NOT NULL CHECK (despachada > 0),
+  entregada        INTEGER CHECK (entregada >= 0 AND entregada <= despachada),
+  PRIMARY KEY (domicilio_id, formula_item_id)
+);
+ALTER TABLE movimientos_inventario DROP CONSTRAINT IF EXISTS movimientos_inventario_tipo_check;
+ALTER TABLE movimientos_inventario ADD CONSTRAINT movimientos_inventario_tipo_check
+  CHECK (tipo IN ('entrada', 'salida', 'ajuste', 'dispensacion', 'devolucion'));

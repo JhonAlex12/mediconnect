@@ -11,6 +11,7 @@ import Carrusel from '../components/Carrusel';
 import { useTitulo } from '../components/Encabezado';
 import { useArticulos } from '../lib/articulos';
 import { TarjetaArticulo } from './SaludAlDia';
+import Revelar from '../components/Revelar';
 
 const ACCESOS = [
   [Search, 'Consultar fórmula', 'Disponibilidad de tus medicamentos', 'bg-marca-azul', '/paciente'],
@@ -38,21 +39,23 @@ export default function Inicio() {
       {/* Accesos rápidos en bloque de color, montados sobre el carrusel en computador */}
       <section className="max-w-6xl mx-auto px-4 mt-6 lg:-mt-10 relative z-20">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 shadow-xl rounded-lg overflow-hidden">
-          {ACCESOS.map(([Icono, titulo, texto, color, a]) => (
-            <Link key={titulo} to={a} className={`${color} text-white p-6 flex items-center gap-4 hover:brightness-110 transition`}>
+          {ACCESOS.map(([Icono, titulo, texto, color, a], i) => (
+            <Revelar key={titulo} retraso={i * 120} className={color}>
+            <Link to={a} className={`${color} h-full text-white p-6 flex items-center gap-4 hover:brightness-110 transition`}>
               <Icono className="w-10 h-10 shrink-0 opacity-90" strokeWidth={1.5} />
               <span>
                 <span className="block font-bold text-lg">{titulo}</span>
                 <span className="block text-sm text-white/80">{texto}</span>
               </span>
             </Link>
+            </Revelar>
           ))}
         </div>
       </section>
 
       {/* Información para pacientes */}
       <section className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-2 gap-10 items-center">
-        <div className="rounded-lg bg-gradient-to-br from-marca-azul to-marca-verde p-8 sm:p-10 text-white">
+        <Revelar efecto="izquierda" className="rounded-lg bg-gradient-to-br from-marca-azul to-marca-verde p-8 sm:p-10 text-white">
           <p className="font-titulo text-2xl font-extrabold">Para reclamar necesitas</p>
           <ul className="mt-6 space-y-4">
             {[
@@ -66,8 +69,8 @@ export default function Inicio() {
               </li>
             ))}
           </ul>
-        </div>
-        <div>
+        </Revelar>
+        <Revelar efecto="derecha" retraso={150}>
           <p className="text-marca-verde-oscuro font-bold text-sm uppercase tracking-wider">Pacientes y familiares</p>
           <h2 className="font-titulo text-3xl font-extrabold text-marca-noche mt-2 mb-6">Información para reclamar tus medicamentos</h2>
           <ul className="divide-y divide-slate-200 border-y border-slate-200">
@@ -80,7 +83,7 @@ export default function Inicio() {
               </li>
             ))}
           </ul>
-        </div>
+        </Revelar>
       </section>
 
       <Domicilio />
@@ -89,12 +92,14 @@ export default function Inicio() {
       {articulos?.length !== 0 && (
       <section className="bg-slate-50 border-y border-slate-200">
         <div className="max-w-7xl mx-auto px-4 py-16">
-          <div className="flex items-end justify-between gap-4 mb-8">
+          <Revelar className="flex items-end justify-between gap-4 mb-8">
             <h2 className="font-titulo text-3xl font-extrabold text-marca-noche">Salud al día</h2>
             <Link to="/salud-al-dia" className="font-semibold text-marca-azul hover:underline">Ver todos los artículos</Link>
-          </div>
+          </Revelar>
           <div className="grid md:grid-cols-3 gap-6">
-            {articulos?.slice(0, 3).map((a) => <TarjetaArticulo key={a.slug} articulo={a} />)}
+            {articulos?.slice(0, 3).map((a, i) => (
+              <Revelar key={a.slug} retraso={i * 150} className="grid"><TarjetaArticulo articulo={a} /></Revelar>
+            ))}
           </div>
         </div>
       </section>
@@ -102,20 +107,20 @@ export default function Inicio() {
 
       {/* Quiénes somos */}
       <section id="quienes-somos" className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[3fr_2fr] gap-10 items-center scroll-mt-28">
-        <div>
+        <Revelar>
           <h2 className="font-titulo text-3xl font-extrabold text-marca-noche">Quiénes somos</h2>
           <p className="text-lg text-slate-600 mt-4">
             Mediconnect conecta las fórmulas de tu IPS con la farmacia. Sabes qué medicamentos hay antes de salir,
             apartas los tuyos con un turno virtual y conoces desde el principio el valor de tu cuota moderadora.
           </p>
-        </div>
-        <div className="bg-marca-hielo border-l-4 border-marca-verde rounded p-6">
+        </Revelar>
+        <Revelar efecto="zoom" retraso={150} className="bg-marca-hielo border-l-4 border-marca-verde rounded p-6">
           <p className="font-bold text-marca-noche text-lg">¿Tienes una fórmula vigente?</p>
           <p className="text-slate-600 mt-1">Consulta disponibilidad y pide tu turno en dos minutos.</p>
           <Link to="/paciente" className="inline-flex items-center gap-2 mt-4 bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold px-5 py-2.5 rounded">
             Consultar ahora <ArrowRight className="w-4 h-4" />
           </Link>
-        </div>
+        </Revelar>
       </section>
 
       <Ubicacion />
@@ -136,7 +141,7 @@ function Domicilio() {
   return (
     <section id="domicilio" className="bg-marca-noche text-white scroll-mt-28">
       <div className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[2fr_3fr] gap-10 items-center">
-        <div>
+        <Revelar efecto="izquierda">
           <p className="text-marca-verde font-bold text-sm uppercase tracking-wider">Nuevo servicio</p>
           <h2 className="font-titulo text-3xl sm:text-4xl font-extrabold mt-2">Tus medicamentos a domicilio</h2>
           <p className="text-blue-100 text-lg mt-4">
@@ -162,17 +167,17 @@ function Domicilio() {
               </>
             )}
           </div>
-        </div>
+        </Revelar>
         <ol className="grid sm:grid-cols-3 gap-4">
           {pasos.map(([Icono, t, d], i) => (
-            <li key={t} className="bg-white/10 rounded-lg p-6">
+            <Revelar as="li" key={t} retraso={200 + i * 150} className="bg-white/10 rounded-lg p-6">
               <span className="flex items-center justify-between">
                 <Icono className="w-9 h-9 text-marca-verde" strokeWidth={1.5} />
                 <span className="font-titulo text-3xl font-extrabold text-white/25">{i + 1}</span>
               </span>
               <span className="block font-bold text-lg mt-4">{t}</span>
               <span className="block text-blue-100 text-sm mt-1">{d}</span>
-            </li>
+            </Revelar>
           ))}
         </ol>
       </div>
@@ -180,17 +185,16 @@ function Domicilio() {
   );
 }
 
-// Ubicación de la farmacia en el mapa (OpenStreetMap, sin clave de API)
+// Ubicación de la farmacia en el mapa (Google Maps insertado, sin clave de API)
 function Ubicacion() {
   const CONTACTO = useContacto();
   const { lat, lon } = CONTACTO;
-  const caja = [lon - 0.006, lat - 0.004, lon + 0.006, lat + 0.004].join(',');
-  const mapa = `https://www.openstreetmap.org/export/embed.html?bbox=${caja}&layer=mapnik&marker=${lat},${lon}`;
+  const mapa = `https://maps.google.com/maps?q=${lat},${lon}&z=16&hl=es&output=embed`;
   const comoLlegar = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
   return (
     <section id="ubicacion" className="bg-marca-hielo border-t border-slate-200 scroll-mt-28">
       <div className="max-w-7xl mx-auto px-4 py-16 grid lg:grid-cols-[2fr_3fr] gap-8 items-stretch">
-        <div className="flex flex-col justify-center">
+        <Revelar efecto="izquierda" className="flex flex-col justify-center">
           <h2 className="font-titulo text-3xl font-extrabold text-marca-noche">Nuestra ubicación</h2>
           <ul className="mt-6 space-y-4 text-slate-700">
             <li className="flex gap-3"><MapPin className="w-6 h-6 text-marca-verde shrink-0" />
@@ -202,9 +206,11 @@ function Ubicacion() {
             className="mt-6 self-start inline-flex items-center gap-2 bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-5 py-3 rounded">
             <Navigation className="w-5 h-5" /> Cómo llegar
           </a>
-        </div>
-        <iframe title="Mapa con la ubicación de la farmacia" src={mapa} loading="lazy"
+        </Revelar>
+        <Revelar efecto="derecha" retraso={150}>
+        <iframe title="Mapa con la ubicación de la farmacia" src={mapa} loading="lazy" referrerPolicy="no-referrer-when-downgrade"
           className="w-full h-80 lg:h-96 rounded-lg border border-slate-300 shadow-sm bg-white" />
+        </Revelar>
       </div>
     </section>
   );
