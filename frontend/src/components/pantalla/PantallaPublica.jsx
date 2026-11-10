@@ -15,7 +15,7 @@ const MENSAJES = [
   'Pide tu turno virtual desde el celular y evita la fila.',
 ];
 
-const ESTADO_INICIAL = { cajas: [], ultimo: null, proximos: [], en_pausa: [] };
+const ESTADO_INICIAL = { cajas: [], ultimo: null, llamados: [], proximos: [], en_pausa: [] };
 
 export default function PantallaPublica() {
   useTitulo('Pantalla de la sala');
@@ -32,9 +32,11 @@ export default function PantallaPublica() {
   const voces = useVocesEspanol();
   const [voz, setVoz] = useState(() => leerVozGuardada());
   const contenedor = useRef(null);
-  const anterior = useRef(undefined);
+  const vistos = useRef(null);                       // llamados ya anunciados (null: aún no llega el primer estado)
+  const ocultar = useRef(null);
   const config = useRef({});
-  config.current = { sonido: iniciada && conSonido, voz };
+  const habla = useUnicaVoz();                       // otra pestaña con la pantalla ya habla: esta queda en silencio
+  config.current = { sonido: iniciada && conSonido && habla, voz };
 
   const elegirVoz = (nombre) => {
     setVoz(nombre);
@@ -67,21 +69,35 @@ export default function PantallaPublica() {
     return () => socket.disconnect();
   }, [token]);
 
-  // Cada llamado nuevo (en cualquier caja) se muestra en grande y se anuncia
+  // Cada llamado nuevo (en cualquier caja) se muestra en grande y se anuncia.
+  // Si llegan varios casi al tiempo, van a una cola: uno no corta al otro.
   useEffect(() => {
-    if (estado === ESTADO_INICIAL) return undefined; // aún no llega el primer estado
-    const u = estado.ultimo;
-    if (anterior.current === undefined) {
-      anterior.current = u?.id ?? null; // primera carga: no se anuncia
-      return undefined;
+    if (estado === ESTADO_INICIAL) return;
+    const llamados = estado.llamados ?? (estado.ultimo ? [estado.ultimo] : []);
+    if (vistos.current === null) {
+      vistos.current = new Set(llamados.map((l) => l.id)); // primera carga: no se anuncia
+      return;
     }
-    if (!u || u.id === anterior.current) return undefined;
-    anterior.current = u.id;
-    setAviso(u);
-    if (config.current.sonido) anunciar(u, config.current.voz);
-    const t = setTimeout(() => setAviso(null), 9000);
-    return () => clearTimeout(t);
+    llamados.filter((l) => !vistos.current.has(l.id)).forEach((l) => {
+      vistos.current.add(l.id);
+      const mostrar = () => {
+        clearTimeout(ocultar.current);
+        setAviso(l);
+      };
+      const esconderLuego = (ms) => {
+        clearTimeout(ocultar.current);
+        ocultar.current = setTimeout(() => setAviso(null), ms);
+      };
+      if (config.current.sonido) {
+        encolarAnuncio(l, config.current.voz, mostrar, () => esconderLuego(3000));
+      } else {
+        mostrar();
+        esconderLuego(9000);
+      }
+    });
   }, [estado]);
+
+  useEffect(() => () => clearTimeout(ocultar.current), []);
 
   // Reloj y mensajes de la franja inferior
   useEffect(() => {
@@ -228,7 +244,7 @@ export default function PantallaPublica() {
         <Control onClick={() => setConSonido((v) => !v)} etiqueta={conSonido ? 'Silenciar anuncios' : 'Activar anuncios'}>
           {conSonido ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
         </Control>
-        <Control onClick={() => anunciar(estado.ultimo ?? { numero: 'V-001', nombre: 'María Rojas', caja: 1 }, voz)} etiqueta="Probar el anuncio">
+        <Control onClick={() => encolarAnuncio(estado.ultimo ?? { numero: 'V-001', nombre: 'María Rojas', caja: 1 }, voz)} etiqueta="Probar el anuncio">
           <Bell className="w-5 h-5" />
         </Control>
         <Control onClick={alternarPantallaCompleta} etiqueta={completa ? 'Salir de pantalla completa' : 'Pantalla completa'}>
@@ -383,17 +399,78 @@ function buscarVoz(nombre) {
     ?? todas.find(esEspanol);
 }
 
-// Campanada y luego: "Turno V 0 0 5. Carlos Gómez. Caja 6." (se repite turno y caja)
-function anunciar({ numero, nombre, caja }, nombreVoz) {
+// "F-013" → "efe 13": la letra con su nombre y el número entero (la voz dice "trece", no "cero uno tres")
+const LETRAS = { F: 'efe', V: 've', P: 'pe', R: 'erre' };
+function turnoHablado(numero) {
+  const [letra, cifras] = String(numero).split('-');
+  if (!cifras) return numero;
+  return `${LETRAS[letra] ?? letra} ${Number.parseInt(cifras, 10)}`;
+}
+
+// Si en el mismo navegador hay dos pestañas con la pantalla (p. ej. dos auxiliares la abrieron),
+// solo una anuncia con voz; si esa se cierra, la otra toma el turno sola.
+function useUnicaVoz() {
+  const [habla, setHabla] = useState(!navigator.locks); // sin soporte: todas hablan, como antes
+  useEffect(() => {
+    if (!navigator.locks) return undefined;
+    const control = new AbortController();
+    navigator.locks
+      .request('mediconect-voz-pantalla', { signal: control.signal }, () => {
+        setHabla(true);
+        return new Promise((liberar) => control.signal.addEventListener('abort', liberar));
+      })
+      .catch(() => {});
+    return () => control.abort();
+  }, []);
+  return habla;
+}
+
+// ---------- Cola de anuncios ----------
+// Cada llamado espera a que termine el anterior (campanada + las dos frases).
+const cola = [];
+let anunciando = false;
+
+function encolarAnuncio(llamado, nombreVoz, alEmpezar, alTerminar) {
+  cola.push({ llamado, nombreVoz, alEmpezar, alTerminar });
+  if (!anunciando) siguienteAnuncio();
+}
+
+function siguienteAnuncio() {
+  const item = cola.shift();
+  if (!item) {
+    anunciando = false;
+    return;
+  }
+  anunciando = true;
+  item.alEmpezar?.();
+  anunciar(item.llamado, item.nombreVoz, () => {
+    item.alTerminar?.();
+    setTimeout(siguienteAnuncio, 700); // pausa breve entre un llamado y otro
+  });
+}
+
+// Campanada y luego: "Turno V 0 0 5. Carlos Gómez. Caja 6." (se repite turno y caja).
+// alTerminar se llama una sola vez cuando acaba la voz (o por tiempo, si el navegador no avisa).
+function anunciar({ numero, nombre, caja }, nombreVoz, alTerminar = () => {}) {
+  let terminado = false;
+  const terminar = () => {
+    if (terminado) return;
+    terminado = true;
+    clearTimeout(seguro);
+    alTerminar();
+  };
+  const dicho = turnoHablado(numero);
+  const frases = [`Turno ${dicho}.${nombre ? ` ${nombre}.` : ''} Caja ${caja}.`, `Turno ${dicho}, caja ${caja}.`];
+  // Por si el navegador nunca avisa el final: tiempo máximo según el largo del texto
+  const seguro = setTimeout(terminar, 4000 + frases.join(' ').length * 120);
+
   const espera = campanada();
   setTimeout(() => {
     try {
       const synth = window.speechSynthesis;
-      if (!synth) return;
-      const deletreado = numero.replace('-', ' ').split('').join(' ');
-      const texto = `Turno ${deletreado}.${nombre ? ` ${nombre}.` : ''} Caja ${caja}.`;
-      synth.cancel();
-      [texto, `Turno ${deletreado}, caja ${caja}.`].forEach((t) => {
+      if (!synth) return terminar();
+      synth.cancel(); // solo limpia restos atascados: el anuncio anterior ya terminó
+      frases.forEach((t, i) => {
         const frase = new SpeechSynthesisUtterance(t);
         frase.lang = 'es-CO';
         const voz = buscarVoz(nombreVoz);
@@ -402,10 +479,15 @@ function anunciar({ numero, nombre, caja }, nombreVoz) {
           frase.lang = voz.lang;
         }
         frase.rate = 0.9;
+        if (i === frases.length - 1) {
+          frase.onend = terminar;
+          frase.onerror = terminar;
+        }
         synth.speak(frase);
       });
     } catch {
       // Sin voz disponible: queda la campanada y el aviso visual
+      terminar();
     }
   }, espera);
 }

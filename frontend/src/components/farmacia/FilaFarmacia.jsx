@@ -77,7 +77,11 @@ export default function FilaFarmacia() {
   const llamarSiguiente = () =>
     ejecutar(
       () => api('/fila/llamar-siguiente', { metodo: 'POST', cuerpo: { caja } }),
-      (r) => `Caja ${caja}: llamando al turno ${r.turno.numero}`
+      (r) => {
+        // Al llamar, la entrega de ese turno queda abierta de una vez (si tiene fórmula)
+        setDispensando(r.turno.id);
+        return `Caja ${caja}: llamando al turno ${r.turno.numero}`;
+      }
     );
 
   const accionTurno = (turno, accion, texto) =>
@@ -87,7 +91,7 @@ export default function FilaFarmacia() {
   const llamado = datos.fila.find((t) => t.estado === 'llamado' && t.caja === caja);
   const otrasCajas = datos.fila.filter((t) => t.estado === 'llamado' && t.caja !== caja);
   // La entrega solo sigue abierta mientras ese mismo turno esté en ventanilla
-  const entregaAbierta = llamado && dispensando === llamado.id;
+  const entregaAbierta = Boolean(llamado?.formula) && dispensando === llamado.id;
   const presentes = datos.fila.filter((t) => t.estado === 'presente');
   const enPausa = datos.fila.filter((t) => t.estado === 'en_pausa');
   const porLlegar = datos.fila.filter((t) => t.estado === 'reservado' || t.estado === 'en_camino');

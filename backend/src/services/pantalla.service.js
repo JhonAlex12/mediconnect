@@ -48,6 +48,9 @@ export async function estadoPantalla() {
   const llamados = rows.filter((r) => r.estado === 'llamado' && r.caja);
   // El llamado más reciente es el que se anuncia
   const ultimo = llamados.reduce((a, r) => (!a || r.hora_llamado > a.hora_llamado ? r : a), null);
+  // Clave de cada llamado: cambia si el mismo turno se vuelve a llamar
+  const llamado = (t) => ({ id: `${t.id}-${new Date(t.hora_llamado).getTime()}`, numero: t.numero,
+    nombre: nombreCorto(t.nombre), caja: t.caja });
   return {
     // Una fila por caja: quién está siendo atendido en cada una
     cajas: CAJAS.map((caja) => {
@@ -59,10 +62,12 @@ export async function estadoPantalla() {
         nombre: t ? nombreCorto(t.nombre) : null,
       };
     }),
-    ultimo: ultimo
-      ? { id: `${ultimo.id}-${new Date(ultimo.hora_llamado).getTime()}`, numero: ultimo.numero,
-          nombre: nombreCorto(ultimo.nombre), caja: ultimo.caja }
-      : null,
+    ultimo: ultimo ? llamado(ultimo) : null,
+    // Todos los llamados vigentes, del más antiguo al más reciente: la pantalla anuncia
+    // cada uno nuevo en orden, aunque dos cajas llamen casi al mismo tiempo
+    llamados: [...llamados]
+      .sort((a, b) => new Date(a.hora_llamado) - new Date(b.hora_llamado))
+      .map(llamado),
     proximos: rows
       .filter((r) => ['presente', 'en_camino', 'reservado'].includes(r.estado))
       .slice(0, 5)
