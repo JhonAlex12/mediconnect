@@ -34,3 +34,9 @@ for (const ancho of [96, 192]) {
     .webp({ quality: 85 }).toFile(`${salida}bot-${ancho}.webp`);
 }
 console.log('✔ ícono del bot');
+
+// Foto de la ventana de ingreso: la familia del slide "bienestar", sin el texto
+await sharp(new URL('../public/img/slide-bienestar-1600.webp', import.meta.url).pathname)
+  .extract({ left: 640, top: 40, width: 920, height: 760 }).resize({ width: 720 })
+  .webp({ quality: 80 }).toFile(`${salida}login-familia.webp`);
+console.log('✔ foto del ingreso');

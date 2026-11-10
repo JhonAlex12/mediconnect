@@ -397,3 +397,7 @@ ALTER TABLE usuarios_farmacia ADD CONSTRAINT usuarios_farmacia_rol_check
 ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS caja SMALLINT CHECK (caja BETWEEN 1 AND 6);
 -- Una caja tiene un solo trabajador activo asignado
 CREATE UNIQUE INDEX IF NOT EXISTS una_persona_por_caja ON usuarios_farmacia (caja) WHERE activo AND caja IS NOT NULL;
+
+-- Recuperar la contraseña de la cuenta del paciente (enlace de un solo uso por correo)
+ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS token_clave_hash TEXT;   -- solo el hash, nunca el token
+ALTER TABLE cuentas_pacientes ADD COLUMN IF NOT EXISTS token_clave_vence TIMESTAMPTZ;

@@ -47,5 +47,27 @@ export function correoConfirmacion({ nombre, enlace, horas }) {
   return { asunto: 'Confirma tu correo · Mediconnect', texto, html };
 }
 
+export function correoRestablecer({ nombre, enlace, minutos }) {
+  const texto =
+    `Hola, ${nombre}:\n\n` +
+    `Pediste crear una contraseña nueva para tu cuenta de Mediconnect:\n${enlace}\n\n` +
+    `El enlace vence en ${minutos} minutos y sirve una sola vez. ` +
+    `Si no lo pediste, ignora este mensaje: tu contraseña actual sigue funcionando.`;
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;color:#0d2259">
+      <h2 style="color:#2257c5">Medi<span style="color:#14ada2">connect</span></h2>
+      <p>Hola, ${escapar(nombre)}:</p>
+      <p>Pediste crear una contraseña nueva para tu cuenta.</p>
+      <p style="margin:28px 0">
+        <a href="${enlace}" style="background:#2257c5;color:#fff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold">
+          Crear contraseña nueva
+        </a>
+      </p>
+      <p style="font-size:13px;color:#555">El enlace vence en ${minutos} minutos y sirve una sola vez.
+        Si no lo pediste, ignora este mensaje: tu contraseña actual sigue funcionando.</p>
+    </div>`;
+  return { asunto: 'Crea tu contraseña nueva · Mediconnect', texto, html };
+}
+
 const escapar = (s) =>
   String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);

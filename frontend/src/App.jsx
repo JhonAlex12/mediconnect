@@ -9,6 +9,7 @@ import { ContenidoProvider } from './lib/contenido';
 import Registro from './paginas/Registro';
 import MiCuenta from './paginas/MiCuenta';
 import ConfirmarCorreo from './paginas/ConfirmarCorreo';
+import RestablecerClave from './paginas/RestablecerClave';
 import Inicio from './paginas/Inicio';
 import NoEncontrada from './paginas/NoEncontrada';
 import Informacion from './paginas/Informacion';
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/registro" element={<Registro />} />
       <Route path="/mi-cuenta" element={<MiCuenta />} />
       <Route path="/confirmar-correo" element={<ConfirmarCorreo />} />
+      <Route path="/restablecer-clave" element={<RestablecerClave />} />
       <Route
         path="/farmacia/*"
         element={<PanelFarmacia />}

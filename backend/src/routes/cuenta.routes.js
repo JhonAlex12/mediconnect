@@ -3,7 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { exigirCuenta } from '../middleware/cuentaPaciente.js';
 import {
   registrarCuenta, iniciarSesionCuenta, verCuenta, actualizarCuenta,
-  agregarFormula, listarFormulas, confirmarCorreo, reenviarConfirmacion, listarDomicilios, solicitarDomicilio, cancelarDomicilio, historial,
+  agregarFormula, listarFormulas, confirmarCorreo, reenviarConfirmacion, solicitarRestablecer, restablecerClave, listarDomicilios, solicitarDomicilio, cancelarDomicilio, historial,
 } from '../services/cuentas.service.js';
 
 const router = Router();
@@ -32,6 +32,16 @@ router.post('/login', limitadorLogin, responder((req) => iniciarSesionCuenta(req
 
 // Enlace del correo de confirmación (no necesita sesión: puede abrirse en otro dispositivo)
 router.post('/confirmar-correo', limitadorFormulas, responder((req) => confirmarCorreo(req.body?.token)));
+
+// Recuperar la contraseña: 5 solicitudes cada 15 minutos por conexión
+const MENSAJE_RESTABLECER = 'Si los datos corresponden a una cuenta, te enviamos un enlace al correo registrado. Revisa también la carpeta de spam.';
+router.post('/olvide-clave', limitar(5, 'Ya pediste varios enlaces. Espera unos minutos.'),
+  responder(async (req) => {
+    await solicitarRestablecer(req.body?.documento);
+    return { mensaje: MENSAJE_RESTABLECER };
+  }));
+router.post('/restablecer-clave', limitadorFormulas,
+  responder(async (req) => (await restablecerClave(req.body?.token, req.body?.clave), {})));
 
 router.use(exigirCuenta);
 // Reenviar el correo: máximo 5 cada 15 minutos

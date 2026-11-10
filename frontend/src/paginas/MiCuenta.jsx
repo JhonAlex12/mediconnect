@@ -10,6 +10,7 @@ import { Aviso, useAccion } from '../components/farmacia/comunes';
 import { CobroFormula, ESTADO_MEDICAMENTO, fechaLarga, pesos } from '../components/paciente/VistaPaciente';
 import CamposPersonales, { Campo, Seccion, claseInput, datosDesdeCuenta } from '../components/cuenta/CamposPersonales';
 import { useCuenta } from '../lib/cuenta';
+import CampoClave from '../components/CampoClave';
 import { totalDomicilio, useCostoEnvio } from '../lib/costoEnvio';
 
 const PESTANAS = [
@@ -458,13 +459,13 @@ function MisDatos() {
       <CamposPersonales datos={datos} cambiar={cambiar} />
       <Seccion titulo="Cambiar contraseña (opcional)">
         <Campo etiqueta="Contraseña actual" id="clave_actual">
-          <input id="clave_actual" type="password" autoComplete="current-password" value={claves.clave_actual}
-            onChange={(e) => setClaves((c) => ({ ...c, clave_actual: e.target.value }))}
+          <CampoClave id="clave_actual" autoComplete="current-password" valor={claves.clave_actual}
+            cambiar={(v) => setClaves((c) => ({ ...c, clave_actual: v }))}
             required={Boolean(claves.clave_nueva)} className={claseInput} />
         </Campo>
         <Campo etiqueta="Contraseña nueva" id="clave_nueva" ayuda="Mínimo 8 caracteres, con letras y números">
-          <input id="clave_nueva" type="password" autoComplete="new-password" value={claves.clave_nueva}
-            onChange={(e) => setClaves((c) => ({ ...c, clave_nueva: e.target.value }))} className={claseInput} />
+          <CampoClave id="clave_nueva" autoComplete="new-password" valor={claves.clave_nueva}
+            cambiar={(v) => setClaves((c) => ({ ...c, clave_nueva: v }))} className={claseInput} />
         </Campo>
       </Seccion>
       <Aviso aviso={aviso} />

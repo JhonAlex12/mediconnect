@@ -5,7 +5,7 @@ import { pool } from '../db/pool.js';
 import { CIUDADES_DOMICILIO, HORAS_ENLACE_CORREO } from '../config/negocio.js';
 import { ErrorNegocio } from './formulas.service.js';
 import { consultarFormula } from './disponibilidad.service.js';
-import { URL_SITIO, correoConfirmacion, enviarCorreo } from './correo.service.js';
+import { URL_SITIO, correoConfirmacion, correoRestablecer, enviarCorreo } from './correo.service.js';
 
 // Cuentas de pacientes: registro, ingreso, datos personales, fórmulas y domicilios
 
@@ -118,6 +118,56 @@ export async function reenviarConfirmacion(cuentaId) {
     throw new ErrorNegocio('No pudimos enviar el correo. Intenta más tarde.', 502);
   }
   await registrarActividad(cuentaId, 'reenviar_confirmacion');
+}
+
+// ---------- Recuperar la contraseña ----------
+
+const MINUTOS_ENLACE_CLAVE = 60;
+
+// Siempre responde igual, exista o no la cuenta: así no se puede averiguar quién está registrado
+export async function solicitarRestablecer(identificador) {
+  const id = texto(identificador);
+  if (!id) throw new ErrorNegocio('Escribe tu documento o tu correo', 400);
+
+  const token = randomBytes(32).toString('hex');
+  const { rows: [c] } = await pool.query(
+    `UPDATE cuentas_pacientes
+        SET token_clave_hash = $2, token_clave_vence = now() + make_interval(mins => $3)
+      WHERE (documento = upper($1) OR correo = lower($1)) AND activa
+      RETURNING id, nombres, correo`,
+    [id, hashToken(token), MINUTOS_ENLACE_CLAVE]
+  );
+  if (c) {
+    const { asunto, texto: cuerpo, html } = correoRestablecer({
+      nombre: c.nombres.split(' ')[0],
+      enlace: `${URL_SITIO}/restablecer-clave?token=${token}`,
+      minutos: MINUTOS_ENLACE_CLAVE,
+    });
+    // Sin "await": la respuesta no espera el envío, así tarda lo mismo exista o no la cuenta
+    enviarCorreo({ para: c.correo, asunto, texto: cuerpo, html })
+      .then(() => registrarActividad(c.id, 'pedir_cambio_clave'))
+      .catch((error) => console.error('No se pudo enviar el correo para restablecer la contraseña:', error.message));
+  }
+}
+
+// Público: se abre desde el enlace del correo
+export async function restablecerClave(token, clave) {
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) {
+    throw new ErrorNegocio('El enlace no es válido', 400);
+  }
+  const errores = [];
+  validarClave(clave, errores);
+  if (errores.length) throw new ErrorNegocio('Revisa la contraseña', 400, errores);
+
+  const { rows: [c] } = await pool.query(
+    `UPDATE cuentas_pacientes
+        SET clave_hash = $2, token_clave_hash = NULL, token_clave_vence = NULL
+      WHERE token_clave_hash = $1 AND token_clave_vence > now() AND activa
+      RETURNING id`,
+    [hashToken(token), await bcrypt.hash(clave, 10)]
+  );
+  if (!c) throw new ErrorNegocio('El enlace venció o ya se usó. Pide uno nuevo desde "¿Olvidaste tu contraseña?".', 410);
+  await registrarActividad(c.id, 'restablecer_clave');
 }
 
 // Público (sin sesión): se abre desde el enlace del correo

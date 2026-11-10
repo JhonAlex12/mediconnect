@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AlertCircle, LogIn, Lock } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
+import CampoClave from '../CampoClave';
 
 // alEntrar: se llama después de un ingreso correcto (p. ej. para ir al panel)
 export default function LoginEmpleado({ alEntrar }) {
@@ -70,12 +71,11 @@ export default function LoginEmpleado({ alEntrar }) {
           <label htmlFor="clave" className="block text-sm font-bold text-slate-800 mb-2">
             Contraseña
           </label>
-          <input
+          <CampoClave
             id="clave"
-            type="password"
             autoComplete="current-password"
-            value={clave}
-            onChange={(e) => setClave(e.target.value)}
+            valor={clave}
+            cambiar={setClave}
             className="w-full border border-slate-400 rounded-lg px-4 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-slate-600"
           />
         </div>

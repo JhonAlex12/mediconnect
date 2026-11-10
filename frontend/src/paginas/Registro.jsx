@@ -8,6 +8,7 @@ import CamposPersonales, {
   Campo, DATOS_VACIOS, Seccion, TIPOS_DOCUMENTO, claseInput,
 } from '../components/cuenta/CamposPersonales';
 import { useCuenta } from '../lib/cuenta';
+import CampoClave from '../components/CampoClave';
 
 export default function Registro() {
   useTitulo('Crear cuenta');
@@ -75,11 +76,11 @@ export default function Registro() {
 
             <Seccion titulo="Contraseña">
               <Campo etiqueta="Contraseña" id="clave" ayuda="Mínimo 8 caracteres, con letras y números">
-                <input id="clave" type="password" value={clave} onChange={(e) => setClave(e.target.value)}
+                <CampoClave id="clave" valor={clave} cambiar={setClave}
                   autoComplete="new-password" minLength={8} required className={claseInput} />
               </Campo>
               <Campo etiqueta="Repite la contraseña" id="clave2">
-                <input id="clave2" type="password" value={clave2} onChange={(e) => setClave2(e.target.value)}
+                <CampoClave id="clave2" valor={clave2} cambiar={setClave2}
                   autoComplete="new-password" required className={claseInput} />
               </Campo>
             </Seccion>
