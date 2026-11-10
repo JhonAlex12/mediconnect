@@ -27,8 +27,9 @@ const app = express();
 // Dirección pública del sitio (en Render la da RENDER_EXTERNAL_URL automáticamente)
 const URL_PUBLICA = process.env.URL_SITIO || process.env.RENDER_EXTERNAL_URL || null;
 
-// Detrás del proxy de Render: así se ve la IP real de cada visitante (límites de intentos)
-if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+// IP real de cada visitante (para los límites de intentos):
+// en Render hay un proxy delante; en local, el túnel de pruebas (cloudflared) corre en este mismo equipo
+app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : 'loopback');
 
 // Cabeceras de seguridad. La política de contenido solo permite lo que usa el sitio:
 // fuentes de Google, el mapa de OpenStreetMap y la conexión en vivo (Socket.IO).
