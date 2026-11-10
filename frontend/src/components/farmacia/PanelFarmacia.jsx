@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { BarChart3, Bike, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 import { TiempoRealProvider } from '../../lib/tiempoReal';
@@ -35,6 +35,12 @@ function Seccion({ titulo, componente: Componente }) {
 
 export default function PanelFarmacia() {
   const { usuario, verificando, cerrarSesion } = useSesion();
+  const navegar = useNavigate();
+  // Al salir se vuelve a la página principal (no al formulario de ingreso)
+  const salir = () => {
+    navegar('/', { replace: true });
+    cerrarSesion();
+  };
   useTitulo('Farmacia');
 
   if (verificando) {
@@ -85,7 +91,7 @@ export default function PanelFarmacia() {
             </div>
             <button
               type="button"
-              onClick={cerrarSesion}
+              onClick={salir}
               className="flex items-center gap-2 text-sm font-semibold bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg transition cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
