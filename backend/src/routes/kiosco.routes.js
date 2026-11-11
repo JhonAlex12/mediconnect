@@ -20,6 +20,9 @@ router.post('/activar', exigirEmpleado('administrador'),
   responder(async (req) => ({ token: await kiosco.activarPantalla(req.empleado) })));
 router.post('/desactivar', exigirEmpleado('administrador'),
   responder(async (req) => (await kiosco.desactivarPantallas(req.empleado), {})));
+router.get('/ajustes', exigirEmpleado('administrador'), responder(async () => ({ ajustes: await kiosco.leerAjustes() })));
+router.put('/ajustes', exigirEmpleado('administrador'),
+  responder(async (req) => ({ ajustes: await kiosco.guardarAjustes(req.empleado, req.body ?? {}) })));
 
 // ---------- La pantalla de la entrada (con su sesión propia) ----------
 
@@ -40,7 +43,8 @@ const limitador = rateLimit({
 const pantalla = Router();
 pantalla.use(exigirPantalla, limitador);
 
-pantalla.get('/estado', responder(async () => ({})));
+// La pantalla consulta aquí si sigue activada y cómo imprimir el tiquete
+pantalla.get('/estado', responder(async () => ({ ajustes: await kiosco.leerAjustes() })));
 pantalla.post('/buscar', responder((req) => kiosco.buscar(req.body?.documento)));
 pantalla.post('/llegada', responder(async (req) => {
   const turno = await kiosco.registrarLlegada(req.body?.documento);

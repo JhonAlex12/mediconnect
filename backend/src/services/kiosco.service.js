@@ -45,6 +45,36 @@ export async function sesionValida(token) {
   }
 }
 
+// ---------- Impresión del tiquete ----------
+
+// Se guardan como números en "configuracion": impresión 0 = no, 1 = con botón, 2 = automática; papel en mm
+const IMPRESION = ['ninguna', 'boton', 'automatica'];
+const PAPELES = [58, 80];
+
+export async function leerAjustes() {
+  const { rows } = await pool.query(
+    `SELECT clave, valor FROM configuracion WHERE clave IN ('impresion_kiosco', 'papel_kiosco')`
+  );
+  const v = Object.fromEntries(rows.map((r) => [r.clave, r.valor]));
+  return {
+    impresion: IMPRESION[v.impresion_kiosco ?? 2] ?? 'automatica', // por defecto: automática
+    papel: PAPELES.includes(v.papel_kiosco) ? v.papel_kiosco : 80,
+  };
+}
+
+export async function guardarAjustes(empleado, { impresion, papel } = {}) {
+  const i = IMPRESION.indexOf(impresion);
+  if (i < 0) throw new ErrorNegocio('Opción de impresión no válida', 400);
+  if (!PAPELES.includes(papel)) throw new ErrorNegocio('El papel debe ser de 58 u 80 mm', 400);
+  await pool.query(
+    `INSERT INTO configuracion (clave, valor, actualizado_por) VALUES ('impresion_kiosco', $1, $3), ('papel_kiosco', $2, $3)
+     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor, actualizado_por = EXCLUDED.actualizado_por, actualizado_en = now()`,
+    [i, papel, empleado.id]
+  );
+  await registrarAcceso({ usuarioId: empleado.id, accion: 'ajustes_pantalla_turnos', detalle: `${impresion}, ${papel} mm` });
+  return leerAjustes();
+}
+
 // ---------- Lo que hace el paciente ----------
 
 function validarDocumento(documento) {

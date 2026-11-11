@@ -32,3 +32,11 @@ html {
   .revelar[data-efecto='zoom'] { transform: scale(0.94); }
   .revelar.visible { opacity: 1; transform: none; }
 }
+
+/* Tiquete de turno (pantalla de turnos): no se ve en pantalla; al imprimirlo es lo único que sale */
+.tiquete-impresion { display: none; }
+@media print {
+  body.con-tiquete > *:not(.tiquete-impresion) { display: none !important; }
+  body.con-tiquete .tiquete-impresion { display: block; page: tiquete; }
+}
+@page tiquete { margin: 0; }

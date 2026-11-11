@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Accessibility, AlertCircle, ArrowRight, Baby, CalendarDays, ChevronLeft, CircleCheck, Clock, Delete, FileText,
-  IdCard, Maximize, MessageCircleQuestion, PersonStanding, Pill, Smartphone, Ticket, Users,
+  IdCard, Maximize, MessageCircleQuestion, PersonStanding, Pill, Printer, Smartphone, Ticket, Users,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { guardarTokenKiosco, leerTokenKiosco } from '../lib/kiosco';
 import { useTitulo } from '../components/Encabezado';
+import { TiqueteImpresion, imprimirTiquete, useImpresionAutomatica } from '../components/TiqueteImpresion';
 
 // Pantalla de turnos de la entrada (táctil, también sirve con mouse y teclado).
 // El paciente escribe su cédula: si tiene turno virtual se registra su llegada; si no, saca un turno
@@ -55,6 +56,7 @@ export default function Kiosco() {
   const [aviso, setAviso] = useState(null);         // { titulo, detalle, ofrecerOtro }
   const [ocupado, setOcupado] = useState(false);
   const [toque, setToque] = useState(0);            // cada interacción reinicia la cuenta de inactividad
+  const [ajustes, setAjustes] = useState({ impresion: 'ninguna', papel: 80 }); // los define el administrador
 
   const reiniciar = useCallback(() => {
     setPaso('inicio');
@@ -79,11 +81,19 @@ export default function Kiosco() {
     }
   }, [token]);
 
-  // ¿La pantalla sigue activada?
+  // ¿La pantalla sigue activada y cómo se imprime? Se vuelve a preguntar cada 2 minutos
   useEffect(() => {
-    if (!token) { setActiva(false); return; }
-    pedir('estado').then(() => setActiva(true)).catch(() => {});
+    if (!token) { setActiva(false); return undefined; }
+    const consultar = () => pedir('estado')
+      .then((r) => { setActiva(true); if (r.ajustes) setAjustes(r.ajustes); })
+      .catch(() => {});
+    consultar();
+    const t = setInterval(consultar, 120_000);
+    return () => clearInterval(t);
   }, [token, pedir]);
+
+  // Impresión automática del tiquete apenas se genera el turno
+  useImpresionAutomatica(paso === 'listo' && ajustes.impresion === 'automatica');
 
   // Vuelve sola al inicio si nadie la usa
   useEffect(() => {
@@ -269,10 +279,24 @@ export default function Kiosco() {
               <Tiquete resultado={resultado} />
               <div className="text-center sm:text-left">
                 <p className="text-2xl text-slate-700">{resultado.detalle}</p>
-                <button type="button" onClick={reiniciar}
-                  className={`${claseAzul} mt-6 px-10 py-4 font-titulo text-xl font-bold`}>
-                  Terminar
-                </button>
+                {ajustes.impresion === 'automatica' && (
+                  <p className="flex items-center justify-center sm:justify-start gap-2 text-lg text-slate-600 mt-4">
+                    <Printer className="w-5 h-5" /> Retire su tiquete impreso.
+                  </p>
+                )}
+                <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-6">
+                  {ajustes.impresion !== 'ninguna' && (
+                    <button type="button" onClick={imprimirTiquete}
+                      className={`${ajustes.impresion === 'boton' ? claseVerde : claseSuave} px-7 py-4 font-titulo text-xl font-bold flex items-center gap-2`}>
+                      <Printer className="w-6 h-6" /> {ajustes.impresion === 'boton' ? 'Imprimir tiquete' : 'Volver a imprimir'}
+                    </button>
+                  )}
+                  <button type="button" onClick={reiniciar}
+                    className={`${claseAzul} px-10 py-4 font-titulo text-xl font-bold`}>
+                    Terminar
+                  </button>
+                </div>
+                {ajustes.impresion !== 'ninguna' && <TiqueteImpresion datos={resultado} papel={ajustes.papel} />}
               </div>
             </div>
           </div>

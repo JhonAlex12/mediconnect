@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, MonitorOff, MonitorSmartphone, TabletSmartphone } from 'lucide-react';
+import { ExternalLink, MonitorOff, MonitorSmartphone, Printer, Save, TabletSmartphone } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useSesion } from '../../lib/sesion';
 import { guardarTokenKiosco } from '../../lib/kiosco';
 import { Aviso, BotonAccion, useAccion } from './comunes';
 import { RegistrarFisico } from './FilaFarmacia';
+import { TiqueteImpresion, imprimirTiquete } from '../TiqueteImpresion';
 
 // Pantalla de turnos de la entrada: activarla en un equipo, desactivarlas y, como respaldo,
 // registrar un turno a mano si la pantalla falla
@@ -67,6 +68,8 @@ export default function KioscoAdmin() {
         </p>
       </section>
 
+      <AjustesImpresion />
+
       <div className="space-y-3">
         <div>
           <h3 className="text-lg font-bold text-slate-900">Respaldo: registrar un turno a mano</h3>
@@ -78,5 +81,92 @@ export default function KioscoAdmin() {
         </div>
       </div>
     </div>
+  );
+}
+
+const OPCIONES_IMPRESION = [
+  ['automatica', 'Automática', 'El tiquete sale apenas se genera el turno, como en los dispensadores de las clínicas.'],
+  ['boton', 'Con botón', 'Aparece el botón “Imprimir tiquete” y solo imprime quien lo toque.'],
+  ['ninguna', 'Sin impresión', 'El turno solo se muestra en la pantalla (si aún no hay impresora).'],
+];
+
+// Cómo se imprime el tiquete del turno en las pantallas de la entrada
+function AjustesImpresion() {
+  const [ajustes, setAjustes] = useState(null);
+  const { ocupado, aviso, setAviso, ejecutar } = useAccion();
+  const [prueba, setPrueba] = useState(false);
+
+  useEffect(() => {
+    api('/kiosco/ajustes').then((r) => setAjustes(r.ajustes)).catch((err) => setAviso({ tipo: 'error', texto: err.message }));
+  }, [setAviso]);
+
+  // El tiquete de prueba se monta, se imprime y se retira
+  useEffect(() => {
+    if (!prueba) return undefined;
+    imprimirTiquete();
+    const t = setTimeout(() => setPrueba(false), 2000);
+    return () => clearTimeout(t);
+  }, [prueba]);
+
+  const guardar = () => ejecutar(async () => {
+    const r = await api('/kiosco/ajustes', { metodo: 'PUT', cuerpo: ajustes });
+    setAjustes(r.ajustes);
+  }, 'Guardado. Las pantallas lo toman en máximo 2 minutos (o al recargarlas).');
+
+  if (!ajustes) return <Aviso aviso={aviso} />;
+  return (
+    <section className="bg-white rounded-xl border border-slate-300 p-5 space-y-4">
+      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2"><Printer className="w-5 h-5 text-slate-600" /> Impresión del tiquete</h3>
+      <div className="grid sm:grid-cols-3 gap-3" role="radiogroup" aria-label="Impresión del tiquete">
+        {OPCIONES_IMPRESION.map(([valor, titulo, detalle]) => (
+          <label key={valor} className={`rounded-lg border-2 p-3 cursor-pointer ${
+            ajustes.impresion === valor ? 'border-marca-azul bg-blue-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <input type="radio" name="impresion" value={valor} checked={ajustes.impresion === valor} className="sr-only"
+              onChange={() => setAjustes((a) => ({ ...a, impresion: valor }))} />
+            <span className="block font-bold text-slate-900">{titulo}</span>
+            <span className="block text-sm text-slate-600 mt-0.5">{detalle}</span>
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <label htmlFor="papel" className="font-semibold text-slate-800">Ancho del papel</label>
+        <select id="papel" value={ajustes.papel} onChange={(e) => setAjustes((a) => ({ ...a, papel: Number(e.target.value) }))}
+          className="border border-slate-400 rounded-lg px-3 py-2">
+          <option value={80}>80 mm (el más común)</option>
+          <option value={58}>58 mm</option>
+        </select>
+      </div>
+      <Aviso aviso={aviso} />
+      <div className="flex flex-wrap gap-3">
+        <BotonAccion color="verde" icono={Save} ocupado={ocupado} onClick={guardar}>Guardar</BotonAccion>
+        <BotonAccion color="gris" icono={Printer} onClick={() => setPrueba(true)}>Imprimir tiquete de prueba</BotonAccion>
+      </div>
+      {prueba && (
+        <TiqueteImpresion papel={ajustes.papel}
+          datos={{ numero: 'F-000', tramite: 'reclamar', prioridad: 'ninguna', fecha: new Date() }} />
+      )}
+
+      <details className="text-sm text-slate-700 bg-slate-50 rounded-lg p-4">
+        <summary className="font-semibold cursor-pointer">Cómo dejar la impresora lista para imprimir sin preguntar</summary>
+        <p className="mt-3">
+          Normalmente el navegador muestra la ventana de impresión cada vez. En el computador de la entrada (con Windows y Google Chrome):
+        </p>
+        <ol className="list-decimal pl-5 mt-2 space-y-1.5">
+          <li>Instale la impresora de tiquetes y déjela como <strong>impresora predeterminada</strong> de Windows. En sus preferencias elija el papel de 80 mm (o 58 mm).</li>
+          <li>En Chrome normal, entre a este panel y toque <strong>Activar este equipo como pantalla de turnos</strong>.</li>
+          <li>Cree un acceso directo en el escritorio con este destino (cambie la dirección por la del sitio):
+            <code className="block bg-white border border-slate-200 rounded px-2 py-1 mt-1 break-all">
+              &quot;C:\Program Files\Google\Chrome\Application\chrome.exe&quot; --kiosk --kiosk-printing {window.location.origin}/kiosco
+            </code>
+          </li>
+          <li>Ábralo con ese acceso directo: la pantalla de turnos ocupa toda la pantalla e imprime directo, sin preguntar.
+            Para salir del modo kiosco use <strong>Alt + F4</strong>.</li>
+          <li>Opcional: copie el acceso directo en la carpeta de inicio de Windows (<code>shell:startup</code>) para que abra sola al encender.</li>
+        </ol>
+        <p className="mt-3 text-slate-600">
+          En tablets Android el navegador siempre muestra la ventana de impresión; para imprimir directo se recomienda un computador con Windows.
+        </p>
+      </details>
+    </section>
   );
 }
