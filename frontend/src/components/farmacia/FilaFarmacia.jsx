@@ -237,9 +237,8 @@ export default function FilaFarmacia() {
           </section>
         </div>
 
-        {/* Columna lateral: registrar turno físico, pausados y por llegar */}
+        {/* Columna lateral: pausados y por llegar (los turnos los sacan los pacientes en la pantalla de la entrada) */}
         <div className="space-y-6">
-          <RegistrarFisico ocupado={ocupado} ejecutar={ejecutar} />
 
           <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-200">
@@ -293,8 +292,9 @@ export default function FilaFarmacia() {
   );
 }
 
-// Registro de turno físico (RN-17): con la fórmula del paciente o solo con su nombre
-function RegistrarFisico({ ocupado, ejecutar }) {
+// Registro manual de turno físico (RN-17): con la fórmula del paciente o solo con su nombre.
+// Solo para el administrador, como respaldo de la pantalla de turnos (se usa en "Pantalla de turnos").
+export function RegistrarFisico({ ocupado, ejecutar }) {
   const [conFormula, setConFormula] = useState(true);
   const [nombre, setNombre] = useState('');
   const [codigo, setCodigo] = useState('');

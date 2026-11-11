@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { BarChart3, Bike, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet } from 'lucide-react';
+import { BarChart3, Bike, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet, TabletSmartphone } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 import { TiempoRealProvider } from '../../lib/tiempoReal';
 import Encabezado, { useTitulo } from '../Encabezado';
@@ -12,6 +12,7 @@ import UsuariosFarmacia from './UsuariosFarmacia';
 import TarifasFarmacia from './TarifasFarmacia';
 import DomiciliosFarmacia from './DomiciliosFarmacia';
 import ContenidoFarmacia from './ContenidoFarmacia';
+import KioscoAdmin from './KioscoAdmin';
 
 const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador' };
 
@@ -27,6 +28,7 @@ const SECCIONES = [
   { ruta: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
   { ruta: 'tarifas', texto: 'Tarifas', icono: Wallet, componente: TarifasFarmacia, soloAdmin: true },
   { ruta: 'contenido', texto: 'Contenido del sitio', icono: LayoutTemplate, componente: ContenidoFarmacia, soloAdmin: true },
+  { ruta: 'pantalla-turnos', texto: 'Pantalla de turnos', icono: TabletSmartphone, componente: KioscoAdmin, soloAdmin: true },
 ];
 
 function Seccion({ titulo, componente: Componente }) {

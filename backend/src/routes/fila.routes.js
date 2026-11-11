@@ -9,7 +9,9 @@ const router = Router();
 router.use(exigirEmpleado('administrador', 'auxiliar'));
 
 router.get('/', ver);
-router.post('/fisico', fisico);
+// Los pacientes sacan su turno en la pantalla de la entrada; este registro manual queda
+// solo para el administrador, como respaldo si esa pantalla falla
+router.post('/fisico', exigirEmpleado('administrador'), fisico);
 router.post('/llamar-siguiente', llamar);
 router.post('/:id/:accion', accion);
 

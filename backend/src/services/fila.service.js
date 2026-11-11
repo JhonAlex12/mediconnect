@@ -57,6 +57,17 @@ export async function verFila() {
   };
 }
 
+// Número del siguiente turno físico (F-014). Misma numeración que los virtuales: es una sola fila.
+// Debe llamarse dentro de una transacción (el candado se suelta al terminarla).
+export async function siguienteNumeroFisico(cliente) {
+  await cliente.query(`SELECT pg_advisory_xact_lock(hashtext('mediconect_numeracion_turnos'))`);
+  const { rows: [sig] } = await cliente.query(
+    `SELECT COALESCE(MAX(substring(numero FROM 3)::int), 0) + 1 AS n
+       FROM turnos WHERE fecha = ${HOY}`
+  );
+  return `F-${String(sig.n).padStart(3, '0')}`;
+}
+
 // ============================================================
 // REGISTRAR TURNO FÍSICO (RN-17): en segundos y en la misma fila
 // Se puede vincular a una fórmula (código + documento) o solo con un nombre
@@ -90,13 +101,7 @@ export async function registrarFisico({ nombre, codigo, documento, prioridad = '
       throw new ErrorNegocio('Ingresa el nombre del paciente o los datos de su fórmula', 400);
     }
 
-    // Misma numeración que los turnos virtuales: es una sola fila
-    await cliente.query(`SELECT pg_advisory_xact_lock(hashtext('mediconect_numeracion_turnos'))`);
-    const { rows: [sig] } = await cliente.query(
-      `SELECT COALESCE(MAX(substring(numero FROM 3)::int), 0) + 1 AS n
-         FROM turnos WHERE fecha = ${HOY}`
-    );
-    const numero = `F-${String(sig.n).padStart(3, '0')}`;
+    const numero = await siguienteNumeroFisico(cliente);
 
     // Quien toma turno físico ya está en la farmacia: entra como "presente"
     const { rows: [turno] } = await cliente.query(
