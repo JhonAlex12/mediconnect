@@ -125,7 +125,7 @@ export const PREGUNTAS_BOT = [
   },
   {
     pregunta: 'No me aparece mi fórmula',
-    variantes: 'no me sale la fórmula\nno encuentra mi fórmula\nel código no funciona\ndice que la fórmula no existe\nno aparece mi código',
+    variantes: 'no me sale la fórmula\ncon mi cédula no aparece la fórmula\nno encuentra mi fórmula\nel código no funciona\ndice que la fórmula no existe\nno aparece mi código',
     respuesta: 'Revisa que el **número de documento** y el **código de la fórmula** (F-2026-0001) estén bien escritos. La fórmula debe estar a tu nombre.\n\nSi la acabas de recibir, puede que la IPS aún no la haya enviado a la farmacia. Si sigue sin aparecer, comunícate al **{telefono}**.',
     enlace: '/paciente', sugerida: false,
   },
@@ -236,6 +236,12 @@ export const PREGUNTAS_BOT = [
     variantes: 'pasó la fecha límite\nhasta cuándo puedo reclamar\ncuánto dura la fórmula\nfórmula vencida',
     respuesta: 'Puedes reclamar hasta la **fecha límite** que aparece al consultar la fórmula. Después de esa fecha ya no se puede entregar: pide una fórmula nueva a tu médico o a tu IPS.',
     enlace: '/paciente', sugerida: false,
+  },
+  {
+    pregunta: 'La página me sale con error',
+    variantes: 'me está dando error\nno funciona la página\nno me deja entrar\nno carga\nsale un error\nla página está fallando',
+    respuesta: 'Lamento el inconveniente. Prueba esto:\n\n- Recarga la página.\n- Revisa tu conexión a internet.\n- Si te sale un aviso, léelo: por ejemplo, el código de la fórmula o el documento pueden estar mal escritos.\n\nSi sigue fallando, comunícate al **{telefono}** y cuéntanos qué estabas haciendo.',
+    enlace: null, sugerida: false,
   },
 ];
 

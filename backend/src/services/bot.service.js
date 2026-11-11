@@ -29,13 +29,17 @@ const FRASES = [
   [/\bno hay\b|\bno habia\b|\bno tenian\b|\bno tienen\b/g, ' #pendiente '],
   [/\bfecha limite\b/g, ' #vence '],
   [/\bcorreo electronico\b/g, ' #contacto '],
+  [/\bno (me )?(funciona|sirve|carga|abre|deja|sale nada)\b/g, ' #error '],
 ];
+
+// Letras que suenan igual se escriben igual: "bale"/"vale", "receta"/"reseta", "llamar"/"yamar", "hora"/"ora"
+const fonetica = (p) => p.replace(/v/g, 'b').replace(/z/g, 's').replace(/c([ei])/g, 's$1').replace(/ll/g, 'y').replace(/h/g, '');
 
 // Palabras con el mismo sentido se cuentan como una sola (#concepto)
 const SINONIMOS = {};
-const grupo = (concepto, palabras) => palabras.split(' ').forEach((p) => { SINONIMOS[p] = concepto; });
+const grupo = (concepto, palabras) => palabras.split(' ').forEach((p) => { SINONIMOS[fonetica(p)] = concepto; });
 grupo('#domicilio', 'domicilio domicilios domiciliario envio envios enviar envian envien mandan mandar llevan llevar traen traer casa');
-grupo('#costo', 'cuanto cuanta cuesta cuestan vale valen valor precio precios cobran cobra cobro pagar pago pagos pago plata tarifa');
+grupo('#costo', 'cuesta cuestan vale valen valor precio precios cobran cobra cobro pagar pago pagos pago plata tarifa');
 grupo('#cuota', 'cuota cuotas copago copagos moderadora moderadoras');
 grupo('#horario', 'horario horarios hora horas abren abre abierto abiertos cierran cierra cerrado domingo domingos sabado sabados festivo festivos');
 grupo('#ubicacion', 'ubicacion ubicados ubicada direccion quedan queda llego llegar mapa sede');
@@ -52,7 +56,32 @@ grupo('#clave', 'contrasena clave password');
 grupo('#pedir', 'pedir pido pide sacar saco saca solicitar solicito');
 grupo('#disponible', 'tienen tiene hay disponible disponibles disponibilidad existencia');
 grupo('#retraso', 'tarde retrasado retrasada retraso retrase atrasado atrasada demoro demora');
+grupo('#documento', 'cedula cedulas documento documentos identificacion');
+grupo('#error', 'error errores falla fallas fallando bloqueada bloqueado');
 grupo('#vence', 'vencida vencido vence vencio vencimiento caduco caducada vigencia vigente');
+
+// Distancia de edición (cuántas letras cambian de una palabra a otra), con tope
+function distancia(a, b, tope = 1) {
+  if (Math.abs(a.length - b.length) > tope) return tope + 1;
+  let fila = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const nueva = [i];
+    let menor = i;
+    for (let j = 1; j <= b.length; j++) {
+      nueva[j] = Math.min(fila[j] + 1, nueva[j - 1] + 1, fila[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      menor = Math.min(menor, nueva[j]);
+    }
+    if (menor > tope) return tope + 1;
+    fila = nueva;
+  }
+  return fila[b.length];
+}
+
+// Palabra mal escrita que se parece a un sinónimo conocido (solo palabras de 5 letras o más)
+const CLAVES_LARGAS = Object.keys(SINONIMOS).filter((k) => k.length >= 5);
+const sinonimoParecido = (p) => (p.length >= 5
+  ? CLAVES_LARGAS.find((k) => k[0] === p[0] && distancia(p, k) <= 1)
+  : undefined);
 
 // Raíz sencilla: "fórmulas" y "fórmula" → "formu"; "reclamar" y "reclamo" → "recla"
 const raiz = (p) => {
@@ -68,9 +97,10 @@ export function terminos(texto) {
   for (const p of t.split(/\s+/)) {
     if (!p) continue;
     if (p.startsWith('#')) { salida.push(p); continue; }
-    const concepto = SINONIMOS[p];
+    const f = fonetica(p);
+    const concepto = SINONIMOS[f] ?? (VACIAS.has(p) ? undefined : SINONIMOS[sinonimoParecido(f)]);
     if (concepto) salida.push(concepto);
-    else if (!VACIAS.has(p) && p.length > 1) salida.push(raiz(p));
+    else if (!VACIAS.has(p) && p.length > 1 && !/^\d+$/.test(p)) salida.push(raiz(f)); // los números no ayudan
   }
   return salida;
 }
@@ -156,11 +186,13 @@ async function armarIndice() {
   const df = new Map();
   for (const d of docs) {
     d.tf = new Map();
+    d.fuertes = new Set(); // palabras de la pregunta, sus variantes o el título
     d.largo = 0;
     for (const [texto, peso] of d.campos) {
       for (const t of terminos(texto)) {
         d.tf.set(t, (d.tf.get(t) ?? 0) + peso);
         d.largo += peso;
+        if (peso >= 2) d.fuertes.add(t);
       }
     }
     for (const t of d.tf.keys()) df.set(t, (df.get(t) ?? 0) + 1);
@@ -179,7 +211,7 @@ async function armarIndice() {
 function buscar(ind, texto) {
   const q = [...new Set(terminos(texto))];
   if (!q.length) return { q, resultados: [] };
-  const idfDesconocida = Math.log(1 + ind.n) * 0.5; // palabras que no aparecen en el sitio
+  const idfDesconocida = Math.log(1 + ind.n) * 0.6; // palabras que no aparecen en el sitio (otros temas)
   const pesoTotal = q.reduce((s, t) => s + (ind.idf.get(t) ?? idfDesconocida), 0);
   const k1 = 1.2;
   const b = 0.3;
@@ -188,14 +220,18 @@ function buscar(ind, texto) {
   for (const d of ind.docs) {
     let puntaje = 0;
     let cubierto = 0;
+    let cubiertoFuerte = 0;
     for (const t of q) {
       const tf = d.tf.get(t);
       if (!tf) continue;
       const idf = ind.idf.get(t);
       puntaje += idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * d.largo / ind.promedio));
       cubierto += idf;
+      if (d.fuertes.has(t)) cubiertoFuerte += idf;
     }
-    if (puntaje > 0) resultados.push({ d, puntaje: puntaje * d.factor, cobertura: cubierto / pesoTotal });
+    if (puntaje > 0) {
+      resultados.push({ d, puntaje: puntaje * d.factor, cobertura: cubierto / pesoTotal, fuerte: cubiertoFuerte / pesoTotal });
+    }
   }
   resultados.sort((x, y) => y.puntaje - x.puntaje);
   return { q, resultados };
@@ -205,6 +241,8 @@ function buscar(ind, texto) {
 
 const EMERGENCIA = /\b(emergencia|sobredosis|intoxic\w*|envenen\w*|desmay\w*|convulsi\w*|infarto|no puedo respirar|me estoy ahogando|me siento muy mal|suicid\w*|quitarme la vida)\b/;
 const CONSEJO_MEDICO = /\b(dosis|para que sirve|sirve para|efectos? (secundario|adverso)s?|contraindica\w*|(?:me )?puedo tomar(?! (?:un |el |mi |otro )?turno)|debo tomar|cuant[ao]s? (pastillas|tabletas|capsulas|gotas|ml|mg|cucharadas)|mezclar|combinar|con alcohol|con licor|con cerveza|reemplazar el medicamento|cambiar el medicamento|que me tomo|que puedo tomar)\b/;
+const NOMBRE = /\b(como te llamas|cual es tu nombre|tu nombre|quien eres|quien sos|que eres|eres (un |una )?(robot|bot|humano|humana|persona|real|maquina|inteligencia artificial))\b/;
+const COMO_ESTAS = /^((hola|buenas|buenos dias|buenas tardes|buenas noches) )?(como estas|como esta|como vas|como te va|que tal)$/;
 const SOLO_SALUDO = /^(hola|buenas|buenos|buen|dia|dias|tardes|noches|saludos|hey|que tal|como estas|como esta)( (hola|buenas|buenos|buen|dia|dias|tardes|noches|saludos|que tal|como estas|como esta))*$/;
 const SOLO_GRACIAS = /^(muchas |mil )?(gracias|ok|okey|listo|vale|perfecto|chao|adios|hasta luego|bueno|entendido|excelente)( (gracias|muy amable|listo|chao|bueno))*$/;
 
@@ -221,6 +259,15 @@ async function fija(texto, datos) {
       texto: `No puedo darte indicaciones sobre cómo tomar un medicamento, dosis o efectos: eso debe decírtelo **tu médico o el químico farmacéutico**.\n\nPuedes preguntar en la ventanilla de la farmacia o llamar al **${datos.telefono}**.`,
       enlace: null,
     };
+  }
+  if (NOMBRE.test(n)) {
+    return {
+      texto: 'Soy **Mediconnect Bot**, el asistente virtual de la farmacia. No soy una persona: respondo con la información de este sitio sobre fórmulas, turnos, cuotas, domicilios y horarios.',
+      enlace: null, temas: true,
+    };
+  }
+  if (COMO_ESTAS.test(n)) {
+    return { texto: '¡Muy bien, gracias por preguntar! ¿En qué te puedo ayudar?', enlace: null, temas: true };
   }
   if (SOLO_SALUDO.test(n)) {
     return { texto: '¡Hola! Cuéntame qué necesitas: fórmulas, turnos, cuotas, domicilios, horario…', enlace: null, temas: true };
@@ -274,7 +321,7 @@ export async function preguntar({ texto, id } = {}) {
   const { resultados } = buscar(ind, pregunta);
   const [mejor] = resultados;
   // Se responde solo si la mayor parte de la pregunta coincide con el documento
-  if (mejor && mejor.cobertura >= 0.5 && mejor.puntaje >= 1.2) {
+  if (mejor && mejor.fuerte >= 0.5 && mejor.puntaje >= 1.2) {
     contarUso(mejor.d);
     const relacionadas = resultados.slice(1)
       .filter((r) => r.puntaje >= mejor.puntaje * 0.6 && r.cobertura >= 0.4)
