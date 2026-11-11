@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Bike, CalendarClock, CheckCircle2, ClipboardList, FilePlus2, History, LogOut, MailWarning, MapPin, Package, Save, Ticket, Truck,
+  BadgeCheck, Bike, CalendarClock, CheckCircle2, ClipboardList, FilePlus2, History, LogOut, MailWarning, MapPin, Package, Save, Ticket, Truck,
   UserRound, XCircle,
 } from 'lucide-react';
 import SitioPublico from '../components/SitioPublico';
@@ -40,7 +40,7 @@ const fechaHora = (iso) =>
 
 export default function MiCuenta() {
   useTitulo('Mi cuenta');
-  const { cuenta, verificando, cerrarSesion, apiCuenta } = useCuenta();
+  const { cuenta, verificando, cerrarSesion, apiCuenta, recargarCuenta } = useCuenta();
   const { hash } = useLocation();
   const navegar = useNavigate();
   const pestana = PESTANAS.some(([id]) => `#${id}` === hash) ? hash.slice(1) : 'formulas';
@@ -60,9 +60,37 @@ export default function MiCuenta() {
     }
   }, [apiCuenta]);
 
+  // Se recargan al cambiar de cuenta, no cada vez que se actualizan sus datos
+  const idCuenta = cuenta?.id;
   useEffect(() => {
-    if (cuenta) cargar();
-  }, [cuenta, cargar]);
+    if (idCuenta) cargar();
+  }, [idCuenta, cargar]);
+
+  // Si confirmó el correo en otra pestaña o en el celular, al volver a esta se actualiza sola
+  const sinVerificar = cuenta && !cuenta.correo_verificado;
+  useEffect(() => {
+    if (!sinVerificar) return undefined;
+    const revisar = () => {
+      if (document.visibilityState === 'visible') recargarCuenta().catch(() => {});
+    };
+    window.addEventListener('focus', revisar);
+    document.addEventListener('visibilitychange', revisar);
+    const cada = setInterval(revisar, 20000);
+    return () => {
+      window.removeEventListener('focus', revisar);
+      document.removeEventListener('visibilitychange', revisar);
+      clearInterval(cada);
+    };
+  }, [sinVerificar, recargarCuenta]);
+
+  // Anuncio cuando el correo pasa de "sin confirmar" a "verificado" mientras la página está abierta
+  const estabaSinVerificar = useRef(false);
+  const [recienVerificado, setRecienVerificado] = useState(false);
+  useEffect(() => {
+    if (!cuenta) return;
+    if (estabaSinVerificar.current && cuenta.correo_verificado) setRecienVerificado(true);
+    estabaSinVerificar.current = !cuenta.correo_verificado;
+  }, [cuenta]);
 
   if (verificando) {
     return <SitioPublico><p className="text-center text-slate-500 py-24">Cargando tu cuenta…</p></SitioPublico>;
@@ -84,6 +112,18 @@ export default function MiCuenta() {
             </p>
             <h1 className="font-titulo text-3xl font-extrabold text-marca-noche">Hola, {cuenta.nombres.split(' ')[0]}</h1>
             <p className="text-slate-600">{cuenta.tipo_documento} {cuenta.documento}</p>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              {cuenta.correo}
+              {cuenta.correo_verificado ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-xs font-bold">
+                  <BadgeCheck className="w-3.5 h-3.5" /> Correo verificado
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2.5 py-0.5 text-xs font-bold">
+                  <MailWarning className="w-3.5 h-3.5" /> Sin confirmar
+                </span>
+              )}
+            </p>
           </div>
           <button type="button" onClick={salir}
             className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-red-700 px-3 py-2 rounded cursor-pointer">
@@ -103,6 +143,19 @@ export default function MiCuenta() {
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
         {!cuenta.correo_verificado && <ConfirmaTuCorreo correo={cuenta.correo} />}
+        {recienVerificado && (
+          <div role="status" className="bg-emerald-50 border-l-4 border-emerald-600 rounded-r-lg p-4 flex items-start gap-3">
+            <BadgeCheck className="w-6 h-6 text-emerald-600 shrink-0" />
+            <div className="flex-1">
+              <p className="font-bold text-marca-noche">¡Correo verificado!</p>
+              <p className="text-sm text-slate-700">{cuenta.correo} quedó confirmado. Ya puedes pedir tus medicamentos a domicilio.</p>
+            </div>
+            <button type="button" onClick={() => setRecienVerificado(false)} aria-label="Cerrar aviso"
+              className="text-slate-500 hover:text-slate-800 cursor-pointer">
+              <XCircle className="w-5 h-5" />
+            </button>
+          </div>
+        )}
         <Aviso aviso={error} />
         {pestana === 'formulas' && <MisFormulas formulas={formulas} domicilios={domicilios} recargar={cargar} />}
         {pestana === 'domicilios' && <MisDomicilios domicilios={domicilios} recargar={cargar} />}
