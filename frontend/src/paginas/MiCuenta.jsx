@@ -48,6 +48,8 @@ export default function MiCuenta() {
   const [formulas, setFormulas] = useState(null);
   const [domicilios, setDomicilios] = useState(null);
   const [error, setError] = useState(null);
+  // Sin el correo confirmado no se ven fórmulas, domicilios ni historial (el backend también lo exige)
+  const verificado = Boolean(cuenta?.correo_verificado);
 
   const cargar = useCallback(async () => {
     try {
@@ -63,8 +65,8 @@ export default function MiCuenta() {
   // Se recargan al cambiar de cuenta, no cada vez que se actualizan sus datos
   const idCuenta = cuenta?.id;
   useEffect(() => {
-    if (idCuenta) cargar();
-  }, [idCuenta, cargar]);
+    if (idCuenta && verificado) cargar();
+  }, [idCuenta, verificado, cargar]);
 
   // Si confirmó el correo en otra pestaña o en el celular, al volver a esta se actualiza sola
   const sinVerificar = cuenta && !cuenta.correo_verificado;
@@ -130,7 +132,8 @@ export default function MiCuenta() {
             <LogOut className="w-4 h-4" /> Cerrar sesión
           </button>
         </div>
-        <nav className="max-w-5xl mx-auto px-4 mt-6 flex gap-1 overflow-x-auto" aria-label="Secciones de mi cuenta">
+        {!verificado && <div className="h-6" />}
+        {verificado && <nav className="max-w-5xl mx-auto px-4 mt-6 flex gap-1 overflow-x-auto" aria-label="Secciones de mi cuenta">
           {PESTANAS.map(([id, texto, Icono]) => (
             <Link key={id} to={`#${id}`} replace
               className={`flex items-center gap-2 px-4 py-3 font-semibold text-[15px] border-b-4 whitespace-nowrap transition ${
@@ -138,17 +141,17 @@ export default function MiCuenta() {
               <Icono className="w-4 h-4" /> {texto}
             </Link>
           ))}
-        </nav>
+        </nav>}
       </section>
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        {!cuenta.correo_verificado && <ConfirmaTuCorreo correo={cuenta.correo} />}
+        {!verificado && <ConfirmaTuCorreo correo={cuenta.correo} />}
         {recienVerificado && (
           <div role="status" className="bg-emerald-50 border-l-4 border-emerald-600 rounded-r-lg p-4 flex items-start gap-3">
             <BadgeCheck className="w-6 h-6 text-emerald-600 shrink-0" />
             <div className="flex-1">
               <p className="font-bold text-marca-noche">¡Correo verificado!</p>
-              <p className="text-sm text-slate-700">{cuenta.correo} quedó confirmado. Ya puedes pedir tus medicamentos a domicilio.</p>
+              <p className="text-sm text-slate-700">{cuenta.correo} quedó confirmado. Ya puedes ver tus fórmulas y pedir tus medicamentos a domicilio.</p>
             </div>
             <button type="button" onClick={() => setRecienVerificado(false)} aria-label="Cerrar aviso"
               className="text-slate-500 hover:text-slate-800 cursor-pointer">
@@ -157,10 +160,10 @@ export default function MiCuenta() {
           </div>
         )}
         <Aviso aviso={error} />
-        {pestana === 'formulas' && <MisFormulas formulas={formulas} domicilios={domicilios} recargar={cargar} />}
-        {pestana === 'domicilios' && <MisDomicilios domicilios={domicilios} recargar={cargar} />}
-        {pestana === 'datos' && <MisDatos />}
-        {pestana === 'historial' && <Historial />}
+        {verificado && pestana === 'formulas' && <MisFormulas formulas={formulas} domicilios={domicilios} recargar={cargar} />}
+        {verificado && pestana === 'domicilios' && <MisDomicilios domicilios={domicilios} recargar={cargar} />}
+        {verificado && pestana === 'datos' && <MisDatos />}
+        {verificado && pestana === 'historial' && <Historial />}
       </div>
     </SitioPublico>
   );
@@ -170,15 +173,16 @@ export default function MiCuenta() {
 function ConfirmaTuCorreo({ correo }) {
   const { apiCuenta } = useCuenta();
   const { ocupado, aviso, ejecutar } = useAccion();
+  const [corrigiendo, setCorrigiendo] = useState(false);
   return (
     <div className="bg-amber-50 border-l-4 border-amber-500 rounded-r-lg p-4 space-y-3">
       <div className="flex items-start gap-3">
         <MailWarning className="w-6 h-6 text-amber-600 shrink-0" />
         <div>
-          <p className="font-bold text-marca-noche">Confirma tu correo</p>
+          <p className="font-bold text-marca-noche">Confirma tu correo para usar tu cuenta</p>
           <p className="text-sm text-slate-700">
-            Te enviamos un enlace a <strong>{correo}</strong>. Ábrelo para activar los domicilios.
-            Si no lo ves, revisa la carpeta de spam.
+            Te enviamos un enlace a <strong>{correo}</strong>. Ábrelo para ver tus fórmulas, pedir domicilios
+            y consultar tu historial. Si no lo ves, revisa la carpeta de spam.
           </p>
         </div>
       </div>
@@ -188,6 +192,11 @@ function ConfirmaTuCorreo({ correo }) {
         {ocupado ? 'Enviando…' : 'Reenviar el correo'}
       </button>
       <div className="ml-9"><Aviso aviso={aviso} /></div>
+      <button type="button" onClick={() => setCorrigiendo((v) => !v)}
+        className="ml-9 block text-sm font-semibold text-slate-700 hover:text-marca-azul hover:underline cursor-pointer">
+        {corrigiendo ? 'Ocultar mis datos' : '¿Escribiste mal tu correo? Corrígelo aquí'}
+      </button>
+      {corrigiendo && <div className="pt-2"><MisDatos /></div>}
     </div>
   );
 }

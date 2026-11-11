@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { exigirCuenta } from '../middleware/cuentaPaciente.js';
+import { exigirCuenta, exigirCorreoVerificado } from '../middleware/cuentaPaciente.js';
 import {
   registrarCuenta, iniciarSesionCuenta, verCuenta, actualizarCuenta,
   agregarFormula, listarFormulas, confirmarCorreo, reenviarConfirmacion, solicitarRestablecer, restablecerClave, listarDomicilios, solicitarDomicilio, cancelarDomicilio, historial,
@@ -52,6 +52,9 @@ router.post('/reenviar-confirmacion', limitar(5, 'Ya te enviamos varios correos.
   }));
 router.get('/yo', responder(async (req) => ({ cuenta: await verCuenta(req.cuentaId) })));
 router.put('/yo', responder(async (req) => ({ cuenta: await actualizarCuenta(req.cuentaId, req.body ?? {}) })));
+
+// Lo demás exige el correo confirmado (antes solo se puede reenviar el enlace o corregir los datos)
+router.use(exigirCorreoVerificado);
 router.get('/formulas', responder(async (req) => ({ formulas: await listarFormulas(req.cuentaId) })));
 router.post('/formulas', limitadorFormulas,
   responder(async (req) => ({ formula: await agregarFormula(req.cuentaId, req.body?.codigo) })));
