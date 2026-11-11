@@ -126,7 +126,7 @@ function FormularioArticulo({ id, temas, alTerminar, alCancelar }) {
         <SubirImagen etiqueta="Imagen de portada" ayuda="opcional" imagen={a.imagen} alto="h-44"
           alSubir={(img) => setA((x) => ({ ...x, imagen: img.url }))} alQuitar={() => setA((x) => ({ ...x, imagen: '' }))} />
       </div>
-      <EditorTexto id="ar-contenido" etiqueta="Contenido" valor={a.contenido} cambiar={cambiar('contenido')} filas={18} />
+      <EditorTexto id="ar-contenido" etiqueta="Contenido" valor={a.contenido} cambiar={cambiar('contenido')} filas={18} imagenes />
       <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
         <input type="checkbox" checked={a.publicado} onChange={(e) => cambiar('publicado')(e.target.checked)} className="w-5 h-5" />
         Publicado (si lo desmarcas queda como borrador y no se ve en el sitio)

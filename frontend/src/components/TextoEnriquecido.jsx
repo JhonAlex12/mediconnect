@@ -8,6 +8,7 @@ import { ArrowRight } from 'lucide-react';
 //   - elemento           → lista con viñetas
 //   **texto**            → negrita
 //   [Texto](/ruta)       → solo en su línea: botón; dentro de un párrafo: enlace
+//   ![Texto](/api/contenido/imagenes/N) → solo en su línea: imagen del sitio con su descripción
 //   {telefono} {correo} {horario} {direccion} → datos de contacto
 //   {tabla_cuotas}       → (solo en su línea) bloque especial que pasa la página en "especiales"
 
@@ -20,7 +21,28 @@ export const AYUDA_FORMATO = [
   ['{telefono} {correo} {horario} {direccion}', 'datos de contacto'],
 ];
 
+// Solo en los artículos de "Salud al día" (el editor tiene el botón "Insertar imagen")
+export const AYUDA_IMAGEN = [
+  ['![Descripción](/api/contenido/imagenes/12)', 'imagen (solo en su línea; usa el botón “Insertar imagen”)'],
+];
+
 const ENLACE_SEGURO = /^(\/[\w\-/#?=&.%]*|https:\/\/[^\s<>"]+)$/;
+// Solo imágenes del propio sitio: las subidas desde el panel o las de /img/
+const IMAGEN_SEGURA = /^\/(img\/[\w.-]+|api\/contenido\/imagenes\/\d+)$/;
+
+function Imagen({ ruta, texto }) {
+  const subida = ruta.startsWith('/api/');
+  return (
+    <figure className="my-2">
+      {/* Las subidas tienen versión para celular (900 px) y para computador (hasta 1600 px) */}
+      <img src={ruta} alt={texto} loading="lazy" decoding="async"
+        srcSet={subida ? `${ruta}?movil=1 900w, ${ruta} 1600w` : undefined}
+        sizes={subida ? '(max-width: 800px) 100vw, 768px' : undefined}
+        className="w-full h-auto rounded-lg border border-slate-200" />
+      {texto && <figcaption aria-hidden="true" className="mt-2 text-sm text-slate-500 text-center">{texto}</figcaption>}
+    </figure>
+  );
+}
 
 function Enlace({ a, children, className }) {
   if (!ENLACE_SEGURO.test(a)) return <>{children}</>;
@@ -67,7 +89,9 @@ export default function TextoEnriquecido({ texto = '', datos = {}, especiales = 
     if (!linea) { cerrarParrafo(); cerrarLista(); continue; }
     const especial = /^\{(\w+)\}$/.exec(linea);
     const boton = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(linea);
-    if (especial && especial[1] in especiales) { cerrarParrafo(); cerrarLista(); bloques.push({ tipo: 'especial', clave: especial[1] }); }
+    const imagen = /^!\[([^\]]*)\]\(([^)\s]+)\)$/.exec(linea);
+    if (imagen && IMAGEN_SEGURA.test(imagen[2])) { cerrarParrafo(); cerrarLista(); bloques.push({ tipo: 'imagen', texto: imagen[1].trim(), ruta: imagen[2] }); }
+    else if (especial && especial[1] in especiales) { cerrarParrafo(); cerrarLista(); bloques.push({ tipo: 'especial', clave: especial[1] }); }
     else if (linea.startsWith('## ')) { cerrarParrafo(); cerrarLista(); bloques.push({ tipo: 'h', texto: linea.slice(3) }); }
     else if (/^[-•*] /.test(linea)) { cerrarParrafo(); (lista ??= []).push(linea.slice(2)); }
     else if (boton) { cerrarParrafo(); cerrarLista(); bloques.push({ tipo: 'boton', texto: boton[1], a: boton[2] }); }
@@ -96,6 +120,7 @@ export default function TextoEnriquecido({ texto = '', datos = {}, especiales = 
             </p>
           );
         }
+        if (b.tipo === 'imagen') return <Imagen key={i} ruta={b.ruta} texto={b.texto} />;
         if (b.tipo === 'especial') return <React.Fragment key={i}>{especiales[b.clave]}</React.Fragment>;
         return <p key={i}>{enLinea(b.texto, i)}</p>;
       })}
