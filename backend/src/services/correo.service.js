@@ -9,7 +9,7 @@ const transporte = process.env.SMTP_HOST
       port: Number(process.env.SMTP_PORT ?? 587),
       secure: Number(process.env.SMTP_PORT) === 465,
       auth: process.env.SMTP_USUARIO
-        ? { user: process.env.SMTP_USUARIO, pass: process.env.SMTP_CLAVE }
+        ? { user: process.env.SMTP_USUARIO, pass: process.env.SMTP_CLAVE?.replace(/\s/g, '') }
         : undefined,
     })
   : null;
