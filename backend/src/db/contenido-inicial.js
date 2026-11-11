@@ -114,6 +114,131 @@ export const CONTACTO = {
   "lon": -72.505
 };
 
+// Preguntas frecuentes iniciales de Mediconnect Bot (el administrador las edita en el panel).
+// {telefono} {correo} {horario} {direccion} {ciudad} {costo_envio} y {tabla_cuotas} se llenan solos.
+export const PREGUNTAS_BOT = [
+  {
+    pregunta: '¿Cómo consulto mi fórmula?',
+    variantes: 'ver mi fórmula\nqué medicamentos hay disponibles\nhay disponibilidad de mis medicamentos\ntienen mis medicamentos\nqué me van a entregar\nconsultar disponibilidad',
+    respuesta: 'Entra a **Consultar fórmula** y escribe tu número de documento y el código de la fórmula (tiene la forma F-2026-0001; te lo entrega el médico o la IPS).\n\nVerás qué medicamentos hay disponibles, lo que te queda pendiente y el valor de la cuota moderadora que te corresponde.',
+    enlace: '/paciente', sugerida: true,
+  },
+  {
+    pregunta: 'No me aparece mi fórmula',
+    variantes: 'no me sale la fórmula\nno encuentra mi fórmula\nel código no funciona\ndice que la fórmula no existe\nno aparece mi código',
+    respuesta: 'Revisa que el **número de documento** y el **código de la fórmula** (F-2026-0001) estén bien escritos. La fórmula debe estar a tu nombre.\n\nSi la acabas de recibir, puede que la IPS aún no la haya enviado a la farmacia. Si sigue sin aparecer, comunícate al **{telefono}**.',
+    enlace: '/paciente', sugerida: false,
+  },
+  {
+    pregunta: '¿Cómo pido un turno virtual?',
+    variantes: 'sacar turno\ntomar un turno\npedir ficha\nhacer la fila desde el celular\nreservar mis medicamentos\nquiero un turno\ncita para reclamar',
+    respuesta: 'Consulta tu fórmula en **Pedir turno virtual** y, si hay medicamentos disponibles, toca **Pedir turno**.\n\nTus medicamentos quedan **apartados durante 2 horas**. Cuando llegues a la farmacia, espera a que te llamen en la pantalla de la sala.',
+    enlace: '/paciente', sugerida: false,
+  },
+  {
+    pregunta: 'Voy a llegar tarde a mi turno',
+    variantes: 'me retrasé\nno alcanzo a llegar\nse me hizo tarde\nmás tiempo para el turno\nno puedo ir a mi turno',
+    respuesta: 'En la página de tu turno toca **Voy retrasado** y te damos **20 minutos más** (se puede usar una sola vez).\n\nSi ya no puedes ir, cancela el turno para que otro paciente lo aproveche. Tu fórmula sigue vigente y puedes pedir un turno nuevo después.',
+    enlace: '/paciente', sugerida: false,
+  },
+  {
+    pregunta: '¿Qué necesito para reclamar mis medicamentos?',
+    variantes: 'requisitos para reclamar\nqué documentos llevo\nqué debo llevar a la farmacia\nqué piden para entregar los medicamentos',
+    respuesta: '- Tu documento de identidad.\n- El código de tu fórmula (F-2026-0001).\n- Que la fórmula esté vigente (hasta la fecha límite que ves al consultarla).\n- El valor de la cuota moderadora, si te corresponde pagarla.',
+    enlace: '/informacion#requisitos', sugerida: false,
+  },
+  {
+    pregunta: '¿Otra persona puede reclamar por mí?',
+    variantes: 'puede reclamar un familiar\nmi mamá puede recoger mi fórmula\nenviar a alguien a reclamar\nreclamar los medicamentos de otra persona\nautorizar a alguien',
+    respuesta: 'Sí. La persona debe llevar **el código de tu fórmula y tu número de documento**. En la ventanilla se registran su nombre y su número de documento.',
+    enlace: '/informacion#requisitos', sugerida: false,
+  },
+  {
+    pregunta: '¿Cuánto pago de cuota moderadora?',
+    variantes: 'valor de la cuota moderadora\ncuánto cuesta reclamar\ncuánto debo pagar\ncuánto vale el copago\ntengo que pagar algo',
+    respuesta: 'La pagan los afiliados del **régimen contributivo** y depende de tu ingreso base de cotización:\n\n{tabla_cuotas}\n\nSe paga **una sola vez por fórmula**. Al consultar tu fórmula ves el valor exacto que te corresponde.',
+    enlace: '/informacion#cuotas', sugerida: true,
+  },
+  {
+    pregunta: '¿Quién no paga cuota moderadora?',
+    variantes: 'exenciones de la cuota\nsoy del subsidiado tengo que pagar\nno pagan cuota\nquiénes están exentos',
+    respuesta: '**No pagan cuota moderadora:**\n\n- Los afiliados del régimen subsidiado.\n- Los programas de promoción y prevención.\n- El control prenatal.\n- Las enfermedades de alto costo (por ejemplo, cáncer o VIH).\n- Las urgencias.',
+    enlace: '/informacion#cuotas', sugerida: false,
+  },
+  {
+    pregunta: '¿Cómo puedo pagar?',
+    variantes: 'medios de pago\nreciben tarjeta\npuedo pagar con transferencia\naceptan nequi\npago en efectivo',
+    respuesta: 'En la ventanilla puedes pagar en **efectivo, transferencia o tarjeta**. En los domicilios pagas al recibir, en efectivo, transferencia o datáfono.',
+    enlace: '/informacion#cuotas', sugerida: false,
+  },
+  {
+    pregunta: '¿Hacen domicilios?',
+    variantes: 'quiero un domicilio\nme llevan los medicamentos a la casa\ncuánto cuesta el domicilio\nvalor del envío\nmandan a domicilio\ncómo pido un domicilio',
+    respuesta: 'Sí, **solo en Cúcuta**. El envío cuesta **{costo_envio}**.\n\n- Crea tu cuenta y confirma tu correo.\n- En **Mi cuenta**, agrega tu fórmula con el código que te dio la IPS.\n- Toca **Pedir domicilio**. Te llamamos para confirmar y pagas el envío y la cuota al recibir.',
+    enlace: '/#domicilio', sugerida: true,
+  },
+  {
+    pregunta: '¿Cuál es el horario?',
+    variantes: 'a qué hora abren\na qué hora cierran\natienden los domingos\nestán abiertos hoy\nhorario de atención',
+    respuesta: 'Nuestro horario de atención: **{horario}**',
+    enlace: '/#ubicacion', sugerida: true,
+  },
+  {
+    pregunta: '¿Dónde quedan?',
+    variantes: 'dirección de la farmacia\ncómo llego\nubicación\ndónde están ubicados',
+    respuesta: 'Estamos en **{direccion}**, {ciudad}.',
+    enlace: '/#ubicacion', sugerida: false,
+  },
+  {
+    pregunta: '¿Cómo me comunico con la farmacia?',
+    variantes: 'número de teléfono\nteléfono de la farmacia\nwhatsapp\ntienen whatsapp\ncorreo electrónico\nquiero hablar con alguien\ncontacto',
+    respuesta: '- Teléfono: **{telefono}**\n- Correo: **{correo}**\n- En la ventanilla: {horario}',
+    enlace: null, sugerida: false,
+  },
+  {
+    pregunta: 'No me entregaron todos los medicamentos',
+    variantes: 'me quedaron debiendo\nmedicamentos pendientes\nno había el medicamento\nestá agotado\ncuándo me entregan lo que falta\nentrega incompleta',
+    respuesta: 'Lo que no se pudo entregar **queda pendiente en la misma fórmula** y puedes reclamarlo hasta la fecha límite, sin pagar la cuota otra vez.\n\nAl consultar tu fórmula ves cuánto te falta de cada medicamento. Para reclamarlo, pide un turno nuevo.',
+    enlace: '/informacion#pendientes', sugerida: false,
+  },
+  {
+    pregunta: '¿Quién tiene atención preferencial?',
+    variantes: 'adulto mayor\nestoy embarazada\npersona con discapacidad\nprioridad en la fila\ntercera edad',
+    respuesta: 'Tienen prioridad en la fila los **adultos mayores, las mujeres en embarazo y las personas con discapacidad**.\n\nIndícalo al pedir tu turno virtual o al llegar a la farmacia.',
+    enlace: '/informacion#preferencial', sugerida: false,
+  },
+  {
+    pregunta: '¿Cómo pongo una queja o sugerencia?',
+    variantes: 'pqrs\nhacer un reclamo\nponer una queja\nfelicitar a la farmacia\nme atendieron mal',
+    respuesta: 'Puedes presentar peticiones, quejas, reclamos y sugerencias:\n\n- En la ventanilla ({horario}).\n- Por teléfono: {telefono}.\n- Por correo: {correo}.\n\nIndica tu nombre, tu documento, el código de la fórmula (si aplica) y lo que necesitas.',
+    enlace: '/informacion#pqrs', sugerida: false,
+  },
+  {
+    pregunta: '¿Para qué sirve crear una cuenta?',
+    variantes: 'crear cuenta\nregistrarme\ncómo me registro\ninscribirme en la página',
+    respuesta: 'Con tu cuenta puedes **pedir domicilios**, ver tus fórmulas y su historial en un solo lugar. Solo necesitas tus datos y confirmar tu correo.\n\nPara consultar una fórmula o pedir un turno virtual **no** necesitas cuenta.',
+    enlace: '/registro', sugerida: false,
+  },
+  {
+    pregunta: 'Olvidé mi contraseña',
+    variantes: 'no recuerdo la clave\nrecuperar contraseña\ncambiar mi contraseña\nno puedo entrar a mi cuenta',
+    respuesta: 'Toca **Ingresar** y luego **¿Olvidaste tu contraseña?**. Te enviamos a tu correo un enlace para crear una nueva (vence en 60 minutos).',
+    enlace: null, sugerida: false,
+  },
+  {
+    pregunta: 'No me llegó el correo de confirmación',
+    variantes: 'confirmar mi correo\nverificar el correo\nno me llega el correo\nreenviar confirmación',
+    respuesta: 'Revisa la carpeta de **spam o correo no deseado**. Si no está, entra a **Mi cuenta** y toca **Reenviar el correo**.',
+    enlace: '/mi-cuenta', sugerida: false,
+  },
+  {
+    pregunta: 'Mi fórmula se venció',
+    variantes: 'pasó la fecha límite\nhasta cuándo puedo reclamar\ncuánto dura la fórmula\nfórmula vencida',
+    respuesta: 'Puedes reclamar hasta la **fecha límite** que aparece al consultar la fórmula. Después de esa fecha ya no se puede entregar: pide una fórmula nueva a tu médico o a tu IPS.',
+    enlace: '/paciente', sugerida: false,
+  },
+];
+
 // Inserta el contenido inicial en las tablas que estén vacías (se puede correr varias veces)
 export async function sembrarContenido(cliente) {
   const vacia = async (tabla) => (await cliente.query(`SELECT NOT EXISTS (SELECT 1 FROM ${tabla}) AS v`)).rows[0].v;
@@ -146,4 +271,12 @@ export async function sembrarContenido(cliente) {
     `INSERT INTO ajustes_sitio (clave, datos) VALUES ('contacto', $1) ON CONFLICT (clave) DO NOTHING`,
     [CONTACTO]
   );
+  if (await vacia('preguntas_bot')) {
+    for (const [i, p] of PREGUNTAS_BOT.entries()) {
+      await cliente.query(
+        `INSERT INTO preguntas_bot (pregunta, variantes, respuesta, enlace, sugerida, orden) VALUES ($1,$2,$3,$4,$5,$6)`,
+        [p.pregunta, p.variantes, p.respuesta, p.enlace, p.sugerida, i + 1]
+      );
+    }
+  }
 }

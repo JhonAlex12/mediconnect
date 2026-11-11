@@ -67,7 +67,8 @@ function enLinea(texto, clave = '') {
   return partes;
 }
 
-export default function TextoEnriquecido({ texto = '', datos = {}, especiales = {}, tamano = 'text-lg' }) {
+// compacto: menos espacio entre bloques (para el chat)
+export default function TextoEnriquecido({ texto = '', datos = {}, especiales = {}, tamano = 'text-lg', compacto = false }) {
   // Reemplaza {telefono}, {correo}... (solo claves conocidas)
   const conDatos = texto.replace(/\{(\w+)\}/g, (todo, k) =>
     k in especiales ? todo : (datos[k] != null ? String(datos[k]) : todo));
@@ -101,7 +102,7 @@ export default function TextoEnriquecido({ texto = '', datos = {}, especiales = 
   cerrarLista();
 
   return (
-    <div className={`space-y-4 text-slate-700 leading-relaxed ${tamano}`}>
+    <div className={`${compacto ? 'space-y-2' : 'space-y-4'} text-slate-700 leading-relaxed ${tamano}`}>
       {bloques.map((b, i) => {
         if (b.tipo === 'h') return <h2 key={i} className="font-titulo text-xl font-bold text-marca-noche pt-2">{enLinea(b.texto, i)}</h2>;
         if (b.tipo === 'ul') {

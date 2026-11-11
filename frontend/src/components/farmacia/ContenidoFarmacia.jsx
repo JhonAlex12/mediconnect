@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { BookOpen, FileText, Images, LayoutTemplate, MapPin } from 'lucide-react';
+import { BookOpen, Bot, FileText, Images, LayoutTemplate, MapPin } from 'lucide-react';
 import CarruselAdmin from './contenido/CarruselAdmin';
 import ArticulosAdmin from './contenido/ArticulosAdmin';
 import InformacionAdmin from './contenido/InformacionAdmin';
 import ContactoAdmin from './contenido/ContactoAdmin';
+import BotAdmin from './contenido/BotAdmin';
 
 const PESTANAS = [
   ['carrusel', 'Carrusel', Images, CarruselAdmin],
   ['articulos', 'Salud al día', BookOpen, ArticulosAdmin],
   ['informacion', 'Información al paciente', FileText, InformacionAdmin],
   ['contacto', 'Contacto y ubicación', MapPin, ContactoAdmin],
+  ['bot', 'Mediconnect Bot', Bot, BotAdmin],
 ];
 
 // Contenido del sitio público (solo administradores)

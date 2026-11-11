@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { pool } from '../db/pool.js';
 import { publicarCambios } from '../services/tiempoReal.service.js';
+import { limpiarSinRespuesta } from '../services/bot.service.js';
 import {
   ZONA_HORARIA, MINUTOS_GRACIA, MINUTOS_VENCE_PAUSA, CRON_MANTENIMIENTO,
 } from '../config/negocio.js';
@@ -108,5 +109,7 @@ export async function ejecutarMantenimiento() {
 
 export function iniciarTareas() {
   cron.schedule(CRON_MANTENIMIENTO, ejecutarMantenimiento);
+  // Cada madrugada: borra las preguntas del bot sin respuesta de hace más de 60 días
+  cron.schedule('15 3 * * *', () => limpiarSinRespuesta().catch((e) => console.error('[tareas] bot:', e.message)));
   console.log('Tareas automáticas activas');
 }

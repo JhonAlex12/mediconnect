@@ -441,3 +441,31 @@ CREATE TABLE IF NOT EXISTS domicilio_items (
 ALTER TABLE movimientos_inventario DROP CONSTRAINT IF EXISTS movimientos_inventario_tipo_check;
 ALTER TABLE movimientos_inventario ADD CONSTRAINT movimientos_inventario_tipo_check
   CHECK (tipo IN ('entrada', 'salida', 'ajuste', 'dispensacion', 'devolucion'));
+
+-- ============================================================
+-- Mediconnect Bot (asistente del sitio, sin inteligencia artificial)
+-- ============================================================
+-- Preguntas frecuentes que el administrador escribe en el panel.
+-- El bot busca la pregunta del paciente aquí, en "Información al paciente" y en "Salud al día".
+CREATE TABLE IF NOT EXISTS preguntas_bot (
+  id              SERIAL PRIMARY KEY,
+  pregunta        VARCHAR(160) NOT NULL,              -- como se muestra (y botón de tema sugerido)
+  variantes       TEXT         NOT NULL DEFAULT '',   -- otras formas de preguntarlo, una por línea
+  respuesta       TEXT         NOT NULL,              -- mismo formato sencillo que las secciones
+  enlace          VARCHAR(200),                       -- página para ver más (opcional)
+  sugerida        BOOLEAN      NOT NULL DEFAULT FALSE,-- aparece como botón al abrir el chat
+  activa          BOOLEAN      NOT NULL DEFAULT TRUE,
+  orden           INTEGER      NOT NULL DEFAULT 0,
+  veces_usada     INTEGER      NOT NULL DEFAULT 0,
+  actualizado_en  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+-- Preguntas que el bot no supo responder, para que el administrador agregue la respuesta.
+-- Se guardan sin números largos ni correos (pueden ser documentos o datos personales)
+-- y se borran solas a los 60 días.
+CREATE TABLE IF NOT EXISTS bot_sin_respuesta (
+  id         SERIAL PRIMARY KEY,
+  texto      VARCHAR(200) NOT NULL,
+  creado_en  TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS bot_sin_respuesta_fecha ON bot_sin_respuesta (creado_en);

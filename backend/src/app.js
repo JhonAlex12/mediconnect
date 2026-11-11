@@ -21,6 +21,7 @@ import tarifasRoutes from './routes/tarifas.routes.js';
 import cuentaRoutes from './routes/cuenta.routes.js';
 import domiciliosRoutes from './routes/domicilios.routes.js';
 import contenidoRoutes from './routes/contenido.routes.js';
+import botRoutes from './routes/bot.routes.js';
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/tarifas', tarifasRoutes);
 app.use('/api/cuenta', cuentaRoutes);          // cuentas de pacientes
 app.use('/api/domicilios', domiciliosRoutes);  // gestión de domicilios (panel)
 app.use('/api/contenido', contenidoRoutes);    // contenido del sitio (público y administración)
+app.use('/api/bot', botRoutes);                // Mediconnect Bot (chat del sitio y sus preguntas)
 // Estado inicial de la pantalla de la sala (con sesión de empleado; luego se actualiza por Socket.IO)
 app.get('/api/pantalla', exigirEmpleado('administrador', 'auxiliar'), async (req, res, next) => {
   try {
