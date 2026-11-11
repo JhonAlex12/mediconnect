@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, CheckCircle2, AlertCircle, Send, FileText, Copy } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, AlertCircle, Send, FileText, Copy, Lock } from 'lucide-react';
+import { leerToken } from '../lib/api.js';
+
+// Las rutas exigen la sesión de un administrador de la farmacia (se comparte con /farmacia)
+const conSesion = (cabeceras = {}) => {
+  const token = leerToken();
+  return token ? { ...cabeceras, Authorization: `Bearer ${token}` } : cabeceras;
+};
 
 export default function FormulaMedica({ onIrAPaciente }) {
   // Fechas locales (toISOString usa UTC: de noche en Colombia daría el día siguiente)
@@ -34,13 +41,19 @@ export default function FormulaMedica({ onIrAPaciente }) {
   const [error, setError] = useState('');
   const [exito, setExito] = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [sinPermiso, setSinPermiso] = useState('');
 
   const cargarDatos = async () => {
     try {
       const [resMeds, resFormulas] = await Promise.all([
-        fetch('/api/simulador/medicamentos'),
-        fetch('/api/simulador/formulas')
+        fetch('/api/simulador/medicamentos', { headers: conSesion() }),
+        fetch('/api/simulador/formulas', { headers: conSesion() })
       ]);
+      if ([401, 403].includes(resMeds.status)) {
+        setSinPermiso((await resMeds.json()).mensaje ?? 'Debes iniciar sesión');
+        return;
+      }
+      setSinPermiso('');
       const dataMeds = (await resMeds.json()).medicamentos ?? [];
       const dataFormulas = await resFormulas.json();
       if (!resMeds.ok || !resFormulas.ok) {
@@ -138,7 +151,7 @@ export default function FormulaMedica({ onIrAPaciente }) {
     try {
       const respuesta = await fetch('/api/simulador/formulas', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: conSesion({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           documento,
           nombre,
@@ -156,7 +169,9 @@ export default function FormulaMedica({ onIrAPaciente }) {
       });
 
       const data = await respuesta.json();
-      if (!respuesta.ok || !data.ok) {
+      if ([401, 403].includes(respuesta.status)) {
+        setSinPermiso(data.mensaje ?? 'Debes iniciar sesión');
+      } else if (!respuesta.ok || !data.ok) {
         const detalles = Array.isArray(data.detalles) && data.detalles.length ? `: ${data.detalles.join('; ')}` : '';
         setError((data.mensaje || 'Error al guardar y enviar la fórmula.') + detalles);
       } else {
@@ -176,6 +191,30 @@ export default function FormulaMedica({ onIrAPaciente }) {
       setEnviando(false);
     }
   };
+
+  if (sinPermiso) {
+    return (
+      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md border border-slate-300 p-8 text-center space-y-4">
+        <span className="mx-auto w-12 h-12 rounded-full bg-indigo-100 text-indigo-800 flex items-center justify-center">
+          <Lock className="w-6 h-6" />
+        </span>
+        <h2 className="text-xl font-bold text-slate-900">Acceso solo para administradores</h2>
+        <p className="text-sm text-slate-600">
+          {sinPermiso}. Inicia sesión con una cuenta de administrador en el panel de la farmacia y vuelve a esta página.
+        </p>
+        <div className="flex justify-center gap-3 flex-wrap">
+          <a href="/farmacia" target="_blank" rel="noopener"
+            className="bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-semibold px-4 py-2 rounded-lg">
+            Ir al panel de la farmacia ↗
+          </a>
+          <button type="button" onClick={cargarDatos}
+            className="border border-slate-300 hover:bg-slate-50 text-sm font-semibold px-4 py-2 rounded-lg cursor-pointer">
+            Ya inicié sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">

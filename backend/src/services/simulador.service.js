@@ -35,6 +35,7 @@ export async function formulasRecientes() {
        JOIN pacientes p ON p.id = f.paciente_id
        LEFT JOIN formula_items fi ON fi.formula_id = f.id
        LEFT JOIN medicamentos m ON m.id = fi.medicamento_id
+      WHERE f.origen = 'simulador'   -- nunca las fórmulas reales que envía la IPS
       GROUP BY f.id, p.id
       ORDER BY f.creado_en DESC
       LIMIT 10`
