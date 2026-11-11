@@ -41,7 +41,7 @@ const fechaHora = (iso) =>
 export default function MiCuenta() {
   useTitulo('Mi cuenta');
   const { cuenta, verificando, cerrarSesion, apiCuenta, recargarCuenta } = useCuenta();
-  const { hash } = useLocation();
+  const { hash, state } = useLocation();
   const navegar = useNavigate();
   const pestana = PESTANAS.some(([id]) => `#${id}` === hash) ? hash.slice(1) : 'formulas';
 
@@ -91,6 +91,18 @@ export default function MiCuenta() {
     if (estabaSinVerificar.current && cuenta.correo_verificado) setRecienVerificado(true);
     estabaSinVerificar.current = !cuenta.correo_verificado;
   }, [cuenta]);
+  // También al llegar desde la página de confirmación (una sola vez: se borra de la historia)
+  useEffect(() => {
+    if (!state?.correoVerificado) return;
+    setRecienVerificado(true);
+    navegar({ hash }, { replace: true, state: null });
+  }, [state, hash, navegar]);
+  // El anuncio se va solo después de unos segundos
+  useEffect(() => {
+    if (!recienVerificado) return undefined;
+    const t = setTimeout(() => setRecienVerificado(false), 10000);
+    return () => clearTimeout(t);
+  }, [recienVerificado]);
 
   if (verificando) {
     return <SitioPublico><p className="text-center text-slate-500 py-24">Cargando tu cuenta…</p></SitioPublico>;
@@ -112,18 +124,6 @@ export default function MiCuenta() {
             </p>
             <h1 className="font-titulo text-3xl font-extrabold text-marca-noche">Hola, {cuenta.nombres.split(' ')[0]}</h1>
             <p className="text-slate-600">{cuenta.tipo_documento} {cuenta.documento}</p>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-              {cuenta.correo}
-              {cuenta.correo_verificado ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2.5 py-0.5 text-xs font-bold">
-                  <BadgeCheck className="w-3.5 h-3.5" /> Correo verificado
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 px-2.5 py-0.5 text-xs font-bold">
-                  <MailWarning className="w-3.5 h-3.5" /> Sin confirmar
-                </span>
-              )}
-            </p>
           </div>
           <button type="button" onClick={salir}
             className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-red-700 px-3 py-2 rounded cursor-pointer">

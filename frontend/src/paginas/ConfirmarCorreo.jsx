@@ -45,7 +45,7 @@ export default function ConfirmarCorreo() {
             </>
           )}
           {estado.tipo !== 'cargando' && (
-            <Link to={cuenta ? '/mi-cuenta' : '/'}
+            <Link to={cuenta ? '/mi-cuenta' : '/'} state={cuenta && estado.tipo === 'ok' ? { correoVerificado: true } : undefined}
               className="inline-block mt-6 bg-marca-azul hover:bg-marca-azul-oscuro text-white font-bold px-6 py-3 rounded">
               {cuenta ? 'Ir a mi cuenta' : 'Ir al inicio'}
             </Link>
