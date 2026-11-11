@@ -145,14 +145,14 @@ export default function Kiosco() {
     }
   };
 
-  if (activa === null) return <Fondo><p className="text-2xl text-blue-100">Cargando…</p></Fondo>;
+  if (activa === null) return <Fondo><p className="text-2xl text-slate-600">Cargando…</p></Fondo>;
   if (!activa) {
     return (
       <Fondo>
         <div className="text-center max-w-xl">
-          <MonitorOff className="w-20 h-20 mx-auto text-blue-200" strokeWidth={1.5} />
+          <MonitorOff className="w-20 h-20 mx-auto text-slate-400" strokeWidth={1.5} />
           <h1 className="font-titulo text-3xl font-extrabold mt-6">Pantalla de turnos sin activar</h1>
-          <p className="text-xl text-blue-100 mt-4">
+          <p className="text-xl text-slate-600 mt-4">
             Un administrador debe activarla desde el panel de la farmacia, en <strong>Pantalla de turnos</strong>.
           </p>
         </div>
@@ -165,8 +165,8 @@ export default function Kiosco() {
       <div className="w-full max-w-3xl">
         {paso === 'inicio' && (
           <div className="text-center">
-            <h1 className="font-titulo text-4xl sm:text-5xl font-extrabold">¡Bienvenido!</h1>
-            <p className="text-2xl text-blue-100 mt-3">Toca una opción para tomar tu turno</p>
+            <h1 className="font-titulo text-4xl sm:text-5xl font-extrabold text-marca-noche">¡Bienvenido!</h1>
+            <p className="text-2xl text-slate-600 mt-3">Toca una opción para tomar tu turno</p>
             <div className="grid sm:grid-cols-2 gap-5 mt-10">
               <BotonGrande icono={FileText} titulo="Tengo una fórmula" detalle="Pedir turno o registrar que ya llegué"
                 onClick={() => { setModo('formula'); setPaso('documento'); }} />
@@ -185,7 +185,7 @@ export default function Kiosco() {
             <div className="space-y-3">
               {formulas.map((f) => (
                 <button key={f.id} type="button" onClick={() => { setFormulaId(f.id); setPaso('prioridad'); }}
-                  className="w-full flex items-center gap-4 text-left bg-white text-marca-noche rounded-2xl px-6 py-5 text-2xl font-bold hover:ring-4 hover:ring-marca-verde active:scale-[0.99] transition cursor-pointer">
+                  className="w-full flex items-center gap-4 text-left bg-white text-marca-noche rounded-2xl px-6 py-5 text-2xl font-bold shadow-md ring-2 ring-slate-200 hover:ring-4 hover:ring-marca-verde active:scale-[0.99] transition cursor-pointer">
                   <FileText className="w-9 h-9 text-marca-verde shrink-0" />
                   <span>
                     Fórmula del {fechaLarga(f.emitida)}
@@ -205,13 +205,13 @@ export default function Kiosco() {
               {PRIORIDADES.map(([valor, texto, Icono]) => (
                 <button key={valor} type="button" disabled={ocupado} onClick={() => darTurno(valor)}
                   className={`flex items-center justify-center gap-3 rounded-2xl px-6 py-6 text-2xl font-bold transition cursor-pointer active:scale-[0.99] disabled:opacity-50 ${
-                    valor === 'ninguna' ? 'bg-marca-verde hover:bg-marca-verde-oscuro text-white sm:col-span-2' : 'bg-white text-marca-noche hover:ring-4 hover:ring-marca-verde'}`}>
+                    valor === 'ninguna' ? 'bg-marca-verde-oscuro hover:bg-[#0b6f68] text-white sm:col-span-2' : 'bg-white text-marca-noche shadow-md ring-2 ring-slate-200 hover:ring-4 hover:ring-marca-verde'}`}>
                   {Icono && <Icono className="w-9 h-9 text-marca-azul" />}
                   {valor === 'ninguna' ? 'No, continuar' : texto}
                 </button>
               ))}
             </div>
-            {ocupado && <p className="text-center text-xl text-blue-100 mt-6">Generando tu turno…</p>}
+            {ocupado && <p className="text-center text-xl text-slate-600 mt-6">Generando tu turno…</p>}
           </Tarjeta>
         )}
 
@@ -219,12 +219,12 @@ export default function Kiosco() {
           <div className="text-center">
             <CheckCircle2 className="w-20 h-20 mx-auto text-marca-verde" />
             <p className="text-3xl font-bold mt-4">{resultado.titulo}</p>
-            <p className="font-titulo font-extrabold text-[7rem] sm:text-[9rem] leading-none mt-4 tracking-tight" aria-live="polite">
+            <p className="font-titulo font-extrabold text-[7rem] sm:text-[9rem] leading-none mt-4 tracking-tight text-marca-azul" aria-live="polite">
               {resultado.numero}
             </p>
-            <p className="text-2xl text-blue-100 mt-6 max-w-xl mx-auto">{resultado.detalle}</p>
+            <p className="text-2xl text-slate-600 mt-6 max-w-xl mx-auto">{resultado.detalle}</p>
             <button type="button" onClick={reiniciar}
-              className="mt-10 bg-white text-marca-noche font-bold text-2xl rounded-2xl px-10 py-4 hover:ring-4 hover:ring-marca-verde cursor-pointer">
+              className="mt-10 bg-marca-noche hover:bg-marca-azul text-white font-bold text-2xl rounded-2xl px-10 py-4 shadow-md cursor-pointer">
               Terminar
             </button>
           </div>
@@ -232,16 +232,16 @@ export default function Kiosco() {
 
         {paso === 'aviso' && aviso && (
           <Tarjeta titulo={aviso.titulo} alVolver={reiniciar}>
-            <p className="text-2xl text-blue-100">{aviso.detalle}</p>
+            <p className="text-2xl text-slate-600">{aviso.detalle}</p>
             <div className="flex flex-wrap gap-4 mt-8">
               {aviso.ofrecerOtro && (
                 <button type="button" onClick={() => { setModo('otro'); setPaso('prioridad'); }}
-                  className="bg-marca-verde hover:bg-marca-verde-oscuro text-white font-bold text-xl rounded-2xl px-6 py-4 cursor-pointer">
+                  className="bg-marca-verde-oscuro hover:bg-[#0b6f68] text-white font-bold text-xl rounded-2xl px-6 py-4 cursor-pointer">
                   Pedir turno de otro trámite
                 </button>
               )}
               <button type="button" onClick={() => { setDocumento(''); setPaso(modo === 'otro' ? 'inicio' : 'documento'); }}
-                className="bg-white text-marca-noche font-bold text-xl rounded-2xl px-6 py-4 hover:ring-4 hover:ring-marca-verde cursor-pointer">
+                className="bg-white text-marca-noche font-bold text-xl rounded-2xl px-6 py-4 ring-2 ring-marca-azul hover:bg-marca-hielo shadow-md cursor-pointer">
                 Intentar de nuevo
               </button>
             </div>
@@ -268,22 +268,22 @@ function Fondo({ children }) {
   const completa = () => document.documentElement.requestFullscreen?.().catch(() => {});
 
   return (
-    <div className="min-h-dvh bg-marca-noche text-white flex flex-col select-none">
-      <header className="px-6 sm:px-10 py-5 flex items-center justify-between gap-4">
+    <div className="min-h-dvh bg-gradient-to-b from-white via-marca-hielo to-marca-verde-claro text-marca-noche flex flex-col select-none">
+      <header className="bg-white border-b-4 border-marca-azul shadow-sm px-6 sm:px-10 py-4 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <img src="/img/logo-simbolo.png" alt="" className="w-14 h-14 object-contain" />
           <p className="font-titulo font-extrabold text-2xl tracking-tight">
-            Medi<span className="text-marca-verde">connect</span>
+            <span className="text-marca-azul">Medi</span><span className="text-marca-verde">connect</span>
           </p>
         </div>
-        <p className="text-2xl font-bold text-blue-100 tabular-nums">
+        <p className="text-2xl font-bold text-marca-azul tabular-nums">
           {hora.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })}
         </p>
       </header>
       <main className="flex-1 flex items-center justify-center px-6 pb-10">{children}</main>
       {!enCompleta && document.documentElement.requestFullscreen && (
         <button type="button" onClick={completa}
-          className="fixed bottom-3 right-3 flex items-center gap-2 text-sm text-blue-200 hover:text-white px-3 py-2 cursor-pointer">
+          className="fixed bottom-3 right-3 flex items-center gap-2 text-sm text-slate-500 hover:text-marca-noche px-3 py-2 cursor-pointer">
           <Maximize className="w-4 h-4" /> Pantalla completa
         </button>
       )}
@@ -295,10 +295,12 @@ function BotonGrande({ icono: Icono, titulo, detalle, onClick, secundario = fals
   return (
     <button type="button" onClick={onClick}
       className={`rounded-3xl p-8 text-left transition active:scale-[0.99] cursor-pointer ${
-        secundario ? 'bg-white/10 hover:bg-white/15 ring-2 ring-white/30' : 'bg-marca-verde hover:bg-marca-verde-oscuro'}`}>
-      <Icono className="w-14 h-14" strokeWidth={1.75} />
+        secundario
+          ? 'bg-white hover:bg-marca-hielo ring-2 ring-marca-azul text-marca-noche shadow-md'
+          : 'bg-marca-verde-oscuro hover:bg-[#0b6f68] text-white shadow-lg shadow-marca-verde/30'}`}>
+      <Icono className={`w-14 h-14 ${secundario ? 'text-marca-azul' : ''}`} strokeWidth={1.75} />
       <span className="block font-titulo text-3xl font-extrabold mt-5">{titulo}</span>
-      <span className="block text-xl mt-2 text-white/85">{detalle}</span>
+      <span className={`block text-xl mt-2 ${secundario ? 'text-slate-600' : 'text-white/90'}`}>{detalle}</span>
     </button>
   );
 }
@@ -306,10 +308,10 @@ function BotonGrande({ icono: Icono, titulo, detalle, onClick, secundario = fals
 function Tarjeta({ titulo, alVolver, children }) {
   return (
     <div>
-      <h1 className="font-titulo text-3xl sm:text-4xl font-extrabold text-center mb-8">{titulo}</h1>
+      <h1 className="font-titulo text-3xl sm:text-4xl font-extrabold text-center text-marca-noche mb-8">{titulo}</h1>
       {children}
       <div className="text-center mt-8">
-        <button type="button" onClick={alVolver} className="text-xl font-semibold text-blue-200 hover:text-white underline cursor-pointer">
+        <button type="button" onClick={alVolver} className="text-xl font-semibold text-marca-azul hover:text-marca-noche underline cursor-pointer">
           Volver al inicio
         </button>
       </div>
@@ -340,10 +342,12 @@ function Teclado({ valor, cambiar, ocupado, alContinuar, alVolver }) {
   }, [tecla]);
 
   const clase = 'h-20 rounded-2xl text-4xl font-bold transition active:scale-95 cursor-pointer';
+  const numero = 'bg-white text-marca-noche shadow-sm ring-1 ring-slate-300 hover:bg-marca-hielo hover:ring-marca-azul';
+  const gris = 'bg-slate-100 text-slate-700 ring-1 ring-slate-300 hover:bg-slate-200';
   return (
     <Tarjeta titulo="Escribe tu número de documento" alVolver={alVolver}>
       <div className="max-w-md mx-auto">
-        <div className="bg-white text-marca-noche rounded-2xl h-20 flex items-center justify-center gap-3 px-4 mb-5" aria-live="polite">
+        <div className="bg-white text-marca-noche rounded-2xl h-20 flex items-center justify-center gap-3 px-4 mb-5 ring-2 ring-marca-azul shadow-md" aria-live="polite">
           <UserRound className="w-8 h-8 text-slate-400 shrink-0" />
           <span className="font-titulo text-4xl font-extrabold tracking-wider tabular-nums truncate">
             {valor || <span className="text-slate-300 font-semibold text-3xl tracking-normal">Sin puntos ni espacios</span>}
@@ -351,15 +355,15 @@ function Teclado({ valor, cambiar, ocupado, alContinuar, alVolver }) {
         </div>
         <div className="grid grid-cols-3 gap-3">
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((n) => (
-            <button key={n} type="button" onClick={() => tecla(n)} className={`${clase} bg-white/15 hover:bg-white/25`}>{n}</button>
+            <button key={n} type="button" onClick={() => tecla(n)} className={`${clase} ${numero}`}>{n}</button>
           ))}
-          <button type="button" onClick={() => cambiar('')} className={`${clase} bg-white/5 hover:bg-white/15 text-xl`}>Borrar todo</button>
-          <button type="button" onClick={() => tecla('0')} className={`${clase} bg-white/15 hover:bg-white/25`}>0</button>
+          <button type="button" onClick={() => cambiar('')} className={`${clase} ${gris} text-xl`}>Borrar todo</button>
+          <button type="button" onClick={() => tecla('0')} className={`${clase} ${numero}`}>0</button>
           <button type="button" onClick={() => tecla('borrar')} aria-label="Borrar un número"
-            className={`${clase} bg-white/5 hover:bg-white/15 flex items-center justify-center`}><Delete className="w-9 h-9" /></button>
+            className={`${clase} ${gris} flex items-center justify-center`}><Delete className="w-9 h-9" /></button>
         </div>
         <button type="button" onClick={alContinuar} disabled={!valido || ocupado}
-          className="w-full mt-5 h-20 rounded-2xl bg-marca-verde hover:bg-marca-verde-oscuro text-3xl font-extrabold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+          className="w-full mt-5 h-20 rounded-2xl bg-marca-verde-oscuro hover:bg-[#0b6f68] text-white shadow-lg text-3xl font-extrabold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
           {ocupado ? 'Buscando…' : 'Continuar'}
         </button>
       </div>
