@@ -34,7 +34,8 @@ const claseBotonVerde = 'bg-marca-verde-oscuro text-white font-bold uppercase tr
 export default function Kiosco() {
   useTitulo('Pantalla de turnos');
   const [token, setToken] = useState(leerTokenKiosco);
-  const [activa, setActiva] = useState(null); // null mientras se confirma con el servidor
+  // Con sesión guardada se muestra de una vez; si el servidor la rechaza, pasa a "sin activar"
+  const [activa, setActiva] = useState(() => Boolean(leerTokenKiosco()));
   const [paso, setPaso] = useState('inicio');  // inicio | documento | formula | prioridad | listo | aviso
   const [modo, setModo] = useState('formula'); // formula | otro
   const [documento, setDocumento] = useState('');
@@ -149,7 +150,6 @@ export default function Kiosco() {
     }
   };
 
-  if (activa === null) return <Marco><p className="text-2xl text-white">Cargando…</p></Marco>;
   if (!activa) {
     return (
       <Marco>
@@ -167,21 +167,21 @@ export default function Kiosco() {
   return (
     <Marco>
       {paso === 'inicio' && (
-        <div className="w-full max-w-4xl">
+        <div className="w-full max-w-6xl">
           <Instruccion>Seleccione el trámite</Instruccion>
           <div className="grid md:grid-cols-[3fr_2fr] gap-6 items-stretch">
             {/* Las dos opciones con fórmula van juntas, como en un kiosco de clínica */}
             <div className="bg-white rounded-md shadow-[0_3px_0_rgba(13,34,89,0.35)] flex flex-col">
               <OpcionInicio titulo="Reclamar medicamentos" detalle="Pedir turno con su fórmula"
                 onClick={() => { setModo('formula'); setPaso('documento'); }} />
-              <div className="mx-8 border-t-2 border-slate-200" />
+              <div className="mx-10 border-t-2 border-slate-200" />
               <OpcionInicio titulo="Ya tengo turno virtual" detalle="Registrar que ya llegué"
                 onClick={() => { setModo('formula'); setPaso('documento'); }} />
             </div>
             <button type="button" onClick={() => { setModo('otro'); setPaso('prioridad'); }}
-              className={`${claseBoton} px-8 py-10 text-left flex flex-col justify-center`}>
-              <span className="text-3xl">Otro trámite</span>
-              <span className="block text-lg font-semibold normal-case tracking-normal text-slate-500 mt-2">
+              className={`${claseBoton} px-10 py-12 text-left flex flex-col justify-center`}>
+              <span className="text-3xl lg:text-4xl">Otro trámite</span>
+              <span className="block text-lg lg:text-xl font-semibold normal-case tracking-normal text-slate-500 mt-2">
                 Preguntas, quejas o información (sin fórmula)
               </span>
             </button>
@@ -326,7 +326,7 @@ function Marco({ children }) {
 }
 
 function Instruccion({ children }) {
-  return <h1 className="text-white text-2xl sm:text-3xl font-bold uppercase tracking-wider text-center mb-8">{children}</h1>;
+  return <h1 className="text-white text-2xl sm:text-3xl lg:text-4xl font-bold uppercase tracking-wider text-center mb-8 lg:mb-10">{children}</h1>;
 }
 
 function Panel({ children }) {
@@ -336,9 +336,9 @@ function Panel({ children }) {
 function OpcionInicio({ titulo, detalle, onClick }) {
   return (
     <button type="button" onClick={onClick}
-      className="flex-1 px-8 py-8 text-left hover:bg-marca-hielo active:bg-marca-verde-claro transition cursor-pointer first:rounded-t-md last:rounded-b-md">
-      <span className="block text-3xl font-bold uppercase tracking-wide text-marca-noche">{titulo}</span>
-      <span className="block text-lg font-semibold text-slate-500 mt-1">{detalle}</span>
+      className="flex-1 px-10 py-10 text-left hover:bg-marca-hielo active:bg-marca-verde-claro transition cursor-pointer first:rounded-t-md last:rounded-b-md">
+      <span className="block text-3xl lg:text-4xl font-bold uppercase tracking-wide text-marca-noche">{titulo}</span>
+      <span className="block text-lg lg:text-xl font-semibold text-slate-500 mt-2">{detalle}</span>
     </button>
   );
 }
