@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Bike, CheckCircle2, MapPin, Phone, RefreshCw, User, XCircle } from 'lucide-react';
 import { api } from '../../lib/api';
-import { Aviso, BotonAccion, claseCampo, useAccion } from './comunes';
+import { Aviso, BotonAccion, CampoPesos, claseCampo, useAccion } from './comunes';
 import { ESTADOS_DOMICILIO } from '../../paginas/MiCuenta';
 import { totalDomicilio } from '../../lib/costoEnvio';
 
@@ -206,8 +206,7 @@ function TarjetaDomicilio({ d, recargar }) {
           </label>
           {medio === 'efectivo' ? (
             <label className="block">Efectivo recibido
-              <input type="number" min={cobro.total} step="1" value={recibido}
-                onChange={(ev) => setRecibido(ev.target.value)} className={claseCampo} />
+              <CampoPesos valor={recibido} cambiar={setRecibido} placeholder={cobro.total} />
             </label>
           ) : (
             <label className="block">Referencia de transferencia o voucher

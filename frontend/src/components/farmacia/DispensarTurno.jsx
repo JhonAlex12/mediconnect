@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { ClipboardCheck, UserCheck, Wallet, X } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useEventoEnVivo } from '../../lib/tiempoReal';
-import { BotonAccion, claseCampo } from './comunes';
+import { BotonAccion, CampoPesos, claseCampo } from './comunes';
 
 // "2026-11-30" → "30 de noviembre de 2026" (sin pasar por zonas horarias)
 const fechaLarga = (iso) => {
@@ -246,9 +246,7 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
                 <div className="grid sm:grid-cols-2 gap-3 items-end">
                   <div>
                     <label htmlFor="pago-recibido" className="block text-sm font-bold text-slate-800 mb-1">Efectivo recibido</label>
-                    <input id="pago-recibido" type="number" min={cobro.valor} step={50} inputMode="numeric"
-                      value={recibido} onChange={(e) => setRecibido(e.target.value)}
-                      placeholder={String(cobro.valor)} className={claseCampo} />
+                    <CampoPesos id="pago-recibido" valor={recibido} cambiar={setRecibido} placeholder={cobro.valor} />
                   </div>
                   <p className={`text-sm pb-2 ${cambio === null && recibido !== '' ? 'text-red-700 font-semibold' : 'text-slate-700'}`}>
                     {recibido === ''

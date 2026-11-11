@@ -1,9 +1,46 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Wifi, WifiOff } from 'lucide-react';
 import { useConexionEnVivo } from '../../lib/tiempoReal';
 
 export const claseCampo =
   'w-full border border-slate-400 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-slate-600';
+
+// Campo de dinero: muestra los puntos de miles mientras se escribe ("20.000").
+// "valor" y "cambiar" usan solo los dígitos ("20000"), así el resto del formulario no cambia.
+// Se arma a mano (no con toLocaleString) para que se vea igual en todos los navegadores
+const conPuntos = (digitos) => String(digitos ?? '').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+export function CampoPesos({ id, valor, cambiar, placeholder, className = '', ...props }) {
+  const entrada = useRef(null);
+  const cifrasALaDerecha = useRef(null); // para que el cursor no salte al poner o quitar puntos
+
+  useLayoutEffect(() => {
+    const el = entrada.current;
+    if (!el || cifrasALaDerecha.current === null || document.activeElement !== el) return;
+    let pos = el.value.length;
+    for (let quedan = cifrasALaDerecha.current; pos > 0 && quedan > 0; pos--) {
+      if (/\d/.test(el.value[pos - 1])) quedan--;
+    }
+    el.setSelectionRange(pos, pos);
+    cifrasALaDerecha.current = null;
+  });
+
+  const alEscribir = (e) => {
+    const { value, selectionStart } = e.target;
+    cifrasALaDerecha.current = value.slice(selectionStart ?? value.length).replace(/\D/g, '').length;
+    cambiar(value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 9));
+  };
+
+  return (
+    <div className="relative">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" aria-hidden="true">$</span>
+      <input ref={entrada} id={id} type="text" inputMode="numeric" autoComplete="off"
+        value={conPuntos(valor)} onChange={alEscribir}
+        placeholder={placeholder != null ? conPuntos(String(placeholder)) : undefined}
+        className={`${claseCampo} pl-7 ${className}`} {...props} />
+    </div>
+  );
+}
 
 export function BotonAccion({ onClick, ocupado, color, icono: Icono, children, type = 'button' }) {
   const colores = {
