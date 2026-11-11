@@ -91,8 +91,6 @@ export default function SitioPublico({ children }) {
           </div>
           <div className="flex items-center gap-4 ml-auto">
             <Link to="/informacion#pqrs" className="hover:underline">PQRS</Link>
-            <span className="opacity-40" aria-hidden="true">|</span>
-            <Link to="/farmacia" className="hover:underline">Acceso empleados</Link>
           </div>
         </div>
       </div>
