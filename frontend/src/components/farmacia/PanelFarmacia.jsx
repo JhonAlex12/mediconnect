@@ -18,9 +18,10 @@ const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', admini
 // Cada sección es una página: /farmacia/fila, /farmacia/inventario...
 // "roles": quién la ve (si no se indica, administradores y auxiliares). El backend también lo exige.
 const SECCIONES = [
-  { ruta: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia },
+  // Fila y domicilios son el trabajo diario de auxiliares y repartidores; el administrador no los ve en su menú
+  { ruta: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia, roles: ['auxiliar'] },
   { ruta: 'inventario', texto: 'Inventario', icono: Package, componente: InventarioFarmacia },
-  { ruta: 'domicilios', texto: 'Domicilios', icono: Bike, componente: DomiciliosFarmacia, roles: ['administrador', 'domicilios'] },
+  { ruta: 'domicilios', texto: 'Domicilios', icono: Bike, componente: DomiciliosFarmacia, roles: ['domicilios'] },
   // Reportes y usuarios: solo administradores (el backend también lo exige)
   { ruta: 'reportes', texto: 'Reportes', icono: BarChart3, componente: ReportesFarmacia, soloAdmin: true },
   { ruta: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
