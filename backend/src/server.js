@@ -3,12 +3,14 @@ import http from 'node:http';
 import app from './app.js';
 import { iniciarSockets } from './sockets/index.js';
 import { iniciarTareas } from './jobs/mantenimiento.job.js';
+import { iniciarPush } from './services/push.service.js';
 
 // Express y Socket.IO comparten el mismo servidor HTTP
 const servidor = http.createServer(app);
 
 iniciarSockets(servidor);
 iniciarTareas();
+iniciarPush();   // avisos al celular de cada notificación nueva
 
 const puerto = process.env.PORT || 3000;
 servidor.listen(puerto, () => {

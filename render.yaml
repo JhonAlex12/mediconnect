@@ -50,3 +50,13 @@ services:
         sync: false
       - key: CORREO_REMITENTE
         sync: false
+      # Médico de prueba de la IPS (solo con MODO_DEMO=true). Si se deja vacía, la contraseña es Doctor123
+      - key: MEDICO_CLAVE
+        sync: false
+      # Avisos al celular (notificaciones push). Se generan una vez con:
+      #   npx web-push generate-vapid-keys
+      # y se copian aquí. Sin ellas el sitio funciona, pero sin avisos al celular.
+      - key: VAPID_PUBLICA
+        sync: false
+      - key: VAPID_PRIVADA
+        sync: false

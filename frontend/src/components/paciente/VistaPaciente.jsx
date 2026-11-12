@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import {
-  AlertTriangle, Bell, CalendarClock, CheckCircle2, Clock, MapPin, Navigation, Search, Timer, Wallet, XCircle,
+  AlertTriangle, BellOff, BellRing, CalendarClock, CheckCircle2, Clock, MapPin, Navigation, Search, Share, Timer, Wallet, XCircle,
 } from 'lucide-react';
 import { api } from '../../lib/api';
+import { activarAvisos, desactivarAvisos, estadoAvisos, vincularAvisos } from '../../lib/avisosCelular';
 import { Aviso, claseCampo } from '../farmacia/comunes';
 import { useTitulo } from '../Encabezado';
 import SitioPublico, { TituloPagina } from '../SitioPublico';
@@ -301,7 +302,6 @@ const TERMINADOS = ['atendido', 'cancelado', 'vencido'];
 
 function MiTurno({ token, alSalir }) {
   const [turno, setTurno] = useState(null);
-  const [notificaciones, setNotificaciones] = useState([]);
   const [conectado, setConectado] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState(null);
@@ -319,28 +319,21 @@ function MiTurno({ token, alSalir }) {
     () => api('/turnos/mio', { token }).then((d) => setTurno(d.turno)).catch(manejarError),
     [token, manejarError]
   );
-  const cargarNotificaciones = useCallback(
-    () => api('/turnos/mio/notificaciones', { token }).then((d) => setNotificaciones(d.notificaciones)).catch(manejarError),
-    [token, manejarError]
-  );
 
   useEffect(() => {
     cargarTurno();
-    cargarNotificaciones();
     const socket = io({ auth: { token } });
     socket.on('connect', () => {
       setConectado(true);
       cargarTurno();
-      cargarNotificaciones();
     });
     socket.on('disconnect', () => setConectado(false));
     socket.on('connect_error', () => setConectado(false));
     socket.on('turno_actualizado', (t) => setTurno(t));
-    socket.on('notificaciones_actualizadas', cargarNotificaciones);
     // Cuando la farmacia llama a otro turno, cambia la posición de este
     socket.on('turno_actual', cargarTurno);
     return () => socket.disconnect();
-  }, [token, cargarTurno, cargarNotificaciones]);
+  }, [token, cargarTurno]);
 
   const accion = async (nombre, confirmacion) => {
     if (confirmacion && !window.confirm(confirmacion)) return;
@@ -356,35 +349,25 @@ function MiTurno({ token, alSalir }) {
     }
   };
 
-  const marcarLeidas = async () => {
-    try {
-      await api('/turnos/mio/notificaciones/leidas', { metodo: 'POST', token });
-      setNotificaciones((n) => n.map((x) => ({ ...x, leida: true })));
-    } catch (err) {
-      manejarError(err);
-    }
-  };
-
   if (!turno) return <p className="text-center text-slate-500 py-12">Cargando tu turno…</p>;
 
   const llamado = turno.estado === 'llamado';
   const terminado = TERMINADOS.includes(turno.estado);
-  const sinLeer = notificaciones.filter((n) => !n.leida).length;
 
   return (
     <>
       <div className="flex justify-end">
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-          conectado ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+          conectado ? 'bg-marca-hielo text-marca-azul-oscuro' : 'bg-slate-100 text-slate-500'
         }`}>
           {conectado ? 'En vivo' : 'Sin conexión en vivo'}
         </span>
       </div>
 
       <section className={`rounded-2xl p-5 text-center space-y-2 ${
-        llamado ? 'bg-emerald-600 text-white animate-pulse' : terminado ? 'bg-slate-100' : 'bg-slate-900 text-white'
+        llamado ? 'bg-marca-azul text-white animate-pulse' : terminado ? 'bg-slate-100' : 'bg-white border-2 border-marca-azul text-marca-noche'
       }`} aria-live="polite">
-        <p className={`text-sm font-semibold uppercase tracking-wide ${llamado ? 'text-emerald-100' : 'text-slate-400'}`}>
+        <p className={`text-sm font-semibold uppercase tracking-wide ${llamado ? 'text-white/80' : terminado ? 'text-slate-400' : 'text-marca-azul'}`}>
           Tu turno
         </p>
         <p className={`text-6xl font-black ${terminado ? 'text-slate-400' : ''}`}>{turno.numero}</p>
@@ -412,78 +395,153 @@ function MiTurno({ token, alSalir }) {
         </dl>
       )}
 
+      {!terminado && <AvisosCelular token={token} />}
+
       <Aviso aviso={aviso} />
 
       {!terminado ? (
         <div className="grid gap-2">
           {turno.estado === 'reservado' && (
-            <BotonGrande color="oscuro" icono={Navigation} disabled={ocupado} onClick={() => accion('en-camino')}>
+            <BotonGrande color="secundario" icono={Navigation} disabled={ocupado} onClick={() => accion('en-camino')}>
               Voy en camino
             </BotonGrande>
           )}
           {['reservado', 'en_camino', 'en_pausa'].includes(turno.estado) && (
-            <BotonGrande color="verde" icono={CheckCircle2} disabled={ocupado} onClick={() => accion('llegue')}>
+            <BotonGrande color="principal" icono={CheckCircle2} disabled={ocupado} onClick={() => accion('llegue')}>
               Ya llegué
             </BotonGrande>
           )}
           {turno.retraso_disponible && (
-            <BotonGrande color="ambar" icono={Clock} disabled={ocupado}
+            <BotonGrande color="suave" icono={Clock} disabled={ocupado}
               onClick={() => accion('retrasado', '¿Pedir 20 minutos más? Solo puedes hacerlo una vez.')}>
               Voy retrasado (+20 min)
             </BotonGrande>
           )}
           <button type="button" disabled={ocupado}
             onClick={() => accion('cancelar', '¿Seguro que quieres cancelar tu turno? Los medicamentos apartados se liberan.')}
-            className="flex items-center justify-center gap-2 py-2.5 text-red-700 font-semibold hover:bg-red-50 rounded-xl transition cursor-pointer disabled:opacity-50">
+            className="flex items-center justify-center gap-2 py-2.5 text-slate-500 font-semibold hover:text-slate-800 hover:bg-slate-50 rounded-xl transition cursor-pointer disabled:opacity-50">
             <XCircle className="w-5 h-5" />
             Cancelar turno
           </button>
         </div>
       ) : (
-        <BotonGrande color="oscuro" onClick={() => alSalir()}>
+        <BotonGrande color="principal" onClick={() => alSalir()}>
           Consultar otra fórmula
         </BotonGrande>
       )}
 
-      <section className="border-t border-slate-200 pt-4 space-y-2">
-        <div className="flex items-center justify-between">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2">
-            <Bell className="w-4 h-4" />
-            Notificaciones
-            {sinLeer > 0 && (
-              <span className="text-xs bg-red-600 text-white px-1.5 py-0.5 rounded-full">{sinLeer}</span>
-            )}
-          </h3>
-          {sinLeer > 0 && (
-            <button type="button" onClick={marcarLeidas} className="text-sm font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">
-              Marcar como leídas
-            </button>
-          )}
-        </div>
-        {notificaciones.length === 0 ? (
-          <p className="text-sm text-slate-500">Aún no tienes notificaciones.</p>
-        ) : (
-          <ul className="space-y-2">
-            {notificaciones.map((n) => (
-              <li key={n.id} className={`text-sm rounded-lg p-3 border ${
-                n.leida ? 'border-slate-200 text-slate-600' : 'border-emerald-300 bg-emerald-50 text-slate-900'
-              }`}>
-                <p>{n.mensaje}</p>
-                <p className="text-xs text-slate-500 mt-1">{hora(n.fecha)}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </>
+  );
+}
+
+// Avisos en el celular: "Es tu turno", pausas, vencimientos y entregas llegan como notificación del teléfono
+function AvisosCelular({ token }) {
+  const [estado, setEstado] = useState(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelado = false;
+    estadoAvisos()
+      .then(async (e) => {
+        if (cancelado) return;
+        setEstado(e);
+        // Si este celular ya recibía avisos (otro turno), queda vinculado también a este
+        if (e === 'activo') await vincularAvisos(token).catch(() => {});
+      })
+      .catch(() => !cancelado && setEstado('no_soportado'));
+    return () => { cancelado = true; };
+  }, [token]);
+
+  const activar = async () => {
+    setOcupado(true);
+    setError('');
+    try {
+      await activarAvisos(token);
+      setEstado('activo');
+    } catch (err) {
+      setError(err.message);
+      setEstado(await estadoAvisos().catch(() => 'inactivo'));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const desactivar = async () => {
+    setOcupado(true);
+    try {
+      await desactivarAvisos(token);
+      setEstado('inactivo');
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  if (!estado || estado === 'no_soportado' || estado === 'sin_servidor') return null;
+
+  const caja = 'rounded-xl border p-4 flex items-start gap-3';
+  if (estado === 'activo') {
+    return (
+      <div className={`${caja} border-marca-azul/20 bg-marca-hielo`}>
+        <BellRing className="w-5 h-5 text-marca-azul shrink-0 mt-0.5" />
+        <div className="flex-1 text-sm">
+          <p className="font-bold text-marca-noche">Avisos activados en este celular</p>
+          <p className="text-slate-600">Te avisaremos cuando sea tu turno, aunque cierres esta página.</p>
+        </div>
+        <button type="button" onClick={desactivar} disabled={ocupado}
+          className="text-xs font-semibold text-marca-azul hover:text-marca-azul-oscuro underline cursor-pointer disabled:opacity-50">
+          Desactivar
+        </button>
+      </div>
+    );
+  }
+  if (estado === 'iphone') {
+    return (
+      <div className={`${caja} border-slate-200 bg-slate-50`}>
+        <Share className="w-5 h-5 text-marca-azul shrink-0 mt-0.5" />
+        <div className="text-sm text-slate-700">
+          <p className="font-bold text-slate-900">¿Quieres avisos en tu iPhone?</p>
+          <p>Toca <strong>Compartir</strong> y luego <strong>Agregar a inicio</strong>. Abre Mediconnect desde ese ícono y activa los avisos.</p>
+        </div>
+      </div>
+    );
+  }
+  if (estado === 'bloqueado') {
+    return (
+      <div className={`${caja} border-slate-200 bg-slate-50`}>
+        <BellOff className="w-5 h-5 text-marca-azul shrink-0 mt-0.5" />
+        <div className="text-sm text-slate-700">
+          <p className="font-bold">Los avisos están bloqueados</p>
+          <p>Para recibirlos, permite las notificaciones de esta página en la configuración del navegador.</p>
+        </div>
+      </div>
+    );
+  }
+  if (estado === 'sin_https') {
+    return (
+      <div className={`${caja} border-slate-200 bg-slate-50`}>
+        <BellOff className="w-5 h-5 text-slate-500 shrink-0 mt-0.5" />
+        <p className="text-sm text-slate-600">Los avisos al celular solo funcionan cuando la página se abre con una dirección segura (https).</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <button type="button" onClick={activar} disabled={ocupado}
+        className="w-full flex items-center justify-center gap-2 font-semibold py-3 px-4 rounded-xl bg-marca-hielo text-marca-azul-oscuro hover:bg-[#e2eef8] transition cursor-pointer disabled:opacity-50">
+        <BellRing className="w-5 h-5" />
+        {ocupado ? 'Activando…' : 'Avisarme en este celular cuando sea mi turno'}
+      </button>
+      {error && <p className="text-sm text-red-700 text-center">{error}</p>}
+    </div>
   );
 }
 
 function Dato({ icono: Icono, etiqueta, valor }) {
   return (
-    <div className="bg-slate-50 rounded-xl p-3">
-      <dt className="text-slate-500 flex items-center gap-1"><Icono className="w-3.5 h-3.5" />{etiqueta}</dt>
-      <dd className="font-bold text-slate-900">{valor}</dd>
+    <div className="bg-marca-hielo rounded-xl p-3">
+      <dt className="text-slate-600 flex items-center gap-1"><Icono className="w-3.5 h-3.5 text-marca-azul" />{etiqueta}</dt>
+      <dd className="font-bold text-marca-noche">{valor}</dd>
     </div>
   );
 }
@@ -493,6 +551,10 @@ function BotonGrande({ color, icono: Icono, children, ...props }) {
     verde: 'bg-marca-verde hover:bg-marca-verde-oscuro text-white',
     ambar: 'bg-amber-400 hover:bg-amber-500 text-slate-950',
     oscuro: 'bg-slate-800 hover:bg-slate-900 text-white',
+    // Vista del turno: un solo azul (Mediconnect) en tres pesos
+    principal: 'bg-marca-azul hover:bg-marca-azul-oscuro text-white shadow-sm',
+    secundario: 'bg-white border-2 border-marca-azul text-marca-azul hover:bg-marca-hielo',
+    suave: 'bg-marca-hielo text-marca-azul-oscuro hover:bg-[#e2eef8]',
   };
   return (
     <button type="button" {...props}

@@ -469,3 +469,31 @@ CREATE TABLE IF NOT EXISTS bot_sin_respuesta (
   creado_en  TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS bot_sin_respuesta_fecha ON bot_sin_respuesta (creado_en);
+
+-- ============================================================
+-- Avisos al celular (notificaciones push)
+-- ============================================================
+-- Cada celular o navegador donde el paciente aceptó recibir avisos.
+-- Un mismo celular puede recibir avisos de varios pacientes (p. ej. una familia).
+CREATE TABLE IF NOT EXISTS suscripciones_push (
+  id           SERIAL PRIMARY KEY,
+  paciente_id  INTEGER      NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
+  endpoint     TEXT         NOT NULL,
+  p256dh       TEXT         NOT NULL,
+  auth         TEXT         NOT NULL,
+  creado_en    TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  UNIQUE (paciente_id, endpoint)
+);
+
+-- Cada notificación nueva avisa al servidor (canal "nueva_notificacion") para que la envíe al celular.
+-- El aviso solo sale cuando la transacción se confirma: si algo falla y se deshace, no se envía nada.
+CREATE OR REPLACE FUNCTION avisar_notificacion() RETURNS trigger AS $$
+BEGIN
+  PERFORM pg_notify('nueva_notificacion', NEW.id::text);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS notificacion_push ON notificaciones;
+CREATE TRIGGER notificacion_push AFTER INSERT ON notificaciones
+  FOR EACH ROW EXECUTE FUNCTION avisar_notificacion();
