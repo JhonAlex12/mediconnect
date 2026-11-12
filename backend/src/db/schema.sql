@@ -391,7 +391,7 @@ CREATE TABLE IF NOT EXISTS ajustes_sitio (
 -- Rol "domicilios": solo gestiona los pedidos a domicilio
 ALTER TABLE usuarios_farmacia DROP CONSTRAINT IF EXISTS usuarios_farmacia_rol_check;
 ALTER TABLE usuarios_farmacia ADD CONSTRAINT usuarios_farmacia_rol_check
-  CHECK (rol IN ('administrador', 'auxiliar', 'domicilios'));
+  CHECK (rol IN ('administrador', 'auxiliar', 'domicilios', 'medico'));  -- medico: solo el sistema de la IPS de prueba
 
 -- Caja asignada al auxiliar (1 a 5 generales, 6 preferencial). Nula = elige la caja en su equipo.
 ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS caja SMALLINT CHECK (caja BETWEEN 1 AND 6);

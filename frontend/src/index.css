@@ -10,6 +10,13 @@
   --color-marca-verde-claro: #e0f5f3;
   --color-marca-hielo: #f1f8fb;
 
+  /* Salud IPS: la IPS de prueba que emite las fórmulas (página /ips/) */
+  --color-ips: #1b63c6;
+  --color-ips-oscuro: #154f9f;
+  --color-ips-noche: #14306a;
+  --color-ips-rojo: #e3263c;
+  --color-ips-claro: #eaf2fc;
+
   /* Títulos con la misma familia tipográfica del banner */
   --font-titulo: "Montserrat", ui-sans-serif, system-ui, sans-serif;
 }
@@ -40,3 +47,13 @@ html {
   body.con-tiquete .tiquete-impresion { display: block; page: tiquete; }
 }
 @page tiquete { margin: 0; }
+
+/* Fórmula médica de Salud IPS (/ips/): no se ve en pantalla; al imprimirla es lo único que sale, en hoja carta */
+.formula-impresion { display: none; }
+/* Hoja sin margen: así el navegador no pone su encabezado y pie (título, dirección, "1 de 1"); el margen va dentro de la fórmula */
+@page formula { size: letter; margin: 0; }
+@media print {
+  body.con-formula > *:not(.formula-impresion) { display: none !important; }
+  body.con-formula .formula-impresion { display: block; page: formula; box-sizing: border-box; width: 100%; padding: 14mm 16mm; }
+  body.con-formula { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff; }
+}

@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 import { useSesion } from '../../lib/sesion';
 import { Aviso, BotonAccion, claseCampo, useAccion } from './comunes';
 
-const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador' };
+const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador', medico: 'Médico (sistema IPS)' };
 const CAJAS = [1, 2, 3, 4, 5, 6];
 const nombreCaja = (c) => (c ? (c === 6 ? 'Caja 6 · Preferencial' : `Caja ${c}`) : '—');
 

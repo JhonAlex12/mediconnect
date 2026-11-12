@@ -14,7 +14,7 @@ import DomiciliosFarmacia from './DomiciliosFarmacia';
 import ContenidoFarmacia from './ContenidoFarmacia';
 import KioscoAdmin from './KioscoAdmin';
 
-const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador' };
+const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador', medico: 'Médico (sistema IPS)' };
 
 // Cada sección es una página: /farmacia/fila, /farmacia/inventario...
 // "roles": quién la ve (si no se indica, administradores y auxiliares). El backend también lo exige.
@@ -59,6 +59,12 @@ export default function PanelFarmacia() {
         <LoginEmpleado />
       </Pagina>
     );
+  }
+
+  // El médico solo usa el sistema de la IPS (página aparte, con la misma sesión)
+  if (usuario.rol === 'medico') {
+    window.location.replace('/ips/');
+    return null;
   }
 
   const permitidas = SECCIONES.filter((s) =>

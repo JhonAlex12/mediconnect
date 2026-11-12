@@ -5,8 +5,8 @@ import { exigirEmpleado } from '../middleware/autenticacion.js';
 // Rutas del Simulador de IPS (el "doctor" de la demostración).
 // La IPS real usa POST /api/ips/formulas con su clave; el navegador no puede
 // guardar esa clave, así que el simulador tiene sus propias rutas y solo
-// existen con MODO_DEMO=true. Además, solo un administrador con sesión iniciada
-// puede usarlas: sin eso, cualquiera vería y crearía fórmulas de pacientes.
+// existen con MODO_DEMO=true. Además, solo un médico o un administrador con sesión
+// iniciada puede usarlas: sin eso, cualquiera vería y crearía fórmulas de pacientes.
 const router = Router();
 
 router.use((req, res, next) => {
@@ -15,7 +15,7 @@ router.use((req, res, next) => {
   }
   next();
 });
-router.use(exigirEmpleado('administrador'));
+router.use(exigirEmpleado('administrador', 'medico'));
 
 router.get('/medicamentos', catalogo);
 router.get('/formulas', recientes);
