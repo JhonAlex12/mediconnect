@@ -90,7 +90,9 @@ const prioridadValida = (p = 'ninguna') => {
 
 // Turno activo del paciente y sus fórmulas vigentes con algo por entregar.
 // No devuelve el nombre, el código ni los medicamentos: la pantalla está a la vista de todos.
-export async function buscar(documento) {
+// codigo (opcional): viene del QR de la fórmula impresa. Si es de una fórmula pendiente de ese paciente,
+// se devuelve su id en "formula_qr" para pasar directo a la prioridad (los códigos no se devuelven).
+export async function buscar(documento, codigo = null) {
   const doc = validarDocumento(documento);
   const { rows: [p] } = await pool.query('SELECT id FROM pacientes WHERE documento = $1', [doc]);
   if (!p) return { turno: null, formulas: [] };
@@ -101,7 +103,7 @@ export async function buscar(documento) {
       [p.id, ESTADOS_ACTIVOS]
     ),
     pool.query(
-      `SELECT f.id, to_char(f.fecha_emision, 'YYYY-MM-DD') AS emitida, count(*)::int AS medicamentos
+      `SELECT f.id, f.codigo, to_char(f.fecha_emision, 'YYYY-MM-DD') AS emitida, count(*)::int AS medicamentos
          FROM formulas f
          JOIN formula_items fi ON fi.formula_id = f.id
         WHERE f.paciente_id = $1 AND f.fecha_limite >= ${HOY}
@@ -111,7 +113,12 @@ export async function buscar(documento) {
       [p.id]
     ),
   ]);
-  return { turno: turno ?? null, formulas };
+  const delQr = typeof codigo === 'string' ? formulas.find((f) => f.codigo === codigo.trim().toUpperCase()) : null;
+  return {
+    turno: turno ?? null,
+    formulas: formulas.map(({ codigo: _codigo, ...f }) => f),
+    formula_qr: delQr?.id ?? null,
+  };
 }
 
 // Quien sacó turno virtual registra que ya está en la farmacia

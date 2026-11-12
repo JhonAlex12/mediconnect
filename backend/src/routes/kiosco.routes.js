@@ -45,7 +45,7 @@ pantalla.use(exigirPantalla, limitador);
 
 // La pantalla consulta aquí si sigue activada y cómo imprimir el tiquete
 pantalla.get('/estado', responder(async () => ({ ajustes: await kiosco.leerAjustes() })));
-pantalla.post('/buscar', responder((req) => kiosco.buscar(req.body?.documento)));
+pantalla.post('/buscar', responder((req) => kiosco.buscar(req.body?.documento, req.body?.codigo)));
 pantalla.post('/llegada', responder(async (req) => {
   const turno = await kiosco.registrarLlegada(req.body?.documento);
   if (!turno.yaEstaba) publicarCambios([turno.id]);

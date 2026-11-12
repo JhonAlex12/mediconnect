@@ -1,13 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import {
-  AlertTriangle, BellOff, BellRing, CalendarClock, CheckCircle2, Clock, MapPin, Navigation, Search, Share, Timer, Wallet, XCircle,
+  AlertTriangle, BellOff, BellRing, Truck, CalendarClock, CheckCircle2, Clock, MapPin, Navigation, Search, Share, Timer, Wallet, XCircle,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { activarAvisos, desactivarAvisos, estadoAvisos, vincularAvisos } from '../../lib/avisosCelular';
 import { Aviso, claseCampo } from '../farmacia/comunes';
 import { useTitulo } from '../Encabezado';
-import SitioPublico, { TituloPagina } from '../SitioPublico';
+import SitioPublico, { TituloPagina, useAbrirIngreso } from '../SitioPublico';
+import { useNavigate } from 'react-router-dom';
+import { useCuenta } from '../../lib/cuenta';
+import { useCostoEnvio } from '../../lib/costoEnvio';
+import { guardarDomicilioPendiente } from '../../lib/domicilioPendiente';
 
 export const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
 
@@ -140,7 +144,7 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
   const [error, setError] = useState(null);
 
   const consultar = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setOcupado(true);
     setError(null);
     setFormula(null);
@@ -154,6 +158,12 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
       setOcupado(false);
     }
   };
+
+  // Llegó desde el QR de la fórmula impresa (o el enlace de la IPS): se consulta de una vez
+  useEffect(() => {
+    if (codigoInicial && documentoInicial) consultar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pedirTurno = async (confirmar = false) => {
     setOcupado(true);
@@ -273,6 +283,7 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
                   className="w-full bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-50 text-white font-bold text-lg py-3 rounded-xl transition cursor-pointer">
                   Pedir turno virtual
                 </button>
+                <OpcionDomicilio codigo={formula.codigo ?? codigo.trim().toUpperCase()} />
               </div>
             )
           )}
@@ -282,6 +293,38 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
         </section>
       )}
     </>
+  );
+}
+
+// Pedir los medicamentos a domicilio en vez de ir a la farmacia.
+// Necesita una cuenta de Mediconnect (para saber a quién y a dónde se entrega): si no hay sesión,
+// se abre la ventana de ingreso; "Mi cuenta" retoma el pedido al entrar (ver domicilioPendiente.js).
+function OpcionDomicilio({ codigo }) {
+  const { cuenta } = useCuenta();
+  const abrirIngreso = useAbrirIngreso();
+  const navegar = useNavigate();
+  const envio = useCostoEnvio();
+
+  const pedir = () => {
+    guardarDomicilioPendiente(codigo);
+    if (cuenta) navegar('/mi-cuenta');
+    else abrirIngreso();
+  };
+
+  return (
+    <div className="pt-1">
+      <div className="flex items-center gap-3 text-sm text-slate-500 my-2" aria-hidden="true">
+        <span className="h-px flex-1 bg-slate-200" /> o <span className="h-px flex-1 bg-slate-200" />
+      </div>
+      <button type="button" onClick={pedir}
+        className="w-full flex items-center justify-center gap-2 border-2 border-marca-azul text-marca-azul hover:bg-marca-hielo font-bold text-lg py-3 rounded-xl transition cursor-pointer">
+        <Truck className="w-5 h-5" /> Pedir a domicilio
+      </button>
+      <p className="text-xs text-slate-500 text-center mt-2">
+        {envio != null ? `Envío ${pesos(envio)}, se paga al recibir. ` : ''}
+        {cuenta ? 'Lo terminas en tu cuenta.' : 'Necesitas una cuenta de Mediconnect: ingresa o créala en un minuto.'}
+      </p>
+    </div>
   );
 }
 

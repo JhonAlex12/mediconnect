@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import QRCode from 'qrcode';
 import { LogoIps, NOMBRE_IPS } from './IngresoIps';
+import { enlaceFormula } from '../lib/qrFormula';
 
 // Fórmula médica de Salud IPS para imprimir en hoja carta.
 // Se monta fuera de la página (en <body>) y, al imprimir, es lo único que sale en el papel
@@ -50,6 +52,15 @@ const valor = { fontSize: '10.5pt', color: '#0f172a', fontWeight: 600, marginTop
 // datos = { codigo, nombre, documento, fechaEmision, fechaLimite, eps, regimen, rangoIngreso, exencion, cuota, items }
 export function FormulaImpresion({ datos, medico }) {
   const impreso = new Date().toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+  // QR con el enlace a la fórmula (celular del paciente y pantalla de la entrada)
+  const [qr, setQr] = useState('');
+  useEffect(() => {
+    let vigente = true;
+    QRCode.toString(enlaceFormula(datos.codigo, datos.documento), { type: 'svg', margin: 0, errorCorrectionLevel: 'M' })
+      .then((svg) => vigente && setQr(svg.replace('<svg ', '<svg width="100%" height="100%" ')))
+      .catch(() => vigente && setQr(''));
+    return () => { vigente = false; };
+  }, [datos.codigo, datos.documento]);
   const afiliacion = [
     REGIMENES[datos.regimen] ?? datos.regimen,
     datos.regimen === 'contributivo' && datos.rangoIngreso ? `rango ${datos.rangoIngreso}` : null,
@@ -140,10 +151,19 @@ export function FormulaImpresion({ datos, medico }) {
             {datos.exencion ? `Sin costo (${EXENCIONES[datos.exencion] ?? 'exento'})` : datos.cuota > 0 ? pesos(datos.cuota) : 'Sin costo'}
           </div>
         </div>
-        <div style={{ flex: 2, border: `1px solid ${AZUL}`, background: '#eaf2fc', borderRadius: '2mm', padding: '3mm 4mm', fontSize: '9.5pt', lineHeight: 1.45 }}>
-          <strong style={{ color: NOCHE }}>Reclame sus medicamentos en la farmacia Mediconnect</strong> con su documento y el código
-          {' '}<strong style={{ fontFamily: '"Courier New", monospace' }}>{datos.codigo}</strong>. Puede pedir turno en la página de
-          Mediconnect o en la pantalla de la entrada. Después de la fecha límite la fórmula vence.
+        <div style={{ flex: 2, display: 'flex', gap: '4mm', alignItems: 'center', border: `1px solid ${AZUL}`, background: '#eaf2fc', borderRadius: '2mm', padding: '3mm 4mm', fontSize: '9.5pt', lineHeight: 1.45 }}>
+          {qr && (
+            <div style={{ background: '#fff', padding: '1.5mm', borderRadius: '1mm', flexShrink: 0 }}>
+              <div style={{ width: '27mm', height: '27mm' }} dangerouslySetInnerHTML={{ __html: qr }} />
+            </div>
+          )}
+          <div>
+            <strong style={{ color: NOCHE }}>Reclame sus medicamentos en la farmacia Mediconnect.</strong>{' '}
+            Escanee este código con la cámara de su celular para ver su fórmula, pedir turno o pedirla a domicilio, o muéstrelo
+            en la pantalla de la entrada. También puede usar su documento y el código
+            {' '}<strong style={{ fontFamily: '"Courier New", monospace' }}>{datos.codigo}</strong>.
+            Después de la fecha límite la fórmula vence.
+          </div>
         </div>
       </div>
 

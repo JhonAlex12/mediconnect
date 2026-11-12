@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Accessibility, AlertCircle, ArrowRight, Baby, CalendarDays, ChevronLeft, CircleCheck, Clock, Delete, FileText,
-  IdCard, Maximize, MessageCircleQuestion, PersonStanding, Pill, Printer, Smartphone, Ticket, Users,
+  IdCard, Maximize, MessageCircleQuestion, PersonStanding, Pill, Printer, QrCode, Smartphone, Ticket, Users,
 } from 'lucide-react';
 import { api } from '../lib/api';
 import { guardarTokenKiosco, leerTokenKiosco } from '../lib/kiosco';
 import { useTitulo } from '../components/Encabezado';
 import { TiqueteImpresion, imprimirTiquete, useImpresionAutomatica } from '../components/TiqueteImpresion';
+import EscanerQR from '../components/EscanerQR';
 
 // Pantalla de turnos de la entrada (táctil, también sirve con mouse y teclado).
 // El paciente escribe su cédula: si tiene turno virtual se registra su llegada; si no, saca un turno
@@ -47,7 +48,7 @@ export default function Kiosco() {
   const [token, setToken] = useState(leerTokenKiosco);
   // Con sesión guardada se muestra de una vez; si el servidor la rechaza, pasa a "sin activar"
   const [activa, setActiva] = useState(() => Boolean(leerTokenKiosco()));
-  const [paso, setPaso] = useState('inicio');   // inicio | documento | formula | prioridad | listo | aviso
+  const [paso, setPaso] = useState('inicio');   // inicio | escanear | documento | formula | prioridad | listo | aviso
   const [tramite, setTramite] = useState(null); // reclamar | virtual | otro
   const [documento, setDocumento] = useState('');
   const [formulas, setFormulas] = useState([]);
@@ -113,6 +114,21 @@ export default function Kiosco() {
     };
   }, []);
 
+  // Lectura del QR de la fórmula impresa
+  const leerQr = ({ codigo, documento: doc }) => {
+    setTramite('reclamar');
+    setDocumento(doc);
+    buscar(doc, codigo);
+  };
+  const errorCamara = (motivo) => {
+    setTramite('reclamar');
+    setAviso({
+      titulo: motivo === 'permiso' ? 'La cámara no tiene permiso' : 'No pudimos usar la cámara',
+      detalle: 'Puede escribir su número de documento para sacar el turno.',
+    });
+    setPaso('aviso');
+  };
+
   const elegir = (t) => {
     setTramite(t);
     setPaso(t === 'otro' ? 'prioridad' : 'documento');
@@ -124,19 +140,31 @@ export default function Kiosco() {
   };
 
   // 1. Con la cédula: registrar llegada, elegir fórmula o avisar que no hay nada por reclamar
-  const buscar = async () => {
+  // doc y codigo vienen del QR de la fórmula; sin ellos se usa la cédula escrita en el teclado
+  const buscar = async (doc = documento, codigo = null) => {
     setOcupado(true);
     try {
-      const r = await pedir('buscar', { documento });
+      const r = await pedir('buscar', codigo ? { documento: doc, codigo } : { documento: doc });
       if (r.turno) {
         const yaEstaba = ['presente', 'llamado'].includes(r.turno.estado);
-        const l = yaEstaba ? { turno: r.turno } : await pedir('llegada', { documento });
+        const l = yaEstaba ? { turno: r.turno } : await pedir('llegada', { documento: doc });
         listo({
           numero: l.turno.numero,
           titulo: yaEstaba ? 'Ya está en la fila' : 'Llegada registrada',
           detalle: 'Espere a que su turno aparezca en la pantalla de la sala.',
           tramite: 'virtual',
         });
+      } else if (codigo && r.formula_qr) {
+        // QR de una fórmula pendiente: directo a la prioridad
+        setFormulaId(r.formula_qr);
+        setPaso('prioridad');
+      } else if (codigo) {
+        setAviso({
+          titulo: 'Esta fórmula no tiene medicamentos por reclamar',
+          detalle: 'Puede que ya se haya entregado completa o que esté vencida. Si tiene otra fórmula, escriba su documento.',
+          ofrecerOtro: true,
+        });
+        setPaso('aviso');
       } else if (r.formulas.length === 0) {
         setAviso({
           titulo: tramite === 'virtual' ? 'No encontramos un turno virtual' : 'No hay fórmulas por reclamar',
@@ -203,7 +231,9 @@ export default function Kiosco() {
               onClick={() => elegir('reclamar')} />
             <BotonTramite clase={claseVerde} icono={Smartphone} titulo="Ya tengo turno virtual" detalle="Registrar que ya llegué"
               onClick={() => elegir('virtual')} />
-            <BotonTramite clase={`${claseSuave} sm:col-span-2`} icono={MessageCircleQuestion} centrado
+            <BotonTramite clase={claseSuave} icono={QrCode} titulo="Escanear mi fórmula"
+              detalle="Muestre el código QR de la fórmula impresa" onClick={() => { setTramite('reclamar'); setPaso('escanear'); }} />
+            <BotonTramite clase={claseSuave} icono={MessageCircleQuestion}
               titulo="Otro trámite" detalle="Preguntas, quejas o información (sin fórmula)" onClick={() => elegir('otro')} />
           </div>
           <div className="grid sm:grid-cols-2 gap-4 sm:gap-5 mt-6">
@@ -217,11 +247,33 @@ export default function Kiosco() {
         </>
       )}
 
+      {paso === 'escanear' && (
+        <>
+          <Encabezado />
+          <Titulo icono={QrCode}>Muestre el código QR de su fórmula</Titulo>
+          {ocupado ? (
+            <p className="text-center text-2xl font-semibold text-marca-noche py-24">Buscando su fórmula…</p>
+          ) : (
+            <EscanerQR alLeer={leerQr} alError={errorCamara} />
+          )}
+          <p className="text-center text-xl text-slate-600 mt-5">
+            Acerque la hoja a la cámara, con el código dentro del recuadro.
+          </p>
+          <div className="text-center mt-4">
+            <button type="button" onClick={() => setPaso('documento')}
+              className={`${claseSuave} inline-flex items-center gap-3 px-7 py-4 font-titulo text-xl font-bold`}>
+              <IdCard className="w-7 h-7 text-marca-azul" strokeWidth={1.75} /> Mejor escribo mi documento
+            </button>
+          </div>
+          <Volver alVolver={reiniciar} />
+        </>
+      )}
+
       {paso === 'documento' && (
         <>
           <Encabezado />
           <Teclado tramite={tramite} valor={documento} cambiar={setDocumento} ocupado={ocupado}
-            alContinuar={buscar} alVolver={reiniciar} />
+            alContinuar={() => buscar()} alVolver={reiniciar} />
         </>
       )}
 

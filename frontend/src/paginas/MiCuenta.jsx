@@ -12,6 +12,7 @@ import CamposPersonales, { Campo, Seccion, claseInput, datosDesdeCuenta } from '
 import { useCuenta } from '../lib/cuenta';
 import CampoClave from '../components/CampoClave';
 import { totalDomicilio, useCostoEnvio } from '../lib/costoEnvio';
+import { tomarDomicilioPendiente } from '../lib/domicilioPendiente';
 
 const PESTANAS = [
   ['formulas', 'Mis fórmulas', ClipboardList],
@@ -210,6 +211,23 @@ function MisFormulas({ formulas, domicilios, recargar }) {
   const [pidiendo, setPidiendo] = useState(null); // código de la fórmula con el formulario de domicilio abierto
   const { ocupado, aviso, ejecutar } = useAccion(recargar);
 
+  // Domicilio pedido desde la consulta de la fórmula (o su QR): se agrega la fórmula y se abre el formulario
+  useEffect(() => {
+    const pendiente = tomarDomicilioPendiente();
+    if (!pendiente) return;
+    (async () => {
+      const ok = await ejecutar(
+        () => apiCuenta('/formulas', { metodo: 'POST', cuerpo: { codigo: pendiente } }),
+        () => `Fórmula ${pendiente} lista. Completa los datos de la entrega.`
+      );
+      if (!ok) return;
+      setPidiendo(pendiente);
+      setTimeout(() => document.getElementById(`formula-${pendiente}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    })();
+    // Solo al abrir la sección
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const agregar = async (e) => {
     e.preventDefault();
     const ok = await ejecutar(
@@ -267,7 +285,7 @@ function TarjetaFormula({ formula: f, domicilio, abierto, alPedir, alTerminar })
   const puedePedir = !f.vencida && !completa && !domicilio && !pendientes.every((m) => m.estado === 'agotado');
 
   return (
-    <article className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+    <article id={`formula-${f.codigo}`} className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden scroll-mt-28">
       <header className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-slate-100">
         <div>
           <h3 className="font-titulo text-lg font-extrabold text-marca-noche">Fórmula {f.codigo}</h3>
@@ -331,7 +349,7 @@ function TarjetaFormula({ formula: f, domicilio, abierto, alPedir, alTerminar })
               </Link>
             </div>
           )}
-          {abierto && <FormularioDomicilio formula={f} alTerminar={alTerminar} />}
+          {abierto && puedePedir && !domicilio && cuenta.correo_verificado && <FormularioDomicilio formula={f} alTerminar={alTerminar} />}
         </div>
       )}
     </article>

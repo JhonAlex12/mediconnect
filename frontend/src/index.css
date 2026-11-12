@@ -57,3 +57,7 @@ html {
   body.con-formula .formula-impresion { display: block; page: formula; box-sizing: border-box; width: 100%; padding: 14mm 16mm; }
   body.con-formula { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff; }
 }
+
+/* Lector de QR de la pantalla de la entrada: línea que recorre el marco */
+@keyframes barrido { 0%, 100% { top: 6%; } 50% { top: 92%; } }
+@media (prefers-reduced-motion: reduce) { .animate-\[barrido_2\.2s_ease-in-out_infinite\] { animation: none; top: 50%; } }
