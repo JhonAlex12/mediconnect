@@ -49,6 +49,9 @@ export function BotonAccion({ onClick, ocupado, color, icono: Icono, children, t
     rojo: 'bg-red-600 hover:bg-red-700 text-white',
     oscuro: 'bg-slate-800 hover:bg-slate-900 text-white',
     gris: 'bg-slate-200 hover:bg-slate-300 text-slate-800',
+    azul: 'bg-marca-azul hover:bg-marca-azul-oscuro text-white',
+    azulSuave: 'bg-marca-hielo hover:bg-[#e2eef8] text-marca-azul-oscuro border border-marca-azul/15',
+    contorno: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-300',
   };
   return (
     <button
@@ -63,12 +66,13 @@ export function BotonAccion({ onClick, ocupado, color, icono: Icono, children, t
   );
 }
 
-export function IndicadorEnVivo() {
+// azul: versión en el color de la marca (la usa el inventario)
+export function IndicadorEnVivo({ azul = false }) {
   const conectado = useConexionEnVivo();
   return (
     <span
       className={`flex items-center gap-1.5 text-sm font-semibold px-3 py-1 rounded-full ${
-        conectado ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+        conectado ? (azul ? 'bg-marca-hielo text-marca-azul-oscuro' : 'bg-emerald-100 text-emerald-800') : 'bg-slate-200 text-slate-600'
       }`}
     >
       {conectado ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}

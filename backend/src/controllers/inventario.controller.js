@@ -1,4 +1,4 @@
-import { verInventario, crearMedicamento, registrarMovimiento, accionDemo } from '../services/inventario.service.js';
+import { verInventario, crearMedicamento, registrarMovimiento, accionDemo, cambiarMinimo } from '../services/inventario.service.js';
 import { ErrorNegocio } from '../services/formulas.service.js';
 import { publicarCambios, publicarInventario } from '../services/tiempoReal.service.js';
 
@@ -23,6 +23,17 @@ export async function crear(req, res, next) {
     const medicamento = await crearMedicamento(req.body, req.empleado);
     publicarInventario();
     res.status(201).json({ ok: true, medicamento });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// PATCH /api/inventario/:id/minimo   { stock_minimo }   (solo administrador)
+export async function minimo(req, res, next) {
+  try {
+    const medicamento = await cambiarMinimo(idValido(req.params.id), req.body ?? {}, req.empleado);
+    publicarInventario();
+    res.json({ ok: true, medicamento });
   } catch (error) {
     next(error);
   }

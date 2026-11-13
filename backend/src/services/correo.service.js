@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import nodemailer from 'nodemailer';
 
 // Envío de correos. Con SMTP_HOST configurado en .env se envían de verdad;
@@ -16,8 +17,23 @@ const transporte = process.env.SMTP_HOST
 
 const REMITENTE = process.env.CORREO_REMITENTE || 'Mediconnect <no-responder@mediconnect.local>';
 
-// Dirección pública del sitio, para armar los enlaces de los correos
-export const URL_SITIO = (process.env.URL_SITIO || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173').replace(/\/$/, '');
+// Dirección pública del sitio, para armar los enlaces de los correos.
+// En el equipo local el túnel cambia de dirección cada vez que se reinicia: si URL_SITIO_ARCHIVO
+// apunta al archivo donde el lanzador guarda la dirección del túnel, se lee en cada correo.
+const URL_FIJA = process.env.URL_SITIO || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5174';
+
+export function urlSitio() {
+  let url = URL_FIJA;
+  if (process.env.URL_SITIO_ARCHIVO) {
+    try {
+      const delArchivo = readFileSync(process.env.URL_SITIO_ARCHIVO, 'utf8').trim();
+      if (/^https:\/\/[a-z0-9.-]+$/i.test(delArchivo)) url = delArchivo;
+    } catch {
+      // Sin túnel abierto: se usa la dirección fija
+    }
+  }
+  return url.replace(/\/$/, '');
+}
 
 export async function enviarCorreo({ para, asunto, texto, html }) {
   if (!transporte) {

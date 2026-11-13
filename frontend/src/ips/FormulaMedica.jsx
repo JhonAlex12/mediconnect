@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Plus, Minus, Trash2, CheckCircle2, AlertCircle, Send, Copy, Check, Search,
-  UserRound, BadgeDollarSign, Pill, ExternalLink, RotateCcw, Printer,
+  UserRound, BadgeDollarSign, Pill, ExternalLink, RotateCcw, Printer, Lock, PencilLine,
 } from 'lucide-react';
-import { leerToken } from '../lib/api.js';
+import { leerTokenIps } from './sesionIps';
 import { FormulaImpresion, imprimirFormula } from './FormulaImpresion';
 
 // Las rutas exigen la sesión de un administrador de la farmacia (se comparte con /farmacia)
 const conSesion = (cabeceras = {}) => {
-  const token = leerToken();
+  const token = leerTokenIps();
   return token ? { ...cabeceras, Authorization: `Bearer ${token}` } : cabeceras;
 };
 
@@ -25,6 +25,9 @@ const diasEntre = (desde, hasta) =>
 const fechaLarga = (fecha) =>
   fecha ? new Date(`${fecha}T12:00:00`).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
+
+// Nombre completo: al menos un nombre y un apellido (dos palabras de 2 letras o más)
+const nombreCompleto = (n) => n.trim().split(/\s+/).filter((p) => p.length >= 2).length >= 2;
 
 const RANGOS = [
   { valor: 'A', texto: 'Menos de 2 SMLMV' },
@@ -124,25 +127,36 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
   const hoyStr = fechaLocal(new Date());
 
   const [catalogo, setCatalogo] = useState([]);
-  const [siguienteCodigo, setSiguienteCodigo] = useState('F-2026-0004');
+  const [siguienteCodigo, setSiguienteCodigo] = useState('');
   const [tarifa, setTarifa] = useState(null);
 
   // Datos del paciente y de la fórmula
-  const [documento, setDocumento] = useState('1090123456');
-  const [nombre, setNombre] = useState('María Fernanda Rojas');
+  const [documento, setDocumento] = useState('');
+  const [nombre, setNombre] = useState('');
   const [fechaEmision, setFechaEmision] = useState(hoyStr);
   const [fechaLimite, setFechaLimite] = useState(sumarDias(hoyStr, 15));
   const [items, setItems] = useState([]);
 
   // Afiliación del paciente: define la cuota moderadora que paga al reclamar
-  const [regimen, setRegimen] = useState('contributivo');
-  const [rangoIngreso, setRangoIngreso] = useState('A');
-  const [eps, setEps] = useState('Nueva EPS');
+  // Régimen, rango y EPS son datos del paciente: si ya están registrados se llenan solos
+  // al escribir el documento y el médico no los cambia (un administrador sí puede corregirlos).
+  const [regimen, setRegimen] = useState('');
+  const [rangoIngreso, setRangoIngreso] = useState('');
+  const [estadoPaciente, setEstadoPaciente] = useState('sin_documento'); // sin_documento | buscando | listo
+  const [afiliacionRegistrada, setAfiliacionRegistrada] = useState(null);
+  const [corrigiendo, setCorrigiendo] = useState(false);
+  const nombreAutomatico = useRef('');
+  const [eps, setEps] = useState('');
   const [exencion, setExencion] = useState('');
+
+  // Indicaciones sobre lo recetado (por ahora opcionales)
+  const [indicaciones, setIndicaciones] = useState('');
 
   // Buscador de medicamentos
   const [busqueda, setBusqueda] = useState('');
-  const [cantidadNueva, setCantidadNueva] = useState(30);
+  // Al elegir un medicamento, el cursor pasa a su campo de cantidad (la escribe el médico)
+  const cantidadRefs = useRef({});
+  const [enfocarId, setEnfocarId] = useState(null);
   const [listaAbierta, setListaAbierta] = useState(false);
   const buscadorRef = useRef(null);
 
@@ -170,18 +184,6 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
       setCatalogo(dataMeds);
       if (dataFormulas.siguiente_codigo) setSiguienteCodigo(dataFormulas.siguiente_codigo);
 
-      // Fórmula de ejemplo: Acetaminofén 500 mg x 30 y Losartán 50 mg x 60 (si no están, los dos primeros del catálogo)
-      if (items.length === 0 && dataMeds.length >= 2) {
-        const buscar = (nombre, presentacion) =>
-          dataMeds.find((m) => m.nombre === nombre && m.presentacion === presentacion);
-        const ejemplo = [
-          [buscar('Acetaminofén', '500 mg tabletas') ?? dataMeds[0], 30],
-          [buscar('Losartán', '50 mg tabletas') ?? dataMeds[1], 60],
-        ];
-        setItems(ejemplo.map(([m, cantidad]) => (
-          { medicamento_id: m.id, nombre: m.nombre, presentacion: m.presentacion, stock: m.stock_actual, cantidad }
-        )));
-      }
     } catch (err) {
       console.error('Error cargando datos del simulador:', err);
     }
@@ -195,6 +197,59 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
       .then((d) => setTarifa(d.tarifa ?? null))
       .catch(() => {});
   }, []);
+
+  // Al escribir el documento: trae el nombre y la afiliación registrados del paciente
+  useEffect(() => {
+    const doc = documento.trim();
+    setAfiliacionRegistrada(null);
+    setCorrigiendo(false);
+    if (!/^\d{5,15}$/.test(doc)) {
+      setEstadoPaciente('sin_documento');
+      return undefined;
+    }
+    setEstadoPaciente('buscando');
+    let vigente = true;
+    const espera = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/simulador/pacientes/${encodeURIComponent(doc)}`, { headers: conSesion() });
+        if ([401, 403].includes(r.status)) {
+          onSesionVencida?.();
+          return;
+        }
+        const p = (await r.json()).paciente ?? null;
+        if (!vigente) return;
+        // Paciente registrado: su nombre completo se llena solo (es el dato oficial).
+        // Sin registro: se borra solo el nombre que se había llenado solo, no lo escrito a mano.
+        const anterior = nombreAutomatico.current;
+        nombreAutomatico.current = p?.nombre ?? '';
+        if (p?.nombre) setNombre(p.nombre);
+        else setNombre((actual) => (actual === anterior ? '' : actual));
+        if (p?.regimen) {
+          setRegimen(p.regimen);
+          setRangoIngreso(p.rango_ingreso ?? '');
+          setEps(p.eps ?? '');
+          setAfiliacionRegistrada(p);
+        } else {
+          setRegimen('');
+          setRangoIngreso('');
+          setEps('');
+        }
+      } catch {
+        // Sin conexión: se deja llenar a mano; el servidor valida al guardar
+      } finally {
+        if (vigente) setEstadoPaciente('listo');
+      }
+    }, 350);
+    return () => {
+      vigente = false;
+      clearTimeout(espera);
+    };
+  }, [documento]);
+
+  const afiliacionFija = afiliacionRegistrada != null && !corrigiendo;
+  // El nombre registrado tampoco lo cambia el médico (un administrador sí, con "Corregir")
+  const nombreFijo = estadoPaciente === 'listo' && !corrigiendo && nombre !== '' && nombre === nombreAutomatico.current;
+  const nombreIncompleto = nombre.trim() !== '' && !nombreCompleto(nombre);
 
   // Cerrar la lista de resultados al hacer clic fuera del buscador
   useEffect(() => {
@@ -216,29 +271,41 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
 
   const agregarMedicamento = (med) => {
     setError('');
-    const cantidad = Number(cantidadNueva);
-    if (!cantidad || cantidad <= 0) {
-      setError('Escriba una cantidad mayor a 0.');
-      return;
-    }
     setItems((actuales) =>
       actuales.some((i) => i.medicamento_id === med.id)
-        ? actuales.map((i) => (i.medicamento_id === med.id ? { ...i, cantidad: Number(i.cantidad) + cantidad } : i))
-        : [...actuales, { medicamento_id: med.id, nombre: med.nombre, presentacion: med.presentacion, stock: med.stock_actual, cantidad }]
+        ? actuales
+        : [...actuales, { medicamento_id: med.id, nombre: med.nombre, presentacion: med.presentacion, stock: med.stock_actual, cantidad: '' }]
     );
     setBusqueda('');
     setListaAbierta(false);
+    setEnfocarId(med.id);
   };
+
+  useEffect(() => {
+    if (enfocarId == null) return;
+    const campoCantidad = cantidadRefs.current[enfocarId];
+    if (campoCantidad) {
+      campoCantidad.focus();
+      campoCantidad.select();
+    }
+    setEnfocarId(null);
+  }, [enfocarId, items]);
 
   const quitarMedicamento = (medId) => setItems(items.filter((i) => i.medicamento_id !== medId));
 
   const cambiarCantidadItem = (medId, nuevaCantidad) =>
-    setItems(items.map((i) => (i.medicamento_id === medId ? { ...i, cantidad: Math.max(0, Number(nuevaCantidad) || 0) } : i)));
+    setItems(items.map((i) => (i.medicamento_id === medId
+      ? { ...i, cantidad: nuevaCantidad === '' ? '' : Number(nuevaCantidad) }
+      : i)));
+
+  // Lo que escribe el médico se respeta tal cual; si no es un entero mayor a 0 se marca en rojo
+  const sinCantidad = (item) => !(Number.isInteger(Number(item.cantidad)) && Number(item.cantidad) > 0);
 
   // Cuota moderadora estimada (la definitiva la calcula el servidor al guardar)
   const cuotaEstimada = useMemo(() => {
+    if (!regimen) return null;
     if (regimen !== 'contributivo' || exencion) return 0;
-    return tarifa?.[rangoIngreso] ?? null;
+    return rangoIngreso ? tarifa?.[rangoIngreso] ?? null : null;
   }, [regimen, exencion, rangoIngreso, tarifa]);
 
   const diasVigencia = fechaEmision && fechaLimite ? diasEntre(fechaEmision, fechaLimite) : null;
@@ -249,6 +316,15 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
     setDocumento('');
     setNombre('');
     setItems([]);
+    setRegimen('');
+    setRangoIngreso('');
+    setAfiliacionRegistrada(null);
+    setCorrigiendo(false);
+    nombreAutomatico.current = '';
+    setEps('');
+    setExencion('');
+    setIndicaciones('');
+    setBusqueda('');
     setFechaEmision(hoyStr);
     setFechaLimite(sumarDias(hoyStr, 15));
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -258,6 +334,24 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
     e.preventDefault();
     setError('');
     setExito(null);
+    if (!nombreCompleto(nombre)) {
+      setError('Escriba el nombre completo del paciente: nombres y apellidos.');
+      return;
+    }
+    if (!regimen) {
+      setError('Indique el régimen del paciente (sección 2).');
+      return;
+    }
+    if (regimen === 'contributivo' && !rangoIngreso) {
+      setError('Indique el rango de ingreso del paciente (sección 2).');
+      return;
+    }
+    const faltante = items.find(sinCantidad);
+    if (faltante) {
+      setError(`Revise la cantidad de ${faltante.nombre}: debe ser un número entero mayor a 0.`);
+      setEnfocarId(faltante.medicamento_id);
+      return;
+    }
     setEnviando(true);
 
     try {
@@ -273,6 +367,7 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
           rango_ingreso: regimen === 'contributivo' ? rangoIngreso : null,
           eps: eps.trim() || null,
           exencion: exencion || null,
+          indicaciones: indicaciones.trim() || null,
           medicamentos: items.map((i) => ({ medicamento_id: i.medicamento_id, cantidad: i.cantidad })),
         }),
       });
@@ -298,6 +393,7 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
           regimen,
           rangoIngreso: regimen === 'contributivo' ? rangoIngreso : null,
           exencion,
+          indicaciones: indicaciones.trim(),
         });
         setSiguienteCodigo(data.siguiente_codigo);
         await cargarDatos();
@@ -319,12 +415,18 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
               <div>
                 <label htmlFor="ips-documento" className={etiqueta}>Documento</label>
                 <input id="ips-documento" type="text" inputMode="numeric" value={documento}
-                  onChange={(e) => setDocumento(e.target.value)} placeholder="1090123456" className={`${campo} font-mono`} />
+                  onChange={(e) => setDocumento(e.target.value)} placeholder="Número de documento" className={`${campo} font-mono`} />
               </div>
               <div>
                 <label htmlFor="ips-nombre" className={etiqueta}>Nombre completo</label>
-                <input id="ips-nombre" type="text" value={nombre}
-                  onChange={(e) => setNombre(e.target.value)} placeholder="Nombres y apellidos" className={campo} />
+                <input id="ips-nombre" type="text" value={nombre} readOnly={nombreFijo} maxLength={120}
+                  onChange={(e) => setNombre(e.target.value)} placeholder="Nombres y apellidos"
+                  className={`${campo} ${nombreFijo ? 'bg-slate-50 text-slate-700 cursor-default' : ''} ${nombreIncompleto ? 'border-amber-500' : ''}`} />
+                {nombreFijo ? (
+                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1"><Lock className="w-3 h-3" /> Nombre registrado del paciente</p>
+                ) : nombreIncompleto ? (
+                  <p className="text-xs text-amber-800 mt-1">Escriba nombres y apellidos completos.</p>
+                ) : null}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -355,46 +457,93 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
 
           {/* 2. Afiliación: régimen, rango de ingreso (IBC), EPS y exención */}
           <Seccion numero="2" titulo="Afiliación y cuota moderadora" icono={BadgeDollarSign}>
-            <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4">
-              <div>
-                <span className={etiqueta}>Régimen</span>
-                <Segmentos
-                  nombre="Régimen"
-                  valor={regimen}
-                  onChange={setRegimen}
-                  opciones={[
-                    { valor: 'contributivo', titulo: 'Contributivo', detalle: 'Paga según ingreso' },
-                    { valor: 'subsidiado', titulo: 'Subsidiado', detalle: 'Sin cuota' },
-                  ]}
-                />
+            {estadoPaciente !== 'listo' ? (
+              <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-3">
+                {estadoPaciente === 'buscando'
+                  ? 'Buscando la afiliación registrada del paciente…'
+                  : 'Escriba el documento del paciente: su régimen, rango de ingreso y EPS se cargan solos.'}
+              </p>
+            ) : afiliacionFija ? (
+              <div className="rounded-md border border-ips/40 bg-ips-claro px-4 py-3">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-ips-noche">
+                    <Lock className="w-4 h-4" /> Afiliación registrada del paciente
+                  </p>
+                  {medico?.rol === 'administrador' && (
+                    <button type="button" onClick={() => setCorrigiendo(true)}
+                      className="flex items-center gap-1 text-xs font-semibold text-ips-oscuro hover:underline cursor-pointer">
+                      <PencilLine className="w-3.5 h-3.5" /> Corregir
+                    </button>
+                  )}
+                </div>
+                <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2 text-sm">
+                  <div>
+                    <dt className="text-xs text-slate-500">Régimen</dt>
+                    <dd className="font-semibold text-slate-900 capitalize">{regimen}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500">Rango de ingreso (IBC)</dt>
+                    <dd className="font-semibold text-slate-900">
+                      {regimen === 'contributivo'
+                        ? `${rangoIngreso} · ${RANGOS.find((r) => r.valor === rangoIngreso)?.texto ?? ''}`
+                        : 'No aplica'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-slate-500">EPS</dt>
+                    <dd className="font-semibold text-slate-900">{eps || '—'}</dd>
+                  </div>
+                </dl>
               </div>
-              <div>
-                <span className={etiqueta}>Rango de ingreso (IBC)</span>
-                {regimen === 'contributivo' ? (
-                  <Segmentos
-                    nombre="Rango de ingreso"
-                    valor={rangoIngreso}
-                    onChange={setRangoIngreso}
-                    opciones={RANGOS.map((r) => ({
-                      valor: r.valor,
-                      titulo: `${r.valor}${tarifa?.[r.valor] != null ? ` · ${pesos(tarifa[r.valor])}` : ''}`,
-                      detalle: r.texto,
-                    }))}
-                  />
-                ) : (
-                  <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-3">
-                    El régimen subsidiado no paga cuota moderadora.
+            ) : (
+              <>
+                {!corrigiendo && (
+                  <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+                    Este paciente no tiene la afiliación registrada. Indíquela una sola vez: las próximas fórmulas la usarán sola.
                   </p>
                 )}
-              </div>
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4">
+                  <div>
+                    <span className={etiqueta}>Régimen</span>
+                    <Segmentos
+                      nombre="Régimen"
+                      valor={regimen}
+                      onChange={setRegimen}
+                      opciones={[
+                        { valor: 'contributivo', titulo: 'Contributivo', detalle: 'Paga según ingreso' },
+                        { valor: 'subsidiado', titulo: 'Subsidiado', detalle: 'Sin cuota' },
+                      ]}
+                    />
+                  </div>
+                  <div>
+                    <span className={etiqueta}>Rango de ingreso (IBC)</span>
+                    {regimen === 'contributivo' ? (
+                      <Segmentos
+                        nombre="Rango de ingreso"
+                        valor={rangoIngreso}
+                        onChange={setRangoIngreso}
+                        opciones={RANGOS.map((r) => ({
+                          valor: r.valor,
+                          titulo: `${r.valor}${tarifa?.[r.valor] != null ? ` · ${pesos(tarifa[r.valor])}` : ''}`,
+                          detalle: r.texto,
+                        }))}
+                      />
+                    ) : (
+                      <p className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-3 py-3">
+                        {regimen === 'subsidiado' ? 'El régimen subsidiado no paga cuota moderadora.' : 'Primero indique el régimen.'}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <label htmlFor="ips-eps" className={etiqueta}>EPS</label>
+                  <input id="ips-eps" type="text" value={eps} maxLength={80} onChange={(e) => setEps(e.target.value)}
+                    placeholder="Nombre de la EPS" className={campo} />
+                </div>
+              </>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-              <div>
-                <label htmlFor="ips-eps" className={etiqueta}>EPS</label>
-                <input id="ips-eps" type="text" value={eps} maxLength={80} onChange={(e) => setEps(e.target.value)}
-                  placeholder="Nombre de la EPS" className={campo} />
-              </div>
               <div>
                 <label htmlFor="ips-exencion" className={etiqueta}>Exención de pago</label>
                 <select id="ips-exencion" value={exencion} onChange={(e) => setExencion(e.target.value)} className={campo}>
@@ -455,13 +604,8 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
                   </ul>
                 )}
               </div>
-              <div className="w-28">
-                <label htmlFor="ips-cantidad" className={etiqueta}>Cantidad</label>
-                <input id="ips-cantidad" type="number" min="1" value={cantidadNueva}
-                  onChange={(e) => setCantidadNueva(e.target.value)} className={campo} />
-              </div>
             </div>
-            <p className="text-xs text-slate-500 mt-1.5">Elija de la lista o presione Enter para agregar el primero.</p>
+            <p className="text-xs text-slate-500 mt-1.5">Elija de la lista o presione Enter para agregar el primero; después escriba la cantidad.</p>
 
             {/* Medicamentos de la fórmula */}
             <div className="mt-4 border border-slate-200 rounded-md overflow-hidden">
@@ -476,20 +620,33 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
                         <p className="font-semibold text-slate-900 truncate">{item.nombre}</p>
                         <p className="text-sm text-slate-500 flex items-center gap-2 flex-wrap">
                           {item.presentacion}
-                          {item.stock != null && item.cantidad > item.stock && (
+                          {sinCantidad(item) && (
+                            <span className="text-xs font-semibold text-red-700 bg-red-50 px-2 py-0.5 rounded">
+                              {item.cantidad === '' ? 'Falta la cantidad' : 'Cantidad no válida'}
+                            </span>
+                          )}
+                          {item.stock != null && Number(item.cantidad) > item.stock && (
                             <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded">
                               La farmacia tiene {item.stock}
                             </span>
                           )}
                         </p>
                       </div>
-                      <div className="flex items-center border border-slate-300 rounded-md">
-                        <button type="button" aria-label="Restar uno" onClick={() => cambiarCantidadItem(item.medicamento_id, item.cantidad - 1)}
+                      <div className={`flex items-center border rounded-md ${sinCantidad(item) ? 'border-red-400 ring-1 ring-red-300' : 'border-slate-300'}`}>
+                        <button type="button" aria-label="Restar uno" onClick={() => cambiarCantidadItem(item.medicamento_id, Math.max(1, (Number(item.cantidad) || 1) - 1))}
                           className="px-2 py-2 text-slate-600 hover:bg-slate-100 cursor-pointer"><Minus className="w-4 h-4" /></button>
-                        <input type="number" min="1" aria-label={`Cantidad de ${item.nombre}`} value={item.cantidad}
+                        <input type="number" min="1" placeholder="Cant." aria-label={`Cantidad de ${item.nombre}`} value={item.cantidad}
+                          ref={(el) => { cantidadRefs.current[item.medicamento_id] = el; }}
+                          onKeyDown={(e) => {
+                            // Enter no envía la fórmula: vuelve al buscador para agregar otro medicamento
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              document.getElementById('ips-buscar')?.focus();
+                            }
+                          }}
                           onChange={(e) => cambiarCantidadItem(item.medicamento_id, e.target.value)}
                           className="w-16 text-center py-1.5 border-x border-slate-300 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
-                        <button type="button" aria-label="Sumar uno" onClick={() => cambiarCantidadItem(item.medicamento_id, item.cantidad + 1)}
+                        <button type="button" aria-label="Sumar uno" onClick={() => cambiarCantidadItem(item.medicamento_id, (Number(item.cantidad) || 0) + 1)}
                           className="px-2 py-2 text-slate-600 hover:bg-slate-100 cursor-pointer"><Plus className="w-4 h-4" /></button>
                       </div>
                       <button type="button" onClick={() => quitarMedicamento(item.medicamento_id)}
@@ -501,6 +658,23 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
                   ))}
                 </ul>
               )}
+            </div>
+
+            {/* Indicaciones del médico */}
+            <div className="mt-5">
+              <div className="flex items-baseline justify-between gap-2 mb-1.5">
+                <label htmlFor="ips-indicaciones" className="text-sm font-semibold text-slate-700">
+                  Indicaciones <span className="font-normal text-slate-500">(opcional)</span>
+                </label>
+                <span className={`text-xs ${indicaciones.length > 950 ? 'text-amber-700 font-semibold' : 'text-slate-400'}`}>
+                  {indicaciones.length}/1000
+                </span>
+              </div>
+              <textarea id="ips-indicaciones" rows={4} maxLength={1000} value={indicaciones}
+                onChange={(e) => setIndicaciones(e.target.value)} className={`${campo} resize-y`} />
+              <p className="text-xs text-slate-500 mt-1">
+                Cómo tomar cada medicamento, cada cuánto y por cuánto tiempo. Sale en la fórmula impresa y la farmacia la ve al entregar.
+              </p>
             </div>
           </Seccion>
         </div>
@@ -547,7 +721,7 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
             <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
               <div className="px-5 py-4 border-b border-slate-200">
                 <p className="text-xs uppercase tracking-wide text-slate-500 font-semibold">Fórmula médica</p>
-                <p className="text-2xl font-mono font-bold text-slate-900 mt-0.5">{siguienteCodigo}</p>
+                <p className="text-2xl font-mono font-bold text-slate-900 mt-0.5">{siguienteCodigo || '—'}</p>
                 <p className="text-xs text-slate-500">Código asignado al enviar</p>
               </div>
               <dl className="px-5 py-4 text-sm space-y-2.5">

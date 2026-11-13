@@ -23,10 +23,14 @@ const cajaOcupada = (error) => {
 };
 const FORMATO_USUARIO = /^[a-z0-9._-]{3,40}$/;
 
-// Contraseña mínima: 10 caracteres, con al menos una letra y un número
+// Contraseña mínima: 10 caracteres, con al menos una letra y un número, sin espacios
 function validarClave(clave) {
   if (typeof clave !== 'string' || clave.length < 10 || !/[a-zA-Z]/.test(clave) || !/\d/.test(clave)) {
     throw new ErrorNegocio('clave: mínimo 10 caracteres, con letras y números', 400);
+  }
+  // El ingreso al panel no deja escribir espacios: tampoco se aceptan al crearla
+  if (/\s/.test(clave)) {
+    throw new ErrorNegocio('clave: el espacio no está permitido en la contraseña', 400);
   }
 }
 

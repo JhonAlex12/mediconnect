@@ -135,6 +135,13 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
         ))}
       </dl>
 
+      {t.indicaciones && (
+        <div className="bg-marca-hielo border border-marca-azul/20 rounded-lg px-4 py-3">
+          <p className="text-sm font-semibold text-marca-azul-oscuro">Indicaciones del médico</p>
+          <p className="text-slate-800 whitespace-pre-wrap mt-0.5">{t.indicaciones}</p>
+        </div>
+      )}
+
       {!datos.puede_dispensar && (
         <p className="text-red-700 font-semibold">Este turno ya no se puede dispensar (estado: {t.estado}).</p>
       )}

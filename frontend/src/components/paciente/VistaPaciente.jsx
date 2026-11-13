@@ -135,23 +135,55 @@ export default function VistaPaciente({ codigoInicial = '', documentoInicial = '
 // 1. Consultar la fórmula y pedir el turno (CU-01, CU-02)
 // ============================================================
 function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
+  // Se consulta con el documento (lista de fórmulas pendientes) o con el código (una fórmula)
+  const [modo, setModo] = useState(codigoInicial ? 'codigo' : 'documento');
   const [codigo, setCodigo] = useState(codigoInicial);
   const [documento, setDocumento] = useState(documentoInicial);
+  const [lista, setLista] = useState(null); // { paciente, formulas } al consultar por documento
   const [formula, setFormula] = useState(null);
   const [prioridad, setPrioridad] = useState('ninguna');
   const [avisosTurno, setAvisosTurno] = useState(null); // avisos que requieren confirmar
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState(null);
 
-  const consultar = async (e) => {
-    e?.preventDefault();
+  const cambiarModo = (nuevo) => {
+    setModo(nuevo);
+    setLista(null);
+    setFormula(null);
+    setError(null);
+    setAvisosTurno(null);
+  };
+
+  // Detalle de una fórmula: con el documento si se conoce (nombre completo y se puede pedir turno)
+  const verFormula = async (cod, doc) => {
     setOcupado(true);
     setError(null);
-    setFormula(null);
     setAvisosTurno(null);
     try {
-      const d = await api('/formulas/consulta', { metodo: 'POST', cuerpo: { codigo, documento }, token: null });
+      const d = await api('/formulas/consulta', { metodo: 'POST', cuerpo: { codigo: cod, documento: doc || undefined }, token: null });
       setFormula(d.formula);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const consultar = async (e) => {
+    e?.preventDefault();
+    setFormula(null);
+    setLista(null);
+    if (modo === 'codigo') {
+      await verFormula(codigo, documentoInicial && codigo === codigoInicial ? documentoInicial : '');
+      return;
+    }
+    setOcupado(true);
+    setError(null);
+    try {
+      const d = await api('/formulas/consulta', { metodo: 'POST', cuerpo: { documento }, token: null });
+      setLista({ paciente: d.paciente, formulas: d.formulas });
+      // Con una sola fórmula pendiente se abre de una vez
+      if (d.formulas.length === 1) await verFormula(d.formulas[0].codigo, documento);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -161,9 +193,13 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
 
   // Llegó desde el QR de la fórmula impresa (o el enlace de la IPS): se consulta de una vez
   useEffect(() => {
-    if (codigoInicial && documentoInicial) consultar();
+    if (codigoInicial) verFormula(codigoInicial, documentoInicial);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // El documento para pedir el turno: el de la consulta o el que escriba al consultar por código
+  const [documentoTurno, setDocumentoTurno] = useState('');
+  const docTurno = formula?.requiere_documento ? documentoTurno : (modo === 'documento' ? documento : documentoInicial);
 
   const pedirTurno = async (confirmar = false) => {
     setOcupado(true);
@@ -171,7 +207,7 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
     try {
       const d = await api('/turnos', {
         metodo: 'POST',
-        cuerpo: { codigo, documento, prioridad, confirmar },
+        cuerpo: { codigo: formula.codigo, documento: docTurno, prioridad, confirmar },
         token: null,
       });
       if (d.requiere_confirmacion) setAvisosTurno(d.avisos);
@@ -184,21 +220,37 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
   };
 
   const pendientes = formula?.medicamentos.filter((m) => m.cantidad_pendiente > 0) ?? [];
+  const pestana = (valor) => `flex-1 py-2 rounded-lg text-sm font-bold transition cursor-pointer ${
+    modo === valor ? 'bg-white text-marca-azul shadow-sm' : 'text-slate-600 hover:text-slate-900'}`;
 
   return (
     <>
       <form onSubmit={consultar} className="space-y-3">
         <h2 className="text-lg font-bold text-slate-800">Consulta tu fórmula</h2>
-        <div>
-          <label htmlFor="p-codigo" className="block text-sm font-bold text-slate-800 mb-1">Código de la fórmula</label>
-          <input id="p-codigo" value={codigo} onChange={(e) => setCodigo(e.target.value)} required
-            placeholder="F-2026-0001" className={`${claseCampo} uppercase`} />
+        <div role="tablist" aria-label="Consultar por" className="flex gap-1 bg-slate-100 p-1 rounded-xl">
+          <button type="button" role="tab" aria-selected={modo === 'documento'} onClick={() => cambiarModo('documento')}
+            className={pestana('documento')}>
+            Por documento
+          </button>
+          <button type="button" role="tab" aria-selected={modo === 'codigo'} onClick={() => cambiarModo('codigo')}
+            className={pestana('codigo')}>
+            Por código de fórmula
+          </button>
         </div>
-        <div>
-          <label htmlFor="p-documento" className="block text-sm font-bold text-slate-800 mb-1">Número de documento</label>
-          <input id="p-documento" value={documento} onChange={(e) => setDocumento(e.target.value)} required
-            inputMode="numeric" className={claseCampo} />
-        </div>
+        {modo === 'documento' ? (
+          <div>
+            <label htmlFor="p-documento" className="block text-sm font-bold text-slate-800 mb-1">Número de documento</label>
+            <input id="p-documento" value={documento} onChange={(e) => setDocumento(e.target.value)} required
+              inputMode="numeric" className={claseCampo} />
+            <p className="text-xs text-slate-500 mt-1">Verás todas las fórmulas que tienes por reclamar.</p>
+          </div>
+        ) : (
+          <div>
+            <label htmlFor="p-codigo" className="block text-sm font-bold text-slate-800 mb-1">Código de la fórmula</label>
+            <input id="p-codigo" value={codigo} onChange={(e) => setCodigo(e.target.value)} required
+              placeholder="F-2026-0001" className={`${claseCampo} uppercase`} />
+          </div>
+        )}
         <button type="submit" disabled={ocupado}
           className="w-full flex items-center justify-center gap-2 bg-marca-azul hover:bg-marca-azul-oscuro disabled:opacity-50 text-white font-bold py-3 rounded-xl transition cursor-pointer">
           <Search className="w-5 h-5" />
@@ -208,8 +260,53 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
 
       {error && <Aviso aviso={{ tipo: 'error', texto: error }} />}
 
+      {lista && !formula && (
+        <section className="space-y-3 border-t border-slate-200 pt-4">
+          {lista.formulas.length === 0 ? (
+            <p className="text-center text-slate-600">
+              No encontramos fórmulas pendientes con ese documento. Revisa el número o consulta con el código de la fórmula.
+            </p>
+          ) : (
+            <>
+              <div>
+                <p className="text-lg font-bold text-slate-900">{lista.paciente}</p>
+                <p className="text-sm text-slate-600">
+                  {lista.formulas.length === 1 ? 'Tienes 1 fórmula pendiente' : `Tienes ${lista.formulas.length} fórmulas pendientes`}
+                </p>
+              </div>
+              <ul className="space-y-2">
+                {lista.formulas.map((f) => (
+                  <li key={f.codigo}>
+                    <button type="button" onClick={() => verFormula(f.codigo, documento)} disabled={ocupado}
+                      className="w-full text-left border border-slate-200 hover:border-marca-azul hover:bg-marca-hielo rounded-xl px-4 py-3 transition cursor-pointer disabled:opacity-50">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-bold text-slate-900 font-mono">{f.codigo}</p>
+                        <span className="text-sm font-semibold text-marca-azul">Ver</span>
+                      </div>
+                      <p className="text-sm text-slate-600">
+                        Emitida el {fechaLarga(f.fecha_emision)} · {f.por_reclamar === 1 ? '1 medicamento' : `${f.por_reclamar} medicamentos`} por reclamar
+                      </p>
+                      <p className={`text-sm flex items-center gap-1.5 ${f.alerta ? 'text-amber-800 font-semibold' : 'text-slate-500'}`}>
+                        {f.alerta ? <AlertTriangle className="w-4 h-4" /> : <CalendarClock className="w-4 h-4" />}
+                        Reclamar hasta el {fechaLarga(f.fecha_limite)}
+                      </p>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
+
       {formula && (
         <section className="space-y-4 border-t border-slate-200 pt-4">
+          {lista?.formulas.length > 1 && (
+            <button type="button" onClick={() => { setFormula(null); setAvisosTurno(null); }}
+              className="text-sm font-semibold text-marca-azul hover:underline cursor-pointer">
+              ← Ver todas mis fórmulas pendientes
+            </button>
+          )}
           <div>
             <p className="text-sm text-slate-500">Fórmula {formula.codigo}</p>
             <p className="text-lg font-bold text-slate-900">{formula.paciente}</p>
@@ -271,6 +368,16 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
               </div>
             ) : (
               <div className="space-y-3">
+                {formula.requiere_documento && (
+                  <div>
+                    <label htmlFor="p-documento-turno" className="block text-sm font-bold text-slate-800 mb-1">
+                      Tu número de documento
+                    </label>
+                    <input id="p-documento-turno" value={documentoTurno} onChange={(e) => setDocumentoTurno(e.target.value)}
+                      inputMode="numeric" className={claseCampo} />
+                    <p className="text-xs text-slate-500 mt-1">Lo pedimos para confirmar que la fórmula es tuya.</p>
+                  </div>
+                )}
                 <div>
                   <label htmlFor="p-prioridad" className="block text-sm font-bold text-slate-800 mb-1">
                     ¿Tienes atención preferencial?
@@ -279,11 +386,11 @@ function ConsultaYTurno({ codigoInicial, documentoInicial, alTomarTurno }) {
                     {Object.entries(PRIORIDADES).map(([v, t]) => <option key={v} value={v}>{t}</option>)}
                   </select>
                 </div>
-                <button type="button" onClick={() => pedirTurno(false)} disabled={ocupado}
+                <button type="button" onClick={() => pedirTurno(false)} disabled={ocupado || !docTurno?.trim()}
                   className="w-full bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-50 text-white font-bold text-lg py-3 rounded-xl transition cursor-pointer">
                   Pedir turno virtual
                 </button>
-                <OpcionDomicilio codigo={formula.codigo ?? codigo.trim().toUpperCase()} />
+                <OpcionDomicilio codigo={formula.codigo} />
               </div>
             )
           )}

@@ -43,10 +43,36 @@ export async function formulasRecientes() {
   return rows;
 }
 
-// Emite una fórmula como lo haría la IPS: el código lo asigna el sistema
+// Datos registrados del paciente (nombre y afiliación), para llenar la fórmula sola
+export async function buscarPaciente(documento) {
+  const doc = typeof documento === 'string' ? documento.trim() : '';
+  if (!/^\d{5,15}$/.test(doc)) return null;
+  // También encuentra a quien solo tiene cuenta (se registró pero aún no tiene fórmulas)
+  const { rows: [p] } = await pool.query(
+    `SELECT COALESCE(p.documento, c.documento) AS documento,
+            COALESCE(c.nombres || ' ' || c.apellidos, p.nombre) AS nombre,
+            p.regimen, p.rango_ingreso, p.eps
+       FROM pacientes p
+       FULL JOIN cuentas_pacientes c ON c.documento = p.documento
+      WHERE p.documento = $1 OR c.documento = $1`,
+    [doc]
+  );
+  return p ?? null;
+}
+
+// Emite una fórmula como lo haría la IPS: el código lo asigna el sistema.
+// Si el paciente ya tiene la afiliación registrada, el médico no la puede cambiar:
+// se usa la registrada (solo un administrador puede corregirla).
 export async function emitirFormula({
-  documento, nombre, fecha_emision, fecha_limite, medicamentos, regimen, rango_ingreso, eps, exencion,
-}) {
+  documento, nombre, fecha_emision, fecha_limite, medicamentos, regimen, rango_ingreso, eps, exencion, indicaciones,
+}, { puedeCorregirAfiliacion = false } = {}) {
+  if (!puedeCorregirAfiliacion) {
+    const registrado = await buscarPaciente(documento);
+    if (registrado?.nombre) nombre = registrado.nombre;
+    if (registrado?.regimen) {
+      ({ regimen, rango_ingreso, eps } = registrado);
+    }
+  }
   const datos = {
     documento: typeof documento === 'string' ? documento.trim() : documento,
     nombre,
@@ -57,6 +83,7 @@ export async function emitirFormula({
     rango_ingreso: rango_ingreso || null,
     eps: eps || null,
     exencion: exencion || null,
+    indicaciones: typeof indicaciones === 'string' ? indicaciones : null,
     origen: 'simulador',
   };
 

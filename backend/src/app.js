@@ -10,6 +10,7 @@ import { pool } from './db/pool.js';
 import turnosRoutes from './routes/turnos.routes.js';
 import ipsRoutes from './routes/ips.routes.js';
 import simuladorRoutes from './routes/simulador.routes.js';
+import pacientesRoutes from './routes/pacientes.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import inventarioRoutes from './routes/inventario.routes.js';
 import dispensacionRoutes from './routes/dispensacion.routes.js';
@@ -68,6 +69,7 @@ app.use('/api/inventario', inventarioRoutes);
 app.use('/api/dispensacion', dispensacionRoutes);
 app.use('/api/reportes', reportesRoutes);
 app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/pacientes', pacientesRoutes);    // pacientes y sus cuentas (panel)
 app.use('/api/tarifas', tarifasRoutes);
 app.use('/api/cuenta', cuentaRoutes);          // cuentas de pacientes
 app.use('/api/domicilios', domiciliosRoutes);  // gestión de domicilios (panel)

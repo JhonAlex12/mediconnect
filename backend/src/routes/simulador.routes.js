@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { catalogo, recientes, emitir } from '../controllers/simulador.controller.js';
+import { catalogo, recientes, emitir, paciente } from '../controllers/simulador.controller.js';
 import { exigirEmpleado } from '../middleware/autenticacion.js';
 
 // Rutas del Simulador de IPS (el "doctor" de la demostración).
@@ -20,5 +20,6 @@ router.use(exigirEmpleado('administrador', 'medico'));
 router.get('/medicamentos', catalogo);
 router.get('/formulas', recientes);
 router.post('/formulas', emitir);
+router.get('/pacientes/:documento', paciente);
 
 export default router;

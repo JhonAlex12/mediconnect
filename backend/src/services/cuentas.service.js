@@ -6,7 +6,7 @@ import { CIUDADES_DOMICILIO, HORAS_ENLACE_CORREO } from '../config/negocio.js';
 import { ErrorNegocio } from './formulas.service.js';
 import { consultarFormula } from './disponibilidad.service.js';
 import { despacharDomicilio, devolverDespacho, entregarDomicilio } from './entregaDomicilio.service.js';
-import { URL_SITIO, correoConfirmacion, correoRestablecer, enviarCorreo } from './correo.service.js';
+import { urlSitio, correoConfirmacion, correoRestablecer, enviarCorreo } from './correo.service.js';
 
 // Cuentas de pacientes: registro, ingreso, datos personales, fórmulas y domicilios
 
@@ -87,7 +87,7 @@ export function ciudadConDomicilio(ciudad) {
 const hashToken = (t) => createHash('sha256').update(t).digest('hex');
 
 // Genera un enlace nuevo (invalida el anterior) y lo envía al correo de la cuenta
-async function enviarConfirmacion(cuentaId) {
+export async function enviarConfirmacion(cuentaId) {
   const token = randomBytes(32).toString('hex');
   const { rows: [c] } = await pool.query(
     `UPDATE cuentas_pacientes
@@ -97,7 +97,7 @@ async function enviarConfirmacion(cuentaId) {
     [cuentaId, hashToken(token), HORAS_ENLACE_CORREO]
   );
   if (!c) return false; // ya estaba confirmado
-  const enlace = `${URL_SITIO}/confirmar-correo?token=${token}`;
+  const enlace = `${urlSitio()}/confirmar-correo?token=${token}`;
   const { asunto, texto: cuerpo, html } = correoConfirmacion({
     nombre: c.nombres.split(' ')[0], enlace, horas: HORAS_ENLACE_CORREO,
   });
@@ -126,7 +126,8 @@ export async function reenviarConfirmacion(cuentaId) {
 const MINUTOS_ENLACE_CLAVE = 60;
 
 // Siempre responde igual, exista o no la cuenta: así no se puede averiguar quién está registrado
-export async function solicitarRestablecer(identificador) {
+// "accion": cómo queda en el historial del paciente (lo pidió él o se lo envió la farmacia)
+export async function solicitarRestablecer(identificador, accion = 'pedir_cambio_clave') {
   const id = texto(identificador);
   if (!id) throw new ErrorNegocio('Escribe tu documento o tu correo', 400);
 
@@ -141,12 +142,12 @@ export async function solicitarRestablecer(identificador) {
   if (c) {
     const { asunto, texto: cuerpo, html } = correoRestablecer({
       nombre: c.nombres.split(' ')[0],
-      enlace: `${URL_SITIO}/restablecer-clave?token=${token}`,
+      enlace: `${urlSitio()}/restablecer-clave?token=${token}`,
       minutos: MINUTOS_ENLACE_CLAVE,
     });
     // Sin "await": la respuesta no espera el envío, así tarda lo mismo exista o no la cuenta
     enviarCorreo({ para: c.correo, asunto, texto: cuerpo, html })
-      .then(() => registrarActividad(c.id, 'pedir_cambio_clave'))
+      .then(() => registrarActividad(c.id, accion))
       .catch((error) => console.error('No se pudo enviar el correo para restablecer la contraseña:', error.message));
   }
 }

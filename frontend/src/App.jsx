@@ -15,6 +15,7 @@ import NoEncontrada from './paginas/NoEncontrada';
 import Informacion from './paginas/Informacion';
 import SaludAlDia from './paginas/SaludAlDia';
 import Kiosco from './paginas/Kiosco';
+import TurnoManual from './paginas/TurnoManual';
 
 // Cada módulo es una página independiente con su propia dirección
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
       />
       <Route path="/pantalla" element={<PantallaPublica />} />
       <Route path="/kiosco" element={<Kiosco />} />
+      <Route path="/turno-manual" element={<TurnoManual />} />
       <Route path="/informacion" element={<Informacion />} />
       <Route path="/salud-al-dia" element={<SaludAlDia />} />
       <Route path="/salud-al-dia/:slug" element={<SaludAlDia />} />

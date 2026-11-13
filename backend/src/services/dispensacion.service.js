@@ -26,7 +26,7 @@ export async function verParaDispensar(turnoId) {
   const { rows: [t] } = await pool.query(
     `SELECT t.id, t.numero, t.estado, t.formula_id,
             p.nombre AS paciente, p.documento, f.codigo AS formula, f.fecha_limite,
-            f.regimen, f.rango_ingreso, f.eps, f.exencion, f.cuota_moderadora,
+            f.regimen, f.rango_ingreso, f.eps, f.exencion, f.cuota_moderadora, f.indicaciones,
             (SELECT json_build_object('valor', pg.valor, 'medio', pg.medio, 'fecha', pg.fecha)
                FROM pagos pg WHERE pg.formula_id = f.id) AS pago
        FROM turnos t

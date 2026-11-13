@@ -3,7 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { ShieldCheck, LogOut } from 'lucide-react';
 import FormulaMedica from './FormulaMedica';
 import IngresoIps, { LogoIps } from './IngresoIps';
-import { api, leerToken, guardarToken } from '../lib/api.js';
+import { api } from '../lib/api.js';
+import { leerTokenIps, guardarTokenIps } from './sesionIps';
 import '../index.css';
 
 // Quién puede emitir fórmulas de prueba (el backend también lo exige)
@@ -22,12 +23,12 @@ function SistemaIps() {
 
   // Al abrir: si ya hay una sesión guardada en este navegador, se comprueba
   useEffect(() => {
-    const token = leerToken();
+    const token = leerTokenIps();
     if (!token) {
       setCargando(false);
       return;
     }
-    api('/auth/yo')
+    api('/auth/yo', { token })
       .then((d) => {
         if (PUEDEN_ENTRAR.includes(d.usuario?.rol)) setUsuario(d.usuario);
         else setAviso('Su cuenta no tiene acceso al sistema de la IPS. Ingrese con la cuenta del médico.');
@@ -41,19 +42,19 @@ function SistemaIps() {
     if (!PUEDEN_ENTRAR.includes(d.usuario?.rol)) {
       throw new Error('Esta cuenta no tiene acceso al sistema de la IPS. Ingrese con la cuenta del médico.');
     }
-    guardarToken(d.token);
+    guardarTokenIps(d.token);
     setAviso('');
     setUsuario(d.usuario);
   };
 
   const salir = () => {
-    guardarToken(null);
+    guardarTokenIps(null);
     setUsuario(null);
   };
 
   // El servidor rechazó la sesión (venció o se cerró en otra pestaña)
   const sesionVencida = useCallback(() => {
-    guardarToken(null);
+    guardarTokenIps(null);
     setAviso('Su sesión terminó. Ingrese de nuevo.');
     setUsuario(null);
   }, []);

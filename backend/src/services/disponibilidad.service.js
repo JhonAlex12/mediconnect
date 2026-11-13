@@ -5,26 +5,76 @@ import { describirCobro } from './cobros.service.js';
 
 // Calcula el estado de un medicamento según las reglas del negocio:
 //   agotado        → stock = 0                                       (RN-04)
-//   pocas_unidades → stock bajo el mínimo, o no alcanza para lo
-//                    pendiente después de lo apartado por otros      (RN-03)
+//   pocas_unidades → lo que queda libre (stock menos lo apartado por
+//                    otros turnos) no alcanza para lo pendiente      (RN-03)
 //   disponible     → alcanza para lo pendiente más lo de otros       (RN-02)
 //   entregado      → ya se entregó todo lo formulado
-export function calcularEstado({ pendiente, stockActual, stockMinimo, reservadoOtros }) {
+// El stock mínimo NO cuenta aquí: es una alerta interna de reposición para la farmacia
+// (Inventario → "Stock bajo"); al paciente solo le importa si le alcanza o no.
+export function calcularEstado({ pendiente, stockActual, reservadoOtros }) {
   if (pendiente === 0) return 'entregado';
   if (stockActual === 0) return 'agotado';
 
   const libre = stockActual - reservadoOtros;
-  if (stockActual < stockMinimo || libre < pendiente) return 'pocas_unidades';
+  if (libre < pendiente) return 'pocas_unidades';
 
   return 'disponible';
 }
 
+const DOCUMENTO = /^\d{5,20}$/;
+const limpiar = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+// "María Fernanda Rojas Pérez" → "María F. R. P.": al consultar solo con el código
+// no se muestra el nombre completo (los códigos son consecutivos y fáciles de adivinar)
+const nombreReservado = (nombre) => {
+  const [primero, ...resto] = String(nombre ?? '').trim().split(/\s+/);
+  return [primero, ...resto.map((p) => `${p.charAt(0).toUpperCase()}.`)].join(' ');
+};
+
+// Fórmulas vigentes del paciente que aún tienen medicamentos por reclamar
+export async function formulasPendientes(documento) {
+  const doc = limpiar(documento);
+  if (!doc || !DOCUMENTO.test(doc)) {
+    throw new ErrorNegocio('Escribe tu número de documento (solo números)', 400);
+  }
+  const { rows: [p] } = await pool.query('SELECT id, nombre FROM pacientes WHERE documento = $1', [doc]);
+  // Mismo resultado si el documento no existe o no tiene nada pendiente
+  if (!p) return { paciente: null, formulas: [] };
+
+  const { rows } = await pool.query(
+    `SELECT f.codigo, f.fecha_emision, f.fecha_limite,
+            (f.fecha_limite - (now() AT TIME ZONE $2)::date) AS dias_restantes,
+            count(*)::int AS medicamentos,
+            count(*) FILTER (WHERE fi.cantidad_entregada < fi.cantidad_formulada)::int AS por_reclamar
+       FROM formulas f
+       JOIN formula_items fi ON fi.formula_id = f.id
+      WHERE f.paciente_id = $1 AND f.fecha_limite >= (now() AT TIME ZONE $2)::date
+      GROUP BY f.id
+     HAVING sum(fi.cantidad_formulada - fi.cantidad_entregada) > 0
+      ORDER BY f.fecha_limite ASC, f.id ASC`,
+    [p.id, ZONA_HORARIA]
+  );
+
+  await pool.query(
+    `INSERT INTO registro_accesos (paciente_id, accion, detalle) VALUES ($1, 'consultar_formulas_documento', $2)`,
+    [p.id, `${rows.length} pendiente(s)`]
+  );
+
+  return {
+    paciente: p.nombre,
+    formulas: rows.map((f) => ({ ...f, alerta: f.dias_restantes <= DIAS_ALERTA })),
+  };
+}
+
+// Detalle de una fórmula: con el código, y opcionalmente el documento.
+// Sin el documento el nombre va abreviado y no se puede pedir turno con ella.
 export async function consultarFormula(codigo, documento) {
-  if (typeof codigo !== 'string' || typeof documento !== 'string') {
-    throw new ErrorNegocio('Ingresa el código de la fórmula y tu documento', 400);
+  const cod = limpiar(codigo)?.toUpperCase();
+  const doc = limpiar(documento);
+  if (!cod) {
+    throw new ErrorNegocio('Escribe el código de la fórmula', 400);
   }
 
-  // Busca la fórmula solo si el código y el documento coinciden
   const { rows: [formula] } = await pool.query(
     `SELECT f.id, f.codigo, f.fecha_emision, f.fecha_limite,
             f.regimen, f.rango_ingreso, f.eps, f.exencion, f.cuota_moderadora,
@@ -34,13 +84,13 @@ export async function consultarFormula(codigo, documento) {
             (f.fecha_limite - (now() AT TIME ZONE $3)::date) AS dias_restantes
        FROM formulas f
        JOIN pacientes p ON p.id = f.paciente_id
-      WHERE f.codigo = $1 AND p.documento = $2`,
-    [codigo.trim().toUpperCase(), documento.trim(), ZONA_HORARIA]
+      WHERE f.codigo = $1 AND ($2::text IS NULL OR p.documento = $2)`,
+    [cod, doc, ZONA_HORARIA]
   );
 
   // Mismo mensaje si falla el código o el documento: no se revela cuál de los dos
   if (!formula) {
-    throw new ErrorNegocio('Código o documento incorrectos', 404);
+    throw new ErrorNegocio(doc ? 'Código o documento incorrectos' : 'No encontramos una fórmula con ese código', 404);
   }
 
   // Medicamentos de la fórmula, con lo que otros pacientes ya tienen apartado.
@@ -85,7 +135,6 @@ export async function consultarFormula(codigo, documento) {
       estado: calcularEstado({
         pendiente,
         stockActual: i.stock_actual,
-        stockMinimo: i.stock_minimo,
         reservadoOtros: i.reservado_otros,
       }),
     };
@@ -94,7 +143,9 @@ export async function consultarFormula(codigo, documento) {
   const dias = formula.dias_restantes;
   return {
     codigo: formula.codigo,
-    paciente: formula.nombre,
+    paciente: doc ? formula.nombre : nombreReservado(formula.nombre),
+    // Sin el documento se ve la fórmula, pero para pedir turno hay que escribirlo
+    requiere_documento: !doc,
     fecha_emision: formula.fecha_emision,
     fecha_limite: formula.fecha_limite,
     dias_restantes: dias,

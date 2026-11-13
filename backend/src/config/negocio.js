@@ -13,6 +13,10 @@ export const MINUTOS_RETRASO = 20;
 // Minutos promedio de atención por turno, para el tiempo estimado
 export const MINUTOS_POR_TURNO = 5;
 
+// Turno virtual que aún no llega: se le avisa "ya casi es tu turno" cuando quedan
+// esta cantidad de personas (o menos) en la sala antes que él
+export const TURNOS_AVISO_CERCA = 3;
+
 // Faltas seguidas a partir de las cuales se pide confirmación extra (RN-11)
 export const FALTAS_CONFIRMACION = 2;
 

@@ -38,7 +38,6 @@ async function estadosPorTurno(cliente, medicamentoIds) {
       estado: calcularEstado({
         pendiente: r.pendiente,
         stockActual: r.stock_actual,
-        stockMinimo: r.stock_minimo,
         reservadoOtros: r.reservado_otros,
       }),
     });
@@ -132,6 +131,41 @@ export async function crearMedicamento(datos, empleado) {
     if (error.code === '23505') {
       throw new ErrorNegocio('Ya existe ese medicamento con esa presentación', 409);
     }
+    throw error;
+  } finally {
+    cliente.release();
+  }
+}
+
+// ============================================================
+// CAMBIAR EL STOCK MÍNIMO (solo administrador)
+// Es el punto de reposición: por debajo de él el medicamento sale como "Stock bajo"
+// en el inventario. No bloquea entregas ni cambia lo que ve el paciente.
+// ============================================================
+export async function cambiarMinimo(medicamentoId, { stock_minimo } = {}, empleado) {
+  if (!Number.isInteger(stock_minimo) || stock_minimo < 0 || stock_minimo > 1000000) {
+    throw new ErrorNegocio('stock_minimo: número entero mayor o igual a 0', 400);
+  }
+  const cliente = await pool.connect();
+  try {
+    await cliente.query('BEGIN');
+    const { rows: [m] } = await cliente.query(
+      `SELECT id, nombre, presentacion, stock_minimo FROM medicamentos WHERE id = $1 AND activo = TRUE FOR UPDATE`,
+      [medicamentoId]
+    );
+    if (!m) throw new ErrorNegocio('Medicamento no encontrado', 404);
+    if (m.stock_minimo === stock_minimo) throw new ErrorNegocio('El mínimo ya tiene ese valor', 400);
+
+    await cliente.query(`UPDATE medicamentos SET stock_minimo = $2 WHERE id = $1`, [m.id, stock_minimo]);
+    await registrarAcceso({
+      usuarioId: empleado.id,
+      accion: 'cambiar_stock_minimo',
+      detalle: `${m.nombre} ${m.presentacion}: ${m.stock_minimo} → ${stock_minimo}`,
+    }, cliente);
+    await cliente.query('COMMIT');
+    return { id: m.id, nombre: m.nombre, minimo_anterior: m.stock_minimo, stock_minimo };
+  } catch (error) {
+    await cliente.query('ROLLBACK');
     throw error;
   } finally {
     cliente.release();

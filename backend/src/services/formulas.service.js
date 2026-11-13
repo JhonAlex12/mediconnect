@@ -62,6 +62,11 @@ function validar(datos) {
     });
   }
 
+  // Indicaciones del médico: opcionales, texto de hasta 1000 caracteres
+  if (d.indicaciones != null && (typeof d.indicaciones !== 'string' || d.indicaciones.trim().length > 1000)) {
+    errores.push('indicaciones: texto de máximo 1000 caracteres');
+  }
+
   // Régimen, rango de ingreso, EPS y exención: definen la cuota moderadora
   errores.push(...validarAfiliacion(d));
 
@@ -89,28 +94,35 @@ export async function crearFormula(datos) {
       throw new ErrorNegocio('Algún medicamento no existe en el catálogo', 400);
     }
 
-    // Registra al paciente si no existe; si ya existe, reutiliza el mismo
+    // Registra al paciente si no existe; si ya existe, reutiliza el mismo y toma el nombre
+    // y la afiliación de la fórmula más reciente (la IPS tiene el dato oficial ligado al documento)
+    const rango = datos.regimen === 'contributivo' ? datos.rango_ingreso : null;
     const { rows: [paciente] } = await cliente.query(
-      `INSERT INTO pacientes (documento, nombre, telefono)
-       VALUES ($1, $2, $3)
+      `INSERT INTO pacientes (documento, nombre, telefono, regimen, rango_ingreso, eps)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (documento)
-       DO UPDATE SET telefono = COALESCE(EXCLUDED.telefono, pacientes.telefono)
+       DO UPDATE SET nombre = EXCLUDED.nombre,
+                     telefono = COALESCE(EXCLUDED.telefono, pacientes.telefono),
+                     regimen = EXCLUDED.regimen,
+                     rango_ingreso = EXCLUDED.rango_ingreso,
+                     eps = COALESCE(EXCLUDED.eps, pacientes.eps)
        RETURNING id`,
-      [datos.documento, datos.nombre.trim(), datos.telefono ?? null]
+      [datos.documento, datos.nombre.trim(), datos.telefono ?? null,
+       datos.regimen, rango, datos.eps?.trim() || null]
     );
 
     // Cuánto pagará el paciente al reclamar (queda fijo con la tarifa de hoy)
-    const rango = datos.regimen === 'contributivo' ? datos.rango_ingreso : null;
     const cuota = await calcularCuota(cliente, { ...datos, rango_ingreso: rango });
 
     // Guarda la fórmula
     const { rows: [formula] } = await cliente.query(
       `INSERT INTO formulas (codigo, paciente_id, fecha_emision, fecha_limite, origen,
-                             regimen, rango_ingreso, eps, exencion, cuota_moderadora)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                             regimen, rango_ingreso, eps, exencion, cuota_moderadora, indicaciones)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id, codigo, fecha_emision, fecha_limite, origen, regimen, cuota_moderadora`,
       [datos.codigo, paciente.id, datos.fecha_emision, datos.fecha_limite, datos.origen ?? 'ips',
-       datos.regimen, rango, datos.eps?.trim() || null, datos.exencion ?? null, cuota]
+       datos.regimen, rango, datos.eps?.trim() || null, datos.exencion ?? null, cuota,
+       datos.indicaciones?.trim() || null]
     );
 
     // Guarda cada medicamento de la fórmula

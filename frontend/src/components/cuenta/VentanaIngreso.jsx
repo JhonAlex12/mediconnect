@@ -201,7 +201,7 @@ function IngresoEmpleado({ alEntrar }) {
       <div>
         <label htmlFor="empleado-clave" className={claseEtiqueta}>Contraseña</label>
         <CampoClave id="empleado-clave" autoComplete="current-password" required valor={clave} cambiar={setClave}
-          className={claseCampo} oscuro />
+          className={claseCampo} oscuro sinEspacios />
       </div>
       <button type="submit" disabled={enviando} className={claseBoton}>
         <LogIn className="w-5 h-5" /> {enviando ? 'Ingresando…' : 'Ingresar al panel'}

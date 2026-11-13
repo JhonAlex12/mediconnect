@@ -49,7 +49,7 @@ const celda = { border: '1px solid #cbd5e1', padding: '2.2mm 2.5mm', verticalAli
 const etiqueta = { fontSize: '7.5pt', textTransform: 'uppercase', letterSpacing: '0.04em', color: '#64748b', fontWeight: 700 };
 const valor = { fontSize: '10.5pt', color: '#0f172a', fontWeight: 600, marginTop: '0.6mm' };
 
-// datos = { codigo, nombre, documento, fechaEmision, fechaLimite, eps, regimen, rangoIngreso, exencion, cuota, items }
+// datos = { codigo, nombre, documento, fechaEmision, fechaLimite, eps, regimen, rangoIngreso, exencion, cuota, items, indicaciones }
 export function FormulaImpresion({ datos, medico }) {
   const impreso = new Date().toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
   // QR con el enlace a la fórmula (celular del paciente y pantalla de la entrada)
@@ -142,6 +142,14 @@ export function FormulaImpresion({ datos, medico }) {
           ))}
         </tbody>
       </table>
+
+      {/* Indicaciones del médico (si las escribió) */}
+      {datos.indicaciones && (
+        <div style={{ marginTop: '5mm', border: '1px solid #cbd5e1', borderRadius: '2mm', padding: '3mm 4mm' }}>
+          <div style={etiqueta}>Indicaciones</div>
+          <div style={{ fontSize: '10pt', lineHeight: 1.45, marginTop: '1mm', whiteSpace: 'pre-wrap' }}>{datos.indicaciones}</div>
+        </div>
+      )}
 
       {/* Cobro y dónde reclamar */}
       <div style={{ display: 'flex', gap: '5mm', marginTop: '6mm' }}>

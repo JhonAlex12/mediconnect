@@ -3,7 +3,7 @@ import { pool } from '../db/pool.js';
 import { publicarCambios } from '../services/tiempoReal.service.js';
 import { limpiarSinRespuesta } from '../services/bot.service.js';
 import {
-  ZONA_HORARIA, MINUTOS_GRACIA, MINUTOS_VENCE_PAUSA, CRON_MANTENIMIENTO,
+  ZONA_HORARIA, MINUTOS_GRACIA, MINUTOS_VENCE_PAUSA, CRON_MANTENIMIENTO, TURNOS_AVISO_CERCA,
 } from '../config/negocio.js';
 
 const HOY = `(now() AT TIME ZONE '${ZONA_HORARIA}')::date`;
@@ -88,12 +88,43 @@ export async function ejecutarMantenimiento() {
       `UPDATE reservas SET liberada = TRUE WHERE liberada = FALSE AND vence_en < now()`
     );
 
+    // 5. Turno virtual que aún no llega y ya casi le toca: se le avisa una sola vez.
+    //    Solo se llama a quien está en la farmacia, así que sin este aviso no sabría cuándo ir.
+    //    "Delante" = personas en la sala de su misma fila que van antes: las cajas generales llaman
+    //    primero a los turnos sin prioridad y la preferencial a los de prioridad (ver fila.service.js).
+    const { rows: cerca } = await cliente.query(
+      `WITH pendientes AS (
+         SELECT v.id,
+                (SELECT count(*)::int FROM turnos t
+                  WHERE t.fecha = v.fecha AND t.estado = 'presente'
+                    AND (t.prioridad <> 'ninguna') = (v.prioridad <> 'ninguna')
+                    AND t.orden < v.orden
+                ) AS delante
+           FROM turnos v
+          WHERE v.fecha = ${HOY} AND v.tipo = 'virtual' AND v.paciente_id IS NOT NULL
+            AND v.estado IN ('reservado', 'en_camino') AND NOT v.aviso_cerca
+       )
+       UPDATE turnos t SET aviso_cerca = TRUE
+         FROM pendientes p
+        WHERE t.id = p.id AND p.delante <= $1
+        RETURNING t.id, t.numero, t.paciente_id, p.delante`,
+      [TURNOS_AVISO_CERCA]
+    );
+    for (const t of cerca) {
+      const quienes = t.delante === 0 ? 'no hay nadie antes que tú'
+        : t.delante === 1 ? 'solo hay 1 persona antes que tú' : `solo hay ${t.delante} personas antes que tú`;
+      await notificar(cliente, t.paciente_id, 'turno_cerca',
+        `Ya casi es tu turno ${t.numero}: ${quienes}. Acércate a la farmacia y registra tu llegada `
+        + '(botón «Llegué» o la pantalla de la entrada); te llamamos cuando estés en la sala.');
+    }
+
     await cliente.query('COMMIT');
 
-    cambiados = [...pausados, ...vencidosConFalta, ...cerrados].map((t) => t.id);
+    cambiados = [...pausados, ...vencidosConFalta, ...cerrados, ...cerca].map((t) => t.id);
     if (cambiados.length > 0) {
       console.log(
-        `[tareas] pausados: ${pausados.length}, vencidos: ${vencidosConFalta.length}, cierre: ${cerrados.length}`
+        `[tareas] pausados: ${pausados.length}, vencidos: ${vencidosConFalta.length}, cierre: ${cerrados.length}, `
+        + `avisos de turno cerca: ${cerca.length}`
       );
     }
   } catch (error) {

@@ -571,6 +571,11 @@ const ACCIONES = {
   cambiar_correo: 'Cambiaste tu correo a',
   confirmar_correo: 'Confirmaste tu correo',
   reenviar_confirmacion: 'Pediste un nuevo enlace de confirmación',
+  pedir_cambio_clave: 'Pediste un enlace para cambiar tu contraseña',
+  farmacia_reenviar_confirmacion: 'La farmacia te reenvió el enlace para confirmar tu correo',
+  farmacia_enviar_cambio_clave: 'La farmacia te envió un enlace para cambiar tu contraseña',
+  farmacia_activar_cuenta: 'La farmacia reactivó tu cuenta',
+  farmacia_desactivar_cuenta: 'La farmacia desactivó tu cuenta',
 };
 
 function Historial() {

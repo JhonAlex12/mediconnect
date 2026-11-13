@@ -1,20 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, MonitorOff, MonitorSmartphone, Printer, Save, TabletSmartphone } from 'lucide-react';
+import { ClipboardPen, ExternalLink, MonitorOff, MonitorSmartphone, Printer, Save, TabletSmartphone } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useSesion } from '../../lib/sesion';
 import { guardarTokenKiosco } from '../../lib/kiosco';
 import { Aviso, BotonAccion, useAccion } from './comunes';
-import { RegistrarFisico } from './FilaFarmacia';
 import { TiqueteImpresion, imprimirTiquete } from '../TiqueteImpresion';
 
 // Pantalla de turnos de la entrada: activarla en un equipo, desactivarlas y, como respaldo,
-// registrar un turno a mano si la pantalla falla
+// abrir la página para registrar un turno a mano (/turno-manual) si la pantalla falla
 export default function KioscoAdmin() {
   const navegar = useNavigate();
   const { cerrarSesion } = useSesion();
   const { ocupado, aviso, ejecutar } = useAccion();
-  const respaldo = useAccion();
 
   const activarAqui = async () => {
     if (!window.confirm(
@@ -70,16 +68,18 @@ export default function KioscoAdmin() {
 
       <AjustesImpresion />
 
-      <div className="space-y-3">
+      <section className="bg-white rounded-xl border border-slate-300 p-5 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h3 className="text-lg font-bold text-slate-900">Respaldo: registrar un turno a mano</h3>
-          <p className="text-sm text-slate-600">Úsalo solo si la pantalla de la entrada no está funcionando.</p>
+          <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <ClipboardPen className="w-5 h-5 text-slate-600" /> Respaldo: registrar un turno a mano
+          </h3>
+          <p className="text-sm text-slate-600">Úsalo solo si la pantalla de la entrada no está funcionando. Se abre en otra pestaña.</p>
         </div>
-        <Aviso aviso={respaldo.aviso} />
-        <div className="max-w-md">
-          <RegistrarFisico ocupado={respaldo.ocupado} ejecutar={respaldo.ejecutar} />
-        </div>
-      </div>
+        <a href="/turno-manual" target="_blank" rel="noopener noreferrer"
+          className="flex items-center gap-2 bg-marca-azul hover:bg-marca-azul-oscuro text-white px-4 py-2.5 rounded-lg text-sm font-semibold">
+          Abrir registro manual <ExternalLink className="w-4 h-4" />
+        </a>
+      </section>
     </div>
   );
 }
@@ -132,7 +132,7 @@ function AjustesImpresion() {
         <label htmlFor="papel" className="font-semibold text-slate-800">Ancho del papel</label>
         <select id="papel" value={ajustes.papel} onChange={(e) => setAjustes((a) => ({ ...a, papel: Number(e.target.value) }))}
           className="border border-slate-400 rounded-lg px-3 py-2">
-          <option value={80}>80 mm (el más común)</option>
+          <option value={80}>80 mm</option>
           <option value={58}>58 mm</option>
         </select>
       </div>

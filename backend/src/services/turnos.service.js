@@ -98,7 +98,6 @@ export async function tomarTurno({ codigo, documento, confirmar, prioridad = 'ni
       i.estado = calcularEstado({
         pendiente: i.pendiente,
         stockActual: i.stock_actual,
-        stockMinimo: i.stock_minimo,
         reservadoOtros: i.reservadoOtros,
       });
       if (i.estado === 'agotado') avisos.push(`${i.nombre}: agotado`);

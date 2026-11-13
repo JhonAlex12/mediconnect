@@ -84,7 +84,7 @@ export default function UsuariosFarmacia() {
           <Users className="w-6 h-6 text-slate-600" />
           Usuarios
         </h2>
-        <BotonAccion color="oscuro" icono={UserPlus} onClick={() => setCreando((v) => !v)}>
+        <BotonAccion color="azul" icono={UserPlus} onClick={() => setCreando((v) => !v)}>
           Nuevo usuario
         </BotonAccion>
       </div>
@@ -113,7 +113,7 @@ export default function UsuariosFarmacia() {
             <option value="inactivos">Solo inactivos</option>
           </select>
           {hayFiltros && (
-            <button type="button" onClick={limpiarFiltros} className="text-sm font-semibold text-sky-700 hover:underline cursor-pointer">
+            <button type="button" onClick={limpiarFiltros} className="text-sm font-semibold text-marca-azul hover:underline cursor-pointer">
               Limpiar filtros
             </button>
           )}
@@ -150,20 +150,20 @@ export default function UsuariosFarmacia() {
                 {visibles.map((u) => {
                   const esYo = u.id === yo.id;
                   const abierto = editando?.id === u.id;
-                  const fondo = abierto ? 'bg-sky-50' : resaltado === u.id ? 'bg-emerald-100' : '';
+                  const fondo = abierto ? 'bg-marca-hielo' : resaltado === u.id ? 'bg-[#dcebf8]' : '';
                   return (
                     <Fragment key={u.id}>
                     <tr className={`transition-colors duration-700 ${fondo} ${u.activo ? '' : 'text-slate-400'}`}>
                       <td className="px-5 py-3 font-semibold">
                         <span className={u.activo ? 'text-slate-900' : ''}>{u.nombre}</span>
-                        {esYo && <span className="ml-2 text-xs font-bold bg-sky-100 text-sky-800 px-2 py-0.5 rounded-full">Tú</span>}
+                        {esYo && <span className="ml-2 text-xs font-bold bg-marca-azul text-white px-2 py-0.5 rounded-full">Tú</span>}
                       </td>
                       <td className="px-3 py-3 font-mono text-sm">{u.usuario}</td>
                       <td className="px-3 py-3">{ROLES[u.rol] ?? u.rol}</td>
                       <td className="px-3 py-3 text-sm">{nombreCaja(u.caja)}</td>
                       <td className="px-3 py-3">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                          u.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                          u.activo ? 'bg-marca-hielo text-marca-azul-oscuro ring-1 ring-marca-azul/25' : 'bg-slate-100 text-slate-500'
                         }`}>
                           {u.activo ? 'Activo' : 'Inactivo'}
                         </span>
@@ -171,16 +171,16 @@ export default function UsuariosFarmacia() {
                       <td className="px-3 py-3 text-sm">{fecha(u.creado_en)}</td>
                       <td className="px-5 py-3">
                         <div className="flex gap-2 justify-end flex-wrap">
-                          <BotonAccion color="gris" icono={Pencil} ocupado={ocupado}
+                          <BotonAccion color="azulSuave" icono={Pencil} ocupado={ocupado}
                             onClick={() => alternar(u.id, 'datos')}>
                             Editar
                           </BotonAccion>
-                          <BotonAccion color="gris" icono={KeyRound} ocupado={ocupado}
+                          <BotonAccion color="azulSuave" icono={KeyRound} ocupado={ocupado}
                             onClick={() => alternar(u.id, 'clave')}>
                             Clave
                           </BotonAccion>
                           {!esYo && (
-                            <BotonAccion color={u.activo ? 'rojo' : 'verde'} icono={Power} ocupado={ocupado}
+                            <BotonAccion color={u.activo ? 'contorno' : 'azul'} icono={Power} ocupado={ocupado}
                               onClick={() => cambiarEstado(u)}>
                               {u.activo ? 'Desactivar' : 'Activar'}
                             </BotonAccion>
@@ -189,7 +189,7 @@ export default function UsuariosFarmacia() {
                       </td>
                     </tr>
                     {abierto && (
-                      <tr className="bg-sky-50">
+                      <tr className="bg-marca-hielo">
                         <td colSpan={7} className="px-5 pb-4">
                           <EditarUsuario
                             key={editando.modo}
@@ -224,11 +224,11 @@ function Tarjeta({ titulo, icono: Icono, alCerrar, embebida = false, children })
   return (
     <section ref={ref} onKeyDown={(e) => e.key === 'Escape' && alCerrar()}
       className={`bg-white overflow-hidden ${embebida
-        ? 'rounded-lg border-2 border-sky-300 shadow-sm'
+        ? 'rounded-lg border-2 border-marca-azul/40 shadow-sm'
         : 'rounded-xl shadow-md border border-slate-300'}`}>
       <div className="px-5 py-3 border-b border-slate-200 flex items-center justify-between gap-3">
         <h3 className="font-bold text-slate-800 flex items-center gap-2">
-          <Icono className="w-5 h-5 text-slate-600" />
+          <Icono className="w-5 h-5 text-marca-azul" />
           {titulo}
         </h3>
         <button type="button" onClick={alCerrar} aria-label="Cerrar" className="p-1 rounded hover:bg-slate-100 cursor-pointer">
@@ -308,7 +308,7 @@ function NuevoUsuario({ ocupado, ejecutar, alCerrar }) {
           <SelectorCaja id="nu-caja" valor={rol === 'auxiliar' ? caja : null} onChange={setCaja} disabled={rol !== 'auxiliar'} />
         </div>
         <div className="lg:pt-6">
-          <BotonAccion type="submit" color="oscuro" ocupado={ocupado || !claveValida(clave)}>
+          <BotonAccion type="submit" color="azul" ocupado={ocupado || !claveValida(clave)}>
             Crear
           </BotonAccion>
         </div>
@@ -361,7 +361,7 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar, alGuardar }
             {confirmacion && !coinciden && <p className="text-xs mt-1 text-red-700">No coinciden.</p>}
           </div>
           <div className="sm:pt-6">
-            <BotonAccion type="submit" color="oscuro" ocupado={ocupado || !claveValida(clave) || !coinciden}>
+            <BotonAccion type="submit" color="azul" ocupado={ocupado || !claveValida(clave) || !coinciden}>
               Guardar
             </BotonAccion>
           </div>
@@ -389,7 +389,7 @@ function EditarUsuario({ u, modo, esYo, ocupado, ejecutar, alCerrar, alGuardar }
           <SelectorCaja id="eu-caja" valor={rol === 'auxiliar' ? caja : null} onChange={setCaja} disabled={rol !== 'auxiliar'} />
         </div>
         <div className="sm:pt-6">
-          <BotonAccion type="submit" color="oscuro" ocupado={ocupado || sinCambios || nombre.trim().length < 3}>
+          <BotonAccion type="submit" color="azul" ocupado={ocupado || sinCambios || nombre.trim().length < 3}>
             Guardar
           </BotonAccion>
         </div>

@@ -23,7 +23,7 @@ const TRAMITES = {
   otro: { texto: 'Otro trámite', icono: MessageCircleQuestion },
 };
 
-const PRIORIDADES = [
+export const PRIORIDADES = [
   ['adulto_mayor', 'Adulto mayor', PersonStanding],
   ['embarazada', 'Mujer en embarazo', Baby],
   ['discapacidad', 'Persona con discapacidad', Accessibility],
@@ -39,9 +39,9 @@ const fechaCorta = (d = new Date()) => d.toLocaleDateString('es-CO', { day: 'num
 
 // Botones: principal azul, principal verde y suave (azul muy claro)
 const base = 'rounded-2xl transition active:scale-[0.99] cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed';
-const claseAzul = `${base} bg-gradient-to-br from-marca-azul to-marca-azul-oscuro text-white shadow-lg shadow-marca-azul/25 hover:brightness-110`;
-const claseVerde = `${base} bg-gradient-to-br from-[#11a196] to-[#0b7a72] text-white shadow-lg shadow-marca-verde/25 hover:brightness-110`;
-const claseSuave = `${base} bg-[#e8f2fb] text-marca-noche border border-[#cfe2f3] shadow-sm hover:bg-[#dcebf8]`;
+export const claseAzul = `${base} bg-gradient-to-br from-marca-azul to-marca-azul-oscuro text-white shadow-lg shadow-marca-azul/25 hover:brightness-110`;
+export const claseVerde = `${base} bg-gradient-to-br from-[#11a196] to-[#0b7a72] text-white shadow-lg shadow-marca-verde/25 hover:brightness-110`;
+export const claseSuave = `${base} bg-[#e8f2fb] text-marca-noche border border-[#cfe2f3] shadow-sm hover:bg-[#dcebf8]`;
 
 export default function Kiosco() {
   useTitulo('Pantalla de turnos');
@@ -382,7 +382,7 @@ export default function Kiosco() {
 }
 
 // Fondo claro con la foto de la sede desvanecida arriba a la derecha y una onda de la marca
-function Marco({ children }) {
+export function Marco({ children }) {
   const [hora, setHora] = useState(() => new Date());
   useEffect(() => {
     const t = setInterval(() => setHora(new Date()), 15_000);
@@ -431,7 +431,7 @@ function Marco({ children }) {
 }
 
 // Logo y saludo. "grande" en el inicio; compacto en los demás pasos.
-function Encabezado({ grande = false }) {
+export function Encabezado({ grande = false }) {
   const logo = (
     <span className="flex items-center justify-center gap-3">
       <img src="/img/logo-simbolo.png" alt="" className={grande ? 'w-20 h-20 sm:w-24 sm:h-24' : 'w-12 h-12'} />
@@ -470,7 +470,7 @@ function Rayitas({ espejo = false }) {
   );
 }
 
-function Titulo({ icono: Icono, children }) {
+export function Titulo({ icono: Icono, children }) {
   return (
     <h1 className="font-titulo text-3xl sm:text-4xl font-extrabold text-marca-noche text-center mb-8 flex items-center justify-center gap-3">
       <Icono className="w-10 h-10 text-marca-azul shrink-0" strokeWidth={1.75} /> {children}
@@ -478,7 +478,7 @@ function Titulo({ icono: Icono, children }) {
   );
 }
 
-function BotonTramite({ clase, icono: Icono, titulo, detalle, onClick, centrado = false }) {
+export function BotonTramite({ clase, icono: Icono, titulo, detalle, onClick, centrado = false }) {
   return (
     <button type="button" onClick={onClick}
       className={`${clase} px-7 py-6 sm:py-7 flex items-center gap-5 text-left ${centrado ? 'justify-center' : ''}`}>
@@ -504,19 +504,19 @@ function Nota({ icono: Icono, titulo, color, children }) {
   );
 }
 
-function Volver({ alVolver }) {
+export function Volver({ alVolver, texto = 'Volver al inicio' }) {
   return (
     <div className="text-center mt-8">
       <button type="button" onClick={alVolver}
         className="inline-flex items-center gap-1 text-lg font-semibold text-marca-azul hover:text-marca-noche px-4 py-2 cursor-pointer">
-        <ChevronLeft className="w-5 h-5" /> Volver al inicio
+        <ChevronLeft className="w-5 h-5" /> {texto}
       </button>
     </div>
   );
 }
 
 // Tiquete del turno, con el borde de abajo dentado como el papel de un dispensador
-function Tiquete({ resultado }) {
+export function Tiquete({ resultado }) {
   const dientes = 'conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 18px 100%';
   const { icono: Icono, texto } = TRAMITES[resultado.tramite] ?? TRAMITES.reclamar;
   return (

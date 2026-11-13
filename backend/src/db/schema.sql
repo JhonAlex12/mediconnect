@@ -200,6 +200,24 @@ ALTER TABLE formulas ADD COLUMN IF NOT EXISTS exencion VARCHAR(30)
 -- Valor calculado al recibir la fórmula: no cambia aunque después cambie la tarifa
 ALTER TABLE formulas ADD COLUMN IF NOT EXISTS cuota_moderadora INTEGER NOT NULL DEFAULT 0
   CHECK (cuota_moderadora >= 0);
+-- Indicaciones del médico sobre lo recetado (cómo tomarlo, por cuánto tiempo). Opcional.
+ALTER TABLE formulas ADD COLUMN IF NOT EXISTS indicaciones TEXT
+  CHECK (indicaciones IS NULL OR char_length(indicaciones) <= 1000);
+
+-- Afiliación vigente del paciente (régimen, rango de ingreso y EPS). Es un dato del
+-- paciente, no de cada consulta: la IPS la registra la primera vez y después se usa sola.
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS regimen VARCHAR(15)
+  CHECK (regimen IN ('contributivo', 'subsidiado'));
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS rango_ingreso CHAR(1)
+  CHECK (rango_ingreso IN ('A', 'B', 'C'));
+ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS eps VARCHAR(80);
+-- Pacientes que ya tenían fórmulas: toma la afiliación de la más reciente
+UPDATE pacientes p
+   SET regimen = u.regimen, rango_ingreso = u.rango_ingreso, eps = u.eps
+  FROM (SELECT DISTINCT ON (paciente_id) paciente_id, regimen, rango_ingreso, eps
+          FROM formulas WHERE regimen IS NOT NULL
+         ORDER BY paciente_id, creado_en DESC) u
+ WHERE p.id = u.paciente_id AND p.regimen IS NULL;
 
 -- PAGOS: la cuota se cobra una sola vez por fórmula (UNIQUE), en la primera entrega.
 -- Si después vuelve por lo pendiente, no paga de nuevo.
@@ -497,3 +515,6 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS notificacion_push ON notificaciones;
 CREATE TRIGGER notificacion_push AFTER INSERT ON notificaciones
   FOR EACH ROW EXECUTE FUNCTION avisar_notificacion();
+
+-- Aviso "ya casi es tu turno" al turno virtual que aún no llega: se envía una sola vez
+ALTER TABLE turnos ADD COLUMN IF NOT EXISTS aviso_cerca BOOLEAN NOT NULL DEFAULT FALSE;

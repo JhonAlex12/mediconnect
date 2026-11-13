@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { BarChart3, Bike, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet, TabletSmartphone } from 'lucide-react';
+import { BarChart3, Bike, Contact, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet, TabletSmartphone } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 import { TiempoRealProvider } from '../../lib/tiempoReal';
 import Encabezado, { useTitulo } from '../Encabezado';
-import LoginEmpleado from './LoginEmpleado';
 import FilaFarmacia from './FilaFarmacia';
 import InventarioFarmacia from './InventarioFarmacia';
 import ReportesFarmacia from './ReportesFarmacia';
@@ -13,6 +12,7 @@ import TarifasFarmacia from './TarifasFarmacia';
 import DomiciliosFarmacia from './DomiciliosFarmacia';
 import ContenidoFarmacia from './ContenidoFarmacia';
 import KioscoAdmin from './KioscoAdmin';
+import PacientesFarmacia from './PacientesFarmacia';
 
 const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador', medico: 'Médico (sistema IPS)' };
 
@@ -23,6 +23,8 @@ const SECCIONES = [
   { ruta: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia, roles: ['auxiliar'] },
   { ruta: 'inventario', texto: 'Inventario', icono: Package, componente: InventarioFarmacia },
   { ruta: 'domicilios', texto: 'Domicilios', icono: Bike, componente: DomiciliosFarmacia, roles: ['domicilios'] },
+  // Pacientes: el administrador ve la lista; el auxiliar solo busca por documento exacto
+  { ruta: 'pacientes', texto: 'Pacientes', icono: Contact, componente: PacientesFarmacia },
   // Reportes y usuarios: solo administradores (el backend también lo exige)
   { ruta: 'reportes', texto: 'Reportes', icono: BarChart3, componente: ReportesFarmacia, soloAdmin: true },
   { ruta: 'usuarios', texto: 'Usuarios', icono: Users, componente: UsuariosFarmacia, soloAdmin: true },
@@ -46,6 +48,11 @@ export default function PanelFarmacia() {
   };
   useTitulo('Farmacia');
 
+  // Una sesión de médico (sistema de la IPS) no sirve en el panel: se cierra
+  useEffect(() => {
+    if (usuario?.rol === 'medico') cerrarSesion();
+  }, [usuario, cerrarSesion]);
+
   if (verificando) {
     return (
       <Pagina>
@@ -53,19 +60,9 @@ export default function PanelFarmacia() {
       </Pagina>
     );
   }
-  if (!usuario) {
-    return (
-      <Pagina>
-        <LoginEmpleado />
-      </Pagina>
-    );
-  }
-
-  // El médico solo usa el sistema de la IPS (página aparte, con la misma sesión)
-  if (usuario.rol === 'medico') {
-    window.location.replace('/ips/');
-    return null;
-  }
+  // Sin sesión (salió, venció o nunca ingresó) se vuelve a la página principal;
+  // los empleados ingresan desde allí con "Iniciar sesión → Soy empleado"
+  if (!usuario || usuario.rol === 'medico') return <Navigate to="/" replace />;
 
   const permitidas = SECCIONES.filter((s) =>
     s.soloAdmin ? usuario.rol === 'administrador' : (s.roles ?? ['administrador', 'auxiliar']).includes(usuario.rol));
