@@ -31,6 +31,7 @@ services:
       - key: IPS_API_KEY
         generateValue: true
       # Usuario administrador: la contraseña se escribe en Render al crear el sitio
+      # (mínimo 10 caracteres, con letras y números; si no, el sitio no arranca la primera vez)
       - key: ADMIN_USUARIO
         value: admin
       - key: ADMIN_CLAVE
@@ -50,7 +51,8 @@ services:
         sync: false
       - key: CORREO_REMITENTE
         sync: false
-      # Médico de prueba de la IPS (solo con MODO_DEMO=true). Si se deja vacía, la contraseña es Doctor123
+      # Médico de prueba de la IPS (solo con MODO_DEMO=true): mínimo 10 caracteres, con letras y números.
+      # Si se deja vacía, el médico de prueba no se crea.
       - key: MEDICO_CLAVE
         sync: false
       # Avisos al celular (notificaciones push). Se generan una vez con:
