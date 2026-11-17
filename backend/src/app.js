@@ -104,6 +104,8 @@ const DIST = fileURLToPath(new URL('../../frontend/dist/', import.meta.url));
 if (existsSync(DIST)) {
   // Los archivos de /assets llevan un código en el nombre: se pueden guardar en caché un año
   app.use('/assets', express.static(`${DIST}assets`, { immutable: true, maxAge: '1y' }));
+  // Un archivo de una versión anterior ya no existe: se responde 404 (no la página), y el navegador recarga
+  app.use('/assets', (req, res) => res.status(404).end());
   app.use(express.static(DIST, { index: false, maxAge: '1h' }));
   // Cualquier otra dirección (/, /farmacia/fila, /salud-al-dia/...) la resuelve React
   app.get(/^(?!\/api\/|\/socket\.io\/).*/, (req, res) => {

@@ -5,6 +5,7 @@ import FormulaMedica from './FormulaMedica';
 import IngresoIps, { LogoIps } from './IngresoIps';
 import { api } from '../lib/api.js';
 import { leerTokenIps, guardarTokenIps } from './sesionIps';
+import LimiteError from '../components/LimiteError';
 import '../index.css';
 
 // Quién puede emitir fórmulas de prueba (el backend también lo exige)
@@ -121,6 +122,8 @@ function SistemaIps() {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <SistemaIps />
+    <LimiteError inicio="/ips/">
+      <SistemaIps />
+    </LimiteError>
   </React.StrictMode>
 );

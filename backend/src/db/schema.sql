@@ -154,6 +154,14 @@ CREATE INDEX IF NOT EXISTS idx_turnos_fecha_estado ON turnos (fecha, estado);
 CREATE INDEX IF NOT EXISTS idx_reservas_medicamento ON reservas (medicamento_id) WHERE liberada = FALSE;
 CREATE INDEX IF NOT EXISTS idx_notificaciones_paciente ON notificaciones (paciente_id, leida);
 CREATE INDEX IF NOT EXISTS idx_formula_items_formula ON formula_items (formula_id);
+-- Búsquedas por paciente, fórmula o medicamento (historial, ficha del paciente, reportes)
+CREATE INDEX IF NOT EXISTS idx_formulas_paciente ON formulas (paciente_id);
+CREATE INDEX IF NOT EXISTS idx_turnos_paciente ON turnos (paciente_id);
+CREATE INDEX IF NOT EXISTS idx_turnos_formula ON turnos (formula_id);
+CREATE INDEX IF NOT EXISTS idx_reservas_turno ON reservas (turno_id) WHERE liberada = FALSE;
+CREATE INDEX IF NOT EXISTS idx_dispensaciones_item ON dispensaciones (formula_item_id);
+CREATE INDEX IF NOT EXISTS idx_movimientos_medicamento ON movimientos_inventario (medicamento_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_registro_paciente ON registro_accesos (paciente_id, fecha) WHERE paciente_id IS NOT NULL;
 
 -- ============================================================
 -- Paso 10: fila de la farmacia
