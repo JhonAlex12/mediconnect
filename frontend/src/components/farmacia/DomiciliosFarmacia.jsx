@@ -1,11 +1,31 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Bike, CheckCircle2, MapPin, Phone, RefreshCw, User, XCircle } from 'lucide-react';
+import { ArrowRightLeft, BadgeCheck, Banknote, Bike, CheckCircle2, Clock, MapPin, Phone, RefreshCw, User, XCircle } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useSocketEnVivo } from '../../lib/tiempoReal';
 import { Aviso, BotonAccion, CampoPesos, claseCampo, useAccion } from './comunes';
 import { ESTADOS_DOMICILIO } from '../../paginas/MiCuenta';
-import { totalDomicilio } from '../../lib/costoEnvio';
+import { totalDomicilio, useDatosDomicilio } from '../../lib/costoEnvio';
 
 const pesos = (n) => `$${Number(n).toLocaleString('es-CO')}`;
+// "hace 25 min", "hace 1 h 10 min"
+export function hace(iso) {
+  const minutos = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (minutos < 1) return 'hace un momento';
+  if (minutos < 60) return `hace ${minutos} min`;
+  return `hace ${Math.floor(minutos / 60)} h${minutos % 60 ? ` ${minutos % 60} min` : ''}`;
+}
+
+// Estado de un domiciliario, calculado por el servidor según sus entregas (nadie lo marca)
+export function estadoDomiciliario(u) {
+  if (u.en_camino > 0) {
+    return `En ruta con ${u.en_camino} ${u.en_camino === 1 ? 'entrega' : 'entregas'} · salió ${hace(u.en_ruta_desde)}`;
+  }
+  if (u.ultima_entrega_en && Date.now() - new Date(u.ultima_entrega_en).getTime() < 60 * 60000) {
+    return `Disponible · entregó lo último ${hace(u.ultima_entrega_en)} (puede venir de regreso)`;
+  }
+  return 'Disponible';
+}
+
 const fechaHora = (iso) =>
   new Date(iso).toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 
@@ -25,25 +45,35 @@ const SIGUIENTE = {
 export default function DomiciliosFarmacia() {
   const [filtro, setFiltro] = useState('activos');
   const [lista, setLista] = useState(null);
+  const [domiciliarios, setDomiciliarios] = useState([]);   // quién puede llevar los pedidos
   const [error, setError] = useState(null);
+  const datosDomicilio = useDatosDomicilio();
 
   const cargar = useCallback(async () => {
     try {
-      const d = await api(`/domicilios?estado=${filtro}`);
+      const [d, r] = await Promise.all([api(`/domicilios?estado=${filtro}`), api('/domicilios/domiciliarios')]);
       setLista(d.domicilios);
+      setDomiciliarios(r.domiciliarios);
       setError(null);
     } catch (err) {
       setError({ tipo: 'error', texto: err.message });
     }
   }, [filtro]);
 
-  // Se actualiza solo cada 30 segundos
+  // Se actualiza al instante cuando un pedido cambia (lo pide o cancela el paciente, o lo mueve
+  // otro equipo de la farmacia); cada 30 segundos, por si se perdió la conexión en vivo
   useEffect(() => {
     setLista(null);
     cargar();
     const t = setInterval(cargar, 30000);
     return () => clearInterval(t);
   }, [cargar]);
+  const socket = useSocketEnVivo();
+  useEffect(() => {
+    if (!socket) return undefined;
+    socket.on('domicilios_actualizados', cargar);
+    return () => socket.off('domicilios_actualizados', cargar);
+  }, [socket, cargar]);
 
   return (
     <div className="space-y-4">
@@ -64,6 +94,14 @@ export default function DomiciliosFarmacia() {
       </div>
 
       <Aviso aviso={error} />
+      {datosDomicilio && !datosDomicilio.transferencia && (
+        <p className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3">
+          <Banknote className="w-4 h-4 mt-0.5 shrink-0" />
+          Los pacientes no pueden pagar por transferencia: falta la cuenta donde la farmacia recibe los pagos.
+          El administrador la registra en Tarifas.
+        </p>
+      )}
+      {filtro === 'activos' && <EstadoDomiciliarios domiciliarios={domiciliarios} lista={lista} />}
       {lista === null ? (
         <p className="text-slate-500">Cargando…</p>
       ) : lista.length === 0 ? (
@@ -72,15 +110,26 @@ export default function DomiciliosFarmacia() {
         </p>
       ) : (
         <div className="grid lg:grid-cols-2 gap-4">
-          {lista.map((d) => <TarjetaDomicilio key={d.id} d={d} recargar={cargar} />)}
+          {lista.map((d) => <TarjetaDomicilio key={d.id} d={d} domiciliarios={domiciliarios} recargar={cargar} />)}
         </div>
       )}
     </div>
   );
 }
 
-function TarjetaDomicilio({ d, recargar }) {
+function TarjetaDomicilio({ d, domiciliarios, recargar }) {
   const [nota, setNota] = useState('');
+  // Quién lo lleva: se elige al despachar (si hay un solo domiciliario, queda elegido)
+  const [domiciliario, setDomiciliario] = useState('');
+  const domiciliarioElegido = domiciliario || (domiciliarios.length === 1 ? String(domiciliarios[0].id) : '');
+  const faltaDomiciliario = domiciliarios.length > 0 && !domiciliarioElegido;
+  const [otroDomiciliario, setOtroDomiciliario] = useState('');   // para pasar un pedido en camino a otro
+  const otros = domiciliarios.filter((u) => u.id !== d.domiciliario_id);
+  const pasarAOtro = async () => {
+    const ok = await ejecutar(() => api(`/domicilios/${d.id}/domiciliario`, { metodo: 'POST',
+      cuerpo: { domiciliario_id: Number(otroDomiciliario) } }), 'Domiciliario cambiado');
+    if (ok) setOtroDomiciliario('');
+  };
   const [cantidades, setCantidades] = useState({});
   const [medio, setMedio] = useState('efectivo');
   const [recibido, setRecibido] = useState('');
@@ -89,6 +138,9 @@ function TarjetaDomicilio({ d, recargar }) {
   const e = ESTADOS_DOMICILIO[d.estado];
   const siguiente = SIGUIENTE[d.estado];
   const cobro = d.cobro ?? totalDomicilio(d);
+  // Pagado por transferencia al pedirlo: se confirma en el banco antes de despachar y al entregar no se cobra
+  const prepago = d.forma_pago === 'transferencia';
+  const pagoPorConfirmar = prepago && !d.pago_verificado_en;
 
   // Al despachar se elige cuánto sale (por defecto, lo pendiente que haya disponible);
   // al entregar, cuánto recibió el paciente (por defecto, todo lo despachado)
@@ -108,7 +160,10 @@ function TarjetaDomicilio({ d, recargar }) {
   const cambiar = (estado, texto) =>
     ejecutar(() => api(`/domicilios/${d.id}`, { metodo: 'PATCH', cuerpo: {
       estado, nota: nota.trim() || undefined,
-      ...(estado === 'en_camino' ? { items: enviados.filter((it) => it.cantidad > 0) } : {}),
+      ...(estado === 'en_camino' ? {
+        items: enviados.filter((it) => it.cantidad > 0),
+        ...(domiciliarioElegido ? { domiciliario_id: Number(domiciliarioElegido) } : {}),
+      } : {}),
       ...(estado === 'entregado' ? {
         items: enviados,
         pago: { medio, recibido: recibido === '' ? null : Number(recibido), referencia },
@@ -186,15 +241,20 @@ function TarjetaDomicilio({ d, recargar }) {
           ))}
         </ul>
       )}
-      <div className="text-sm border border-slate-200 rounded-lg p-3">
-        <p className="font-bold text-slate-800">
-          {d.estado === 'entregado' ? (d.cobro ? 'Cobrado al entregar' : 'Sin recibo registrado · valor estimado') : 'Cobrar al entregar'}: {pesos(cobro.total)}
-        </p>
-        <p className="text-slate-500">
-          {cobro.cuota > 0 ? `Cuota moderadora ${pesos(cobro.cuota)} + ` : 'Sin cuota moderadora · '}envío {pesos(cobro.envio)}
-        </p>
-      </div>
-      {d.estado === 'en_camino' && cobro.total > 0 && (
+      {prepago ? (
+        <PagoPorTransferencia d={d} cobro={cobro} ocupado={ocupado}
+          confirmar={() => ejecutar(() => api(`/domicilios/${d.id}/pago-verificado`, { metodo: 'POST' }), 'Pago confirmado: ya se puede despachar')} />
+      ) : (
+        <div className="text-sm border border-slate-200 rounded-lg p-3">
+          <p className="font-bold text-slate-800">
+            {d.estado === 'entregado' ? (d.cobro ? 'Cobrado al entregar' : 'Sin recibo registrado · valor estimado') : 'Contraentrega · cobrar al entregar'}: {pesos(cobro.total)}
+          </p>
+          <p className="text-slate-500">
+            {cobro.cuota > 0 ? `Cuota moderadora ${pesos(cobro.cuota)} + ` : 'Sin cuota moderadora · '}envío {pesos(cobro.envio)}
+          </p>
+        </div>
+      )}
+      {d.estado === 'en_camino' && cobro.total > 0 && !prepago && (
         <fieldset disabled={ocupado} className="space-y-2 border border-slate-200 rounded-lg p-3 text-sm">
           <legend className="font-bold">Pago recibido al entregar</legend>
           <label className="block">Medio de pago
@@ -217,6 +277,34 @@ function TarjetaDomicilio({ d, recargar }) {
           {medio === 'efectivo' && Number(recibido) >= cobro.total && <p>Cambio: {pesos(Number(recibido) - cobro.total)}</p>}
         </fieldset>
       )}
+      {d.domiciliario && ['en_camino', 'entregado'].includes(d.estado) && (
+        <p className="text-sm text-slate-700 flex items-center gap-1.5"><Bike className="w-4 h-4" /> Lo lleva: <strong>{d.domiciliario}</strong></p>
+      )}
+      {d.estado === 'en_camino' && otros.length > 0 && (
+        <div className="flex items-center gap-2 text-sm">
+          <select value={otroDomiciliario} onChange={(ev) => setOtroDomiciliario(ev.target.value)} disabled={ocupado}
+            aria-label="Pasar el pedido a otro domiciliario" className={claseCampo}>
+            <option value="">{d.domiciliario ? 'Pasarlo a otro domiciliario…' : 'Asignarle un domiciliario…'}</option>
+            {otros.map((u) => (
+              <option key={u.id} value={u.id}>{u.nombre} — {u.en_camino ? `en ruta con ${u.en_camino}` : 'disponible'}</option>
+            ))}
+          </select>
+          <BotonAccion color="contorno" icono={ArrowRightLeft} ocupado={ocupado || !otroDomiciliario} onClick={pasarAOtro}>
+            {d.domiciliario ? 'Pasar' : 'Asignar'}
+          </BotonAccion>
+        </div>
+      )}
+      {despachando && domiciliarios.length > 0 && (
+        <label className="block text-sm font-bold text-slate-800">¿Quién lo lleva?
+          <select value={domiciliarioElegido} onChange={(ev) => setDomiciliario(ev.target.value)} disabled={ocupado}
+            className={`${claseCampo} font-normal`}>
+            <option value="">Elige el domiciliario</option>
+            {domiciliarios.map((u) => (
+              <option key={u.id} value={u.id}>{u.nombre} — {u.en_camino ? `en ruta con ${u.en_camino}` : 'disponible'}</option>
+            ))}
+          </select>
+        </label>
+      )}
       {d.nota_farmacia && <p className="text-sm text-slate-600">Nota al paciente: {d.nota_farmacia}</p>}
 
       {siguiente && (
@@ -226,7 +314,7 @@ function TarjetaDomicilio({ d, recargar }) {
             className={`${claseCampo} text-sm`} />
           <div className="flex flex-wrap gap-2">
             <BotonAccion color={siguiente[2]} icono={siguiente[0] === 'entregado' ? CheckCircle2 : Bike}
-              ocupado={ocupado || ((despachando || entregando) && (!cantidadesValidas || !algo))}
+              ocupado={ocupado || ((despachando || entregando) && (!cantidadesValidas || !algo)) || (despachando && (pagoPorConfirmar || faltaDomiciliario)) || (entregando && pagoPorConfirmar)}
               onClick={() => cambiar(siguiente[0], `Domicilio: ${ESTADOS_DOMICILIO[siguiente[0]].texto.toLowerCase()}`)}>
               {siguiente[1]}
             </BotonAccion>
@@ -241,5 +329,69 @@ function TarjetaDomicilio({ d, recargar }) {
       )}
       <Aviso aviso={aviso} />
     </article>
+  );
+}
+
+// El paciente pagó por transferencia al pedir el domicilio
+function PagoPorTransferencia({ d, cobro, ocupado, confirmar }) {
+  const comprobante = <>comprobante <strong>{d.pago_referencia}</strong></>;
+  // Si mientras tanto la cuota se pagó en ventanilla, el paciente pagó de más
+  const saldoAFavor = d.estado !== 'cancelado' ? d.pago_valor - cobro.total : 0;
+  if (d.estado === 'cancelado') {
+    return (
+      <div className="text-sm bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-3">
+        <p className="font-bold">{d.pago_verificado_en
+          ? `Devolver ${pesos(d.pago_valor)} al paciente`
+          : `Si la transferencia llegó, devolver ${pesos(d.pago_valor)} al paciente`}</p>
+        <p>Pagó por transferencia · {comprobante}</p>
+      </div>
+    );
+  }
+  if (!d.pago_verificado_en) {
+    return (
+      <div className="text-sm bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-3 space-y-2">
+        <p className="font-bold flex items-center gap-1.5"><Banknote className="w-4 h-4" /> Pagó por transferencia {pesos(d.pago_valor)} · por confirmar</p>
+        <p>{comprobante}. Revisa en el banco o la billetera que el dinero llegó: el pedido no se puede
+          {d.estado === 'en_camino' ? ' marcar entregado' : ' despachar'} hasta confirmarlo.
+          {d.estado === 'en_camino' ? ' El domiciliario ya no le cobra.' : ' Si no llegó, cancélalo con un mensaje para el paciente.'}</p>
+        <BotonAccion color="verde" icono={BadgeCheck} ocupado={ocupado} onClick={confirmar}>Confirmar que llegó el pago</BotonAccion>
+      </div>
+    );
+  }
+  return (
+    <div className="text-sm bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-lg p-3">
+      <p className="font-bold flex items-center gap-1.5"><BadgeCheck className="w-4 h-4" /> Pagado por transferencia: {pesos(d.pago_valor)}</p>
+      <p>{comprobante} · el domiciliario no cobra nada al entregar.</p>
+      {saldoAFavor > 0 && <p className="font-bold text-amber-900 mt-1">Saldo a favor del paciente: {pesos(saldoAFavor)} (la cuota se pagó por otro lado): devolvérselo.</p>}
+    </div>
+  );
+}
+
+// Arriba del panel: dónde está cada domiciliario y, si todos están en ruta, cuántos pedidos esperan
+function EstadoDomiciliarios({ domiciliarios, lista }) {
+  if (!domiciliarios.length) return null;
+  const todosEnRuta = domiciliarios.every((u) => u.en_camino > 0);
+  const porSalir = (lista ?? []).filter((d) => d.estado === 'en_preparacion').length;
+  return (
+    <section aria-label="Domiciliarios" className="grid sm:grid-cols-2 gap-2">
+      {domiciliarios.map((u) => (
+        <div key={u.id} className={`rounded-lg border p-3 text-sm flex items-start gap-2 ${
+          u.en_camino ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-emerald-50 border-emerald-300 text-emerald-950'}`}>
+          {u.en_camino ? <Bike className="w-5 h-5 shrink-0" /> : <CheckCircle2 className="w-5 h-5 shrink-0" />}
+          <div>
+            <p className="font-bold">{u.nombre}</p>
+            <p>{estadoDomiciliario(u)}</p>
+          </div>
+        </div>
+      ))}
+      {todosEnRuta && porSalir > 0 && (
+        <p className="sm:col-span-2 text-sm bg-amber-100 text-amber-950 rounded-lg p-3 flex items-start gap-2">
+          <Clock className="w-4 h-4 mt-0.5 shrink-0" />
+          {domiciliarios.length === 1 ? 'El domiciliario está en ruta' : `Los ${domiciliarios.length} domiciliarios están en ruta`}:
+          {' '}{porSalir} {porSalir === 1 ? 'pedido espera' : 'pedidos esperan'} para salir. Los pacientes ven que su pedido
+          sale cuando regrese un domiciliario, y el que termine primero ve que hay pedidos esperando.
+        </p>
+      )}
+    </section>
   );
 }

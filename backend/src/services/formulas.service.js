@@ -139,8 +139,25 @@ export async function crearFormula(datos) {
       );
     }
 
+    // Si el paciente tiene cuenta en el sitio, la fórmula aparece sola en "Mis fórmulas"
+    // (sin escribir el código) y queda en el historial de la cuenta
+    const { rows: cuentas } = await cliente.query(
+      `INSERT INTO cuenta_formulas (cuenta_id, formula_id)
+       SELECT id, $2 FROM cuentas_pacientes WHERE documento = $1 AND activa
+       ON CONFLICT DO NOTHING
+       RETURNING cuenta_id`,
+      [datos.documento, formula.id]
+    );
+    for (const { cuenta_id: cuentaId } of cuentas) {
+      await cliente.query(
+        `INSERT INTO registro_accesos (cuenta_id, accion, detalle) VALUES ($1, 'cuenta:formula_recibida', $2)`,
+        [cuentaId, formula.codigo]
+      );
+    }
+
     await cliente.query('COMMIT');
-    return { ...formula, medicamentos: datos.medicamentos.length };
+    // "cuentas": a quién avisar en vivo (quien llama lo quita antes de responder)
+    return { ...formula, medicamentos: datos.medicamentos.length, cuentas: cuentas.map((c) => c.cuenta_id) };
   } catch (error) {
     await cliente.query('ROLLBACK');
     // 23505 = violación de unicidad en PostgreSQL (código de fórmula repetido)

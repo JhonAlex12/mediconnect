@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
-import { CIUDADES_DOMICILIO, HORAS_ENLACE_CORREO } from '../config/negocio.js';
+import { CIUDADES_DOMICILIO, HORAS_ENLACE_CORREO, ZONA_HORARIA } from '../config/negocio.js';
 import { ErrorNegocio, fechaValida } from './formulas.service.js';
 import { consultarFormula } from './disponibilidad.service.js';
 import { despacharDomicilio, devolverDespacho, entregarDomicilio } from './entregaDomicilio.service.js';
@@ -348,8 +348,45 @@ export async function guardarCostoEnvio(empleadoId, valor) {
   return valor;
 }
 
+// ---------- Datos para pagar los domicilios por transferencia ----------
+// Texto libre que escribe el administrador (Nequi, banco y cuenta, a nombre de quién).
+// Sin datos, el paciente solo puede elegir contraentrega.
+
+export async function datosTransferencia() {
+  const { rows: [a] } = await pool.query(`SELECT datos FROM ajustes_sitio WHERE clave = 'pago_transferencia'`);
+  return a?.datos?.texto || null;
+}
+
+export async function guardarDatosTransferencia(empleadoId, valor) {
+  const textoLimpio = typeof valor === 'string' ? valor.trim() : '';
+  if (textoLimpio.length > 300) throw new ErrorNegocio('Los datos de transferencia admiten máximo 300 caracteres', 400);
+  if (textoLimpio) {
+    await pool.query(
+      `INSERT INTO ajustes_sitio (clave, datos, actualizado_por) VALUES ('pago_transferencia', $1, $2)
+       ON CONFLICT (clave) DO UPDATE SET datos = $1, actualizado_por = $2, actualizado_en = now()`,
+      [{ texto: textoLimpio }, empleadoId]
+    );
+  } else {
+    await pool.query(`DELETE FROM ajustes_sitio WHERE clave = 'pago_transferencia'`);
+  }
+  await pool.query(
+    `INSERT INTO registro_accesos (usuario_id, accion, detalle) VALUES ($1, 'datos_transferencia', $2)`,
+    [empleadoId, textoLimpio ? 'actualizados' : 'quitados']
+  );
+  return textoLimpio || null;
+}
+
+// Todos los domiciliarios activos tienen entregas en camino (si no hay domiciliarios, no aplica)
+const TODOS_EN_RUTA = `(EXISTS (SELECT 1 FROM usuarios_farmacia u WHERE u.rol = 'domiciliario' AND u.activo)
+  AND NOT EXISTS (SELECT 1 FROM usuarios_farmacia u WHERE u.rol = 'domiciliario' AND u.activo
+    AND NOT EXISTS (SELECT 1 FROM domicilios x WHERE x.domiciliario_id = u.id AND x.estado = 'en_camino')))`;
+
 const COLUMNAS_DOMICILIO = `d.id, f.codigo, d.direccion, d.barrio, d.ciudad, d.telefono, d.recibe,
   d.indicaciones, d.estado, d.costo_envio, f.cuota_moderadora,
+  d.forma_pago, d.pago_referencia, d.pago_valor, d.pago_verificado_en, d.domiciliario_id, d.despachado_en,
+  -- Listo para salir, pero los domiciliarios están todos en ruta: el paciente ve el aviso
+  (d.estado = 'en_preparacion' AND ${TODOS_EN_RUTA}) AS esperando_domiciliario,
+  (SELECT u.nombre FROM usuarios_farmacia u WHERE u.id = d.domiciliario_id) AS domiciliario,
   (SELECT json_build_object('cuota', cd.cuota, 'envio', cd.envio, 'total', cd.cuota + cd.envio,
      'medio', cd.medio, 'recibido', cd.recibido, 'referencia', cd.referencia, 'fecha', cd.fecha)
    FROM cobros_domicilio cd WHERE cd.domicilio_id = d.id) AS cobro,
@@ -383,7 +420,17 @@ export async function solicitarDomicilio(cuentaId, d = {}) {
   if (recibe && recibe.length > 120) errores.push('Quién recibe: máximo 120 caracteres');
   const indicaciones = opcional(d.indicaciones);
   if (indicaciones && indicaciones.length > 300) errores.push('Indicaciones: máximo 300 caracteres');
+  // Forma de pago: por transferencia antes de pedirlo (con el comprobante) o contraentrega al domiciliario
+  const formaPago = d.forma_pago ?? 'contraentrega';
+  if (!['contraentrega', 'transferencia'].includes(formaPago)) errores.push('Forma de pago: transferencia o contraentrega');
+  const referencia = formaPago === 'transferencia' ? texto(d.referencia) : null;
+  if (referencia !== null && (referencia.length < 3 || referencia.length > 40)) {
+    errores.push('Comprobante: escribe el número de la transferencia');
+  }
   if (errores.length) throw new ErrorNegocio('Revisa los datos del domicilio', 400, errores);
+  if (formaPago === 'transferencia' && !(await datosTransferencia())) {
+    throw new ErrorNegocio('Por ahora la farmacia no recibe transferencias: elige contraentrega', 409);
+  }
 
   // La fórmula debe estar en la cuenta
   const { rows: [vinculo] } = await pool.query(
@@ -409,10 +456,23 @@ export async function solicitarDomicilio(cuentaId, d = {}) {
       `SELECT COUNT(*)::int AS cantidad FROM formula_items
         WHERE formula_id = $1 AND cantidad_entregada < cantidad_formulada`, [vinculo.id]);
     if (!pendiente.cantidad) throw new ErrorNegocio('Esta fórmula ya fue entregada completa', 409);
+    // Lo que paga: la cuota (si aún no la pagó) + el envío de hoy
+    const envio = await costoEnvio();
+    const { rows: [f] } = await cliente.query(
+      `SELECT cuota_moderadora, EXISTS (SELECT 1 FROM pagos p WHERE p.formula_id = formulas.id) AS pagada
+         FROM formulas WHERE id = $1`, [vinculo.id]);
+    const total = (f.pagada ? 0 : f.cuota_moderadora) + envio;
+    // Sin nada que pagar no hay forma de pago; si transfirió, debe ser el total que vio al pedir
+    const prepago = formaPago === 'transferencia' && total > 0;
+    if (prepago && Number(d.total) !== total) {
+      throw new ErrorNegocio(`El total cambió: ahora es $${total.toLocaleString('es-CO')}. Revísalo antes de transferir.`, 409);
+    }
     const { rows: [nuevo] } = await cliente.query(
-      `INSERT INTO domicilios (cuenta_id, formula_id, direccion, barrio, ciudad, telefono, recibe, indicaciones, costo_envio)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, costo_envio`,
-      [cuentaId, vinculo.id, direccion, barrio, ciudad, telefono, recibe, indicaciones, await costoEnvio()]
+      `INSERT INTO domicilios (cuenta_id, formula_id, direccion, barrio, ciudad, telefono, recibe, indicaciones, costo_envio,
+                               forma_pago, pago_referencia, pago_valor)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, costo_envio, forma_pago`,
+      [cuentaId, vinculo.id, direccion, barrio, ciudad, telefono, recibe, indicaciones, envio,
+       prepago ? 'transferencia' : 'contraentrega', prepago ? referencia : null, prepago ? total : null]
     );
     await cliente.query(
       `INSERT INTO registro_accesos (cuenta_id, accion, detalle) VALUES ($1, 'cuenta:solicitar_domicilio', $2)`,
@@ -422,6 +482,54 @@ export async function solicitarDomicilio(cuentaId, d = {}) {
   } catch (error) {
     await cliente.query('ROLLBACK');
     if (error.code === '23505') throw new ErrorNegocio('Ya hay un domicilio en curso para esa fórmula', 409);
+    throw error;
+  } finally {
+    cliente.release();
+  }
+}
+
+// El paciente que eligió contraentrega paga en línea (por transferencia) antes de que le llegue el pedido,
+// aunque ya vaya en camino: la farmacia confirma el pago y el domiciliario ya no le cobra
+export async function pagarDomicilioEnLinea(cuentaId, id, { referencia, total } = {}) {
+  const comprobante = texto(referencia);
+  if (comprobante.length < 3 || comprobante.length > 40) {
+    throw new ErrorNegocio('Comprobante: escribe el número de la transferencia', 400);
+  }
+  if (!(await datosTransferencia())) throw new ErrorNegocio('Por ahora la farmacia no recibe transferencias', 409);
+
+  const cliente = await pool.connect();
+  try {
+    await cliente.query('BEGIN');
+    const { rows: [d] } = await cliente.query(
+      `SELECT d.id, d.estado, d.forma_pago, d.costo_envio, f.cuota_moderadora,
+              EXISTS (SELECT 1 FROM pagos p WHERE p.formula_id = f.id) AS cuota_pagada
+         FROM domicilios d JOIN formulas f ON f.id = d.formula_id
+        WHERE d.id = $1 AND d.cuenta_id = $2 FOR UPDATE OF d`,
+      [id, cuentaId]
+    );
+    if (!d) throw new ErrorNegocio('El domicilio no existe', 404);
+    if (!['recibido', 'en_preparacion', 'en_camino'].includes(d.estado)) {
+      throw new ErrorNegocio('Este domicilio ya no está en curso', 409);
+    }
+    if (d.forma_pago === 'transferencia') throw new ErrorNegocio('Este domicilio ya está pagado en línea', 409);
+    const valor = (d.cuota_pagada ? 0 : d.cuota_moderadora) + d.costo_envio;
+    if (valor === 0) throw new ErrorNegocio('Este domicilio no tiene nada que pagar', 409);
+    if (Number(total) !== valor) {
+      throw new ErrorNegocio(`El total cambió: ahora es $${valor.toLocaleString('es-CO')}. Revísalo antes de transferir.`, 409);
+    }
+    await cliente.query(
+      `UPDATE domicilios SET forma_pago = 'transferencia', pago_referencia = $2, pago_valor = $3,
+              pago_verificado_en = NULL, actualizado_en = now()
+        WHERE id = $1`,
+      [id, comprobante, valor]
+    );
+    await cliente.query(
+      `INSERT INTO registro_accesos (cuenta_id, accion, detalle) VALUES ($1, 'cuenta:pagar_domicilio', $2)`,
+      [cuentaId, `${id}: $${valor} · comprobante ${comprobante}`]
+    );
+    await cliente.query('COMMIT');
+  } catch (error) {
+    await cliente.query('ROLLBACK');
     throw error;
   } finally {
     cliente.release();
@@ -463,7 +571,7 @@ export async function historial(cuentaId) {
 
 // ---------- Panel de la farmacia ----------
 
-export async function domiciliosFarmacia({ estado } = {}) {
+export async function domiciliosFarmacia({ estado, domiciliarioId = null } = {}) {
   const filtro = estado === 'activos' || !estado
     ? `d.estado = ANY($1)`
     : `d.estado = $1`;
@@ -492,12 +600,85 @@ export async function domiciliosFarmacia({ estado } = {}) {
        FROM domicilios d
        JOIN formulas f ON f.id = d.formula_id
        JOIN cuentas_pacientes c ON c.id = d.cuenta_id
-      WHERE ${filtro}
+      WHERE ${filtro} AND ($2::int IS NULL OR d.domiciliario_id = $2)
       ORDER BY d.creado_en
       LIMIT 200`,
-    [valor]
+    [valor, domiciliarioId]
   );
   return rows;
+}
+
+// Domiciliarios activos y su estado, calculado solo (nadie tiene que marcar nada):
+//   en ruta: cuántas entregas lleva y desde cuándo salió (la más antigua que tiene en camino)
+//   disponible: sin entregas pendientes; "ultima_entrega_en" dice si viene de regreso
+export async function listarDomiciliarios() {
+  const { rows } = await pool.query(
+    `SELECT u.id, u.nombre, u.usuario,
+            COUNT(d.id) FILTER (WHERE d.estado = 'en_camino')::int AS en_camino,
+            MIN(COALESCE(d.despachado_en, d.actualizado_en)) FILTER (WHERE d.estado = 'en_camino') AS en_ruta_desde,
+            MAX(d.actualizado_en) FILTER (WHERE d.estado = 'entregado' AND d.actualizado_en > now() - interval '12 hours')
+              AS ultima_entrega_en
+       FROM usuarios_farmacia u
+       LEFT JOIN domicilios d ON d.domiciliario_id = u.id
+      WHERE u.rol = 'domiciliario' AND u.activo
+      GROUP BY u.id
+      ORDER BY u.nombre`
+  );
+  return rows;
+}
+
+// Pasa un pedido en camino a otro domiciliario (se demoró, se complicó la ruta…)
+export async function reasignarDomiciliario(empleadoId, id, domiciliarioId) {
+  const cliente = await pool.connect();
+  try {
+    await cliente.query('BEGIN');
+    const { rows: [d] } = await cliente.query(
+      `SELECT id, cuenta_id, estado, domiciliario_id FROM domicilios WHERE id = $1 FOR UPDATE`, [id]);
+    if (!d) throw new ErrorNegocio('El domicilio no existe', 404);
+    if (d.estado !== 'en_camino') throw new ErrorNegocio('Solo se cambia el domiciliario de un pedido en camino', 409);
+    const { rows: [u] } = await cliente.query(
+      `SELECT id, nombre FROM usuarios_farmacia WHERE id = $1 AND rol = 'domiciliario' AND activo`, [domiciliarioId]);
+    if (!u) throw new ErrorNegocio('Elige un domiciliario activo', 400);
+    if (d.domiciliario_id === u.id) throw new ErrorNegocio(`${u.nombre} ya lleva este pedido`, 400);
+    await cliente.query(
+      `UPDATE domicilios SET domiciliario_id = $2, actualizado_por = $3, actualizado_en = now() WHERE id = $1`,
+      [id, u.id, empleadoId]
+    );
+    await cliente.query(
+      `INSERT INTO registro_accesos (usuario_id, accion, detalle) VALUES ($1, 'domicilio_domiciliario', $2)`,
+      [empleadoId, `${id}: ahora lo lleva ${u.nombre}`]
+    );
+    await cliente.query('COMMIT');
+    return { cuentaId: d.cuenta_id };
+  } catch (error) {
+    await cliente.query('ROLLBACK');
+    throw error;
+  } finally {
+    cliente.release();
+  }
+}
+
+// Lo que ve el domiciliario: sus pedidos en camino y lo que entregó hoy, con el efectivo que cobró
+export async function rutaDomiciliario(empleadoId) {
+  const pendientes = await domiciliosFarmacia({ estado: 'en_camino', domiciliarioId: empleadoId });
+  const { rows: entregados } = await pool.query(
+    `SELECT d.id, c.nombres || ' ' || c.apellidos AS paciente, d.direccion, d.barrio, d.forma_pago,
+            cd.cuota, cd.envio, cd.medio, cd.recibido, d.actualizado_en AS entregado_en
+       FROM domicilios d
+       JOIN cuentas_pacientes c ON c.id = d.cuenta_id
+       LEFT JOIN cobros_domicilio cd ON cd.domicilio_id = d.id
+      WHERE d.domiciliario_id = $1 AND d.estado = 'entregado'
+        AND (d.actualizado_en AT TIME ZONE '${ZONA_HORARIA}')::date = (now() AT TIME ZONE '${ZONA_HORARIA}')::date
+      ORDER BY d.actualizado_en DESC`,
+    [empleadoId]
+  );
+  const efectivoHoy = entregados
+    .filter((e) => e.medio === 'efectivo')
+    .reduce((suma, e) => suma + e.cuota + e.envio, 0);
+  // Pedidos en la farmacia que aún no salen: al terminar su ruta, el domiciliario sabe si debe volver por ellos
+  const { rows: [espera] } = await pool.query(
+    `SELECT COUNT(*)::int AS total FROM domicilios WHERE estado IN ('recibido', 'en_preparacion')`);
+  return { pendientes, entregados_hoy: entregados, efectivo_hoy: efectivoHoy, en_espera: espera.total };
 }
 
 const SIGUIENTE = {
@@ -506,8 +687,27 @@ const SIGUIENTE = {
   en_camino: ['entregado', 'cancelado'],
 };
 
-export async function cambiarEstadoDomicilio(empleadoId, id, { estado, nota, items, pago } = {}) {
-  const notaLimpia = opcional(nota);
+// El encargado revisó en el banco que llegó la transferencia del paciente: ya se puede despachar
+export async function verificarPagoDomicilio(empleadoId, id) {
+  const { rows: [d] } = await pool.query(
+    `UPDATE domicilios SET pago_verificado_en = now(), pago_verificado_por = $2, actualizado_en = now()
+      WHERE id = $1 AND forma_pago = 'transferencia' AND pago_verificado_en IS NULL
+        AND estado IN ('recibido', 'en_preparacion', 'en_camino')
+      RETURNING cuenta_id, pago_referencia, pago_valor`,
+    [id, empleadoId]
+  );
+  if (!d) throw new ErrorNegocio('Ese domicilio no tiene una transferencia pendiente por confirmar', 409);
+  await pool.query(
+    `INSERT INTO registro_accesos (usuario_id, accion, detalle) VALUES ($1, 'domicilio_pago_verificado', $2)`,
+    [empleadoId, `${id}: $${d.pago_valor} · comprobante ${d.pago_referencia}`]
+  );
+  return { cuentaId: d.cuenta_id };
+}
+
+// "soloDomiciliario": lo llama el domiciliario; solo puede marcar entregados los pedidos que lleva él
+export async function cambiarEstadoDomicilio(empleadoId, id, { estado, nota, items, pago, domiciliario_id } = {},
+  { soloDomiciliario = false } = {}) {
+  const notaLimpia = soloDomiciliario ? null : opcional(nota);   // el mensaje al paciente lo escribe la farmacia
   if (notaLimpia && notaLimpia.length > 300) throw new ErrorNegocio('La nota admite máximo 300 caracteres', 400);
 
   const cliente = await pool.connect();
@@ -515,31 +715,62 @@ export async function cambiarEstadoDomicilio(empleadoId, id, { estado, nota, ite
     await cliente.query('BEGIN');
     let resultado = { turnosAvisados: [] };
     const { rows: [d] } = await cliente.query(
-      `SELECT d.id, d.estado, d.formula_id, d.costo_envio, c.documento FROM domicilios d JOIN cuentas_pacientes c ON c.id = d.cuenta_id
+      `SELECT d.id, d.cuenta_id, d.estado, d.formula_id, d.costo_envio, d.forma_pago, d.pago_referencia,
+              d.pago_verificado_en, d.domiciliario_id, c.documento
+         FROM domicilios d JOIN cuentas_pacientes c ON c.id = d.cuenta_id
         WHERE d.id = $1 FOR UPDATE OF d`,
       [id]
     );
     if (!d) throw new ErrorNegocio('El domicilio no existe', 404);
+    if (soloDomiciliario && (estado !== 'entregado' || d.domiciliario_id !== empleadoId)) {
+      throw new ErrorNegocio('Ese pedido no está entre tus entregas', 403);
+    }
     if (!SIGUIENTE[d.estado]?.includes(estado)) {
       throw new ErrorNegocio(`No se puede pasar de "${d.estado}" a "${estado}"`, 409);
     }
+    // Al despachar se elige qué domiciliario lo lleva (obligatorio si la farmacia tiene domiciliarios)
+    let domiciliarioId = null;
+    if (estado === 'en_camino') {
+      const { rows: activos } = await cliente.query(
+        `SELECT id FROM usuarios_farmacia WHERE rol = 'domiciliario' AND activo`);
+      if (domiciliario_id != null) {
+        if (!activos.some((u) => u.id === domiciliario_id)) throw new ErrorNegocio('Elige un domiciliario activo', 400);
+        domiciliarioId = domiciliario_id;
+      } else if (activos.length) {
+        throw new ErrorNegocio('Elige qué domiciliario lleva el pedido', 400);
+      }
+    }
+    // Pagado por transferencia: no sale hasta confirmar que el dinero llegó, y al entregarlo
+    // el cobro se registra con el comprobante del paciente (no se pide pago al domiciliario)
+    const prepago = d.forma_pago === 'transferencia';
+    if (prepago && estado === 'en_camino' && !d.pago_verificado_en) {
+      throw new ErrorNegocio('Primero confirma que la transferencia del paciente llegó', 409);
+    }
+    if (prepago && estado === 'entregado' && !d.pago_verificado_en) {
+      throw new ErrorNegocio(soloDomiciliario
+        ? 'El paciente pagó en línea y la farmacia aún no confirma que llegó: llama a la farmacia antes de entregar'
+        : 'El paciente pagó en línea: confirma que la transferencia llegó antes de marcarlo entregado', 409);
+    }
+    const pagoFinal = prepago ? { medio: 'transferencia', referencia: d.pago_referencia } : pago;
     // El stock baja al despachar; al entregar o cancelar, lo que no llegó al paciente vuelve al inventario
     if (estado === 'en_camino') resultado = await despacharDomicilio(cliente, d, items, empleadoId);
-    else if (estado === 'entregado') resultado = await entregarDomicilio(cliente, d, items, pago, empleadoId);
+    else if (estado === 'entregado') resultado = await entregarDomicilio(cliente, d, items, pagoFinal, empleadoId);
     else if (estado === 'cancelado' && d.estado === 'en_camino') resultado = await devolverDespacho(cliente, d, empleadoId);
     await cliente.query(
       `UPDATE domicilios
           SET estado = $2, nota_farmacia = COALESCE($3, nota_farmacia),
+              domiciliario_id = COALESCE($5, domiciliario_id),
+              despachado_en = CASE WHEN $6 THEN now() ELSE despachado_en END,
               actualizado_por = $4, actualizado_en = now()
         WHERE id = $1`,
-      [id, estado, notaLimpia, empleadoId]
+      [id, estado, notaLimpia, empleadoId, domiciliarioId, estado === 'en_camino']
     );
     await cliente.query(
       `INSERT INTO registro_accesos (usuario_id, accion, detalle) VALUES ($1, 'domicilio_estado', $2)`,
       [empleadoId, `${id}: ${d.estado} → ${estado}`]
     );
     await cliente.query('COMMIT');
-    return resultado;
+    return { ...resultado, cuentaId: d.cuenta_id };   // a quién avisar en vivo
   } catch (error) {
     await cliente.query('ROLLBACK');
     throw error;

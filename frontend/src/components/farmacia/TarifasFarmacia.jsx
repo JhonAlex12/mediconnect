@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Bike, Save, Wallet } from 'lucide-react';
+import { Banknote, Bike, Save, Wallet } from 'lucide-react';
 import { api } from '../../lib/api';
 import { Aviso, BotonAccion, claseCampo, useAccion } from './comunes';
 
@@ -97,6 +97,7 @@ export default function TarifasFarmacia() {
       </form>
 
       <CostoEnvio />
+      <DatosTransferencia />
 
       <section className="bg-white rounded-xl shadow-md border border-slate-300 overflow-hidden">
         <h3 className="px-5 py-3 border-b border-slate-200 font-bold text-slate-800">Historial por año</h3>
@@ -152,7 +153,7 @@ function CostoEnvio() {
           <Bike className="w-5 h-5 text-slate-600" /> Costo de envío de domicilios
         </h3>
         <p className="text-sm text-slate-600 mt-1">
-          Lo paga el paciente al recibir, junto con la cuota moderadora si le corresponde.
+          Lo paga el paciente junto con la cuota moderadora si le corresponde: por transferencia al pedir o al recibir.
           Los domicilios ya pedidos conservan el valor con el que se pidieron.
         </p>
       </div>
@@ -167,6 +168,48 @@ function CostoEnvio() {
           Guardar costo de envío
         </BotonAccion>
       </div>
+      <Aviso aviso={aviso} />
+    </form>
+  );
+}
+
+// Datos de la cuenta de la farmacia para que el paciente pague el domicilio por transferencia al pedirlo.
+// Vacío: el paciente ve la opción de transferencia pero no la puede elegir (solo contraentrega).
+function DatosTransferencia() {
+  const [texto, setTexto] = useState('');
+  const [error, setError] = useState(null);
+  const { ocupado, aviso, ejecutar } = useAccion();
+
+  useEffect(() => {
+    api('/tarifas/domicilio')
+      .then((d) => setTexto(d.transferencia ?? ''))
+      .catch((err) => setError(err.message));
+  }, []);
+
+  const guardar = (e) => {
+    e.preventDefault();
+    ejecutar(
+      () => api('/tarifas/domicilio/transferencia', { metodo: 'PUT', cuerpo: { texto } }),
+      (r) => (r.transferencia ? 'Datos de transferencia guardados' : 'Sin datos: los pacientes no podrán elegir transferencia')
+    );
+  };
+
+  return (
+    <form onSubmit={guardar} className="bg-white rounded-xl border border-slate-300 p-5 space-y-4">
+      <div>
+        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <Banknote className="w-5 h-5 text-slate-600" /> Pago de domicilios por transferencia
+        </h3>
+        <p className="text-sm text-slate-600 mt-1">
+          Lo que ve el paciente para pagar el domicilio al pedirlo: billetera o banco, número y a nombre de quién.
+          Mientras esté vacío, el paciente ve la transferencia pero no la puede elegir: solo le queda contraentrega.
+        </p>
+      </div>
+      {error && <Aviso aviso={{ tipo: 'error', texto: error }} />}
+      <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={3} maxLength={300}
+        placeholder={'Nequi 300 000 0000\nBancolombia ahorros 000-000000-00\nA nombre de: Farmacia Mediconnect'}
+        className={claseCampo} />
+      <BotonAccion type="submit" color="verde" icono={Save} ocupado={ocupado}>Guardar datos de transferencia</BotonAccion>
       <Aviso aviso={aviso} />
     </form>
   );

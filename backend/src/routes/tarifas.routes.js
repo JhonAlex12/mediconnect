@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { exigirEmpleado } from '../middleware/autenticacion.js';
 import { listarTarifas, guardarTarifas } from '../services/cobros.service.js';
-import { costoEnvio, guardarCostoEnvio } from '../services/cuentas.service.js';
+import { costoEnvio, datosTransferencia, guardarCostoEnvio, guardarDatosTransferencia } from '../services/cuentas.service.js';
 
 const router = Router();
 
@@ -15,10 +15,10 @@ router.get('/vigentes', async (req, res, next) => {
   }
 });
 
-// Pública: costo de envío de los domicilios
+// Pública: costo de envío de los domicilios y datos para pagarlos por transferencia (null: solo contraentrega)
 router.get('/domicilio', async (req, res, next) => {
   try {
-    res.json({ ok: true, costo_envio: await costoEnvio() });
+    res.json({ ok: true, costo_envio: await costoEnvio(), transferencia: await datosTransferencia() });
   } catch (error) {
     next(error);
   }
@@ -40,6 +40,15 @@ router.get('/', async (req, res, next) => {
 router.put('/domicilio', async (req, res, next) => {
   try {
     res.json({ ok: true, costo_envio: await guardarCostoEnvio(req.empleado.id, req.body?.valor) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/tarifas/domicilio/transferencia  { "texto": "Nequi 300 000 0000 a nombre de ..." } (vacío: quitar)
+router.put('/domicilio/transferencia', async (req, res, next) => {
+  try {
+    res.json({ ok: true, transferencia: await guardarDatosTransferencia(req.empleado.id, req.body?.texto) });
   } catch (error) {
     next(error);
   }

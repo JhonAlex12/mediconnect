@@ -135,8 +135,8 @@ function Domicilio() {
   const envio = useCostoEnvio();
   const pasos = [
     [UserPlus, 'Crea tu cuenta', 'Con tus datos, y confirma tu correo.'],
-    [FileText, 'Agrega tu fórmula', 'Con el código que te dio la IPS.'],
-    [Home, 'Recíbela en casa', 'Te llamamos para confirmar y pagas el envío y la cuota al recibir.'],
+    [FileText, 'Recibe tu fórmula', 'La que te formule el médico aparece sola en tu cuenta.'],
+    [Home, 'Recíbela en casa', 'Pagas el envío y la cuota por transferencia al pedir o contraentrega, al domiciliario.'],
   ];
   return (
     <section id="domicilio" className="bg-marca-noche text-white scroll-mt-28">

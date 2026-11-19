@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { AlertTriangle, BarChart3, Bike, Contact, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet, TabletSmartphone, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bike, Contact, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Navigation, Package, UserCircle2, Users, Wallet, TabletSmartphone, X } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
 import { VENTANA_PANTALLA } from '../../lib/api';
 import { TiempoRealProvider, useSocketEnVivo } from '../../lib/tiempoReal';
@@ -11,11 +11,12 @@ import ReportesFarmacia from './ReportesFarmacia';
 import UsuariosFarmacia from './UsuariosFarmacia';
 import TarifasFarmacia from './TarifasFarmacia';
 import DomiciliosFarmacia from './DomiciliosFarmacia';
+import RutaDomiciliario from './RutaDomiciliario';
 import ContenidoFarmacia from './ContenidoFarmacia';
 import KioscoAdmin from './KioscoAdmin';
 import PacientesFarmacia from './PacientesFarmacia';
 
-const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', administrador: 'Administrador', medico: 'Médico (sistema IPS)' };
+const ROLES = { auxiliar: 'Auxiliar', domicilios: 'Pedidos y domicilios', domiciliario: 'Domiciliario', administrador: 'Administrador', medico: 'Médico (sistema IPS)' };
 
 // Cada sección es una página: /farmacia/fila, /farmacia/inventario...
 // "roles": quién la ve (si no se indica, administradores y auxiliares). El backend también lo exige.
@@ -24,6 +25,8 @@ const SECCIONES = [
   { ruta: 'fila', texto: 'Fila', icono: ListOrdered, componente: FilaFarmacia, roles: ['auxiliar'] },
   { ruta: 'inventario', texto: 'Inventario', icono: Package, componente: InventarioFarmacia },
   { ruta: 'domicilios', texto: 'Domicilios', icono: Bike, componente: DomiciliosFarmacia, roles: ['domicilios'] },
+  // El domiciliario solo ve sus entregas (en el celular)
+  { ruta: 'entregas', texto: 'Mis entregas', icono: Navigation, componente: RutaDomiciliario, roles: ['domiciliario'] },
   // Pacientes: el administrador ve la lista; el auxiliar solo busca por documento exacto
   { ruta: 'pacientes', texto: 'Pacientes', icono: Contact, componente: PacientesFarmacia },
   // Reportes y usuarios: solo administradores (el backend también lo exige)
@@ -68,7 +71,7 @@ export default function PanelFarmacia() {
   const permitidas = SECCIONES.filter((s) =>
     s.soloAdmin ? usuario.rol === 'administrador' : (s.roles ?? ['administrador', 'auxiliar']).includes(usuario.rol));
   const inicio = permitidas[0]?.ruta ?? 'fila';
-  const atiendeFila = usuario.rol !== 'domicilios';
+  const atiendeFila = ['administrador', 'auxiliar'].includes(usuario.rol);
 
   return (
     <TiempoRealProvider>

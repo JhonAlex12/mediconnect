@@ -4,7 +4,7 @@ import { ErrorNegocio } from './formulas.service.js';
 import { registrarAcceso } from './auditoria.service.js';
 import { desconectarEmpleado } from '../sockets/emisor.js';
 
-const ROLES = ['administrador', 'auxiliar', 'domicilios', 'medico'];
+const ROLES = ['administrador', 'auxiliar', 'domicilios', 'domiciliario', 'medico'];
 const CAJAS = [1, 2, 3, 4, 5, 6];
 
 // Solo los auxiliares tienen caja; null = elige la caja en su equipo

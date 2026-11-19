@@ -258,8 +258,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS un_llamado_por_caja
 -- ============================================================
 
 -- CUENTAS DE PACIENTES: el paciente se registra en el sitio con sus datos.
--- Es una tabla aparte de "pacientes" (que llena la IPS): registrarse con un
--- documento NO da acceso a sus fórmulas; cada fórmula se agrega a la cuenta
+-- Es una tabla aparte de "pacientes" (que llena la IPS). Las fórmulas que el médico emite
+-- después para ese documento aparecen solas en la cuenta; las anteriores se agregan
 -- escribiendo su código (ver cuenta_formulas).
 CREATE TABLE IF NOT EXISTS cuentas_pacientes (
   id                 SERIAL PRIMARY KEY,
@@ -283,7 +283,7 @@ CREATE TABLE IF NOT EXISTS cuentas_pacientes (
   creado_en          TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
--- Fórmulas que el paciente agregó a su cuenta (con código + su documento)
+-- Fórmulas de la cuenta: las emitidas para su documento (automático) o agregadas con código + documento
 CREATE TABLE IF NOT EXISTS cuenta_formulas (
   cuenta_id    INTEGER     NOT NULL REFERENCES cuentas_pacientes(id) ON DELETE CASCADE,
   formula_id   INTEGER     NOT NULL REFERENCES formulas(id) ON DELETE CASCADE,
@@ -415,9 +415,10 @@ CREATE TABLE IF NOT EXISTS ajustes_sitio (
 -- Caja fija por trabajador y rol de pedidos/domicilios
 -- ============================================================
 -- Rol "domicilios": solo gestiona los pedidos a domicilio
+-- Rol "domiciliario": lleva los pedidos; solo ve las entregas que le asignan y las marca entregadas
 ALTER TABLE usuarios_farmacia DROP CONSTRAINT IF EXISTS usuarios_farmacia_rol_check;
 ALTER TABLE usuarios_farmacia ADD CONSTRAINT usuarios_farmacia_rol_check
-  CHECK (rol IN ('administrador', 'auxiliar', 'domicilios', 'medico'));  -- medico: solo el sistema de la IPS de prueba
+  CHECK (rol IN ('administrador', 'auxiliar', 'domicilios', 'domiciliario', 'medico'));  -- medico: solo el sistema de la IPS de prueba
 
 -- Caja asignada al auxiliar (1 a 5 generales, 6 preferencial). Nula = elige la caja en su equipo.
 ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS caja SMALLINT CHECK (caja BETWEEN 1 AND 6);
@@ -545,3 +546,24 @@ ALTER TABLE suscripciones_push ADD COLUMN IF NOT EXISTS vence_en TIMESTAMPTZ NOT
 ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS equipo_sesion TEXT;
 ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS version_sesion INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS ultima_actividad TIMESTAMPTZ;
+
+-- Forma de pago del domicilio, la elige el paciente al pedirlo:
+--   "transferencia": paga antes, con el número del comprobante; la farmacia confirma que llegó antes de despacharlo
+--   "contraentrega": le paga al domiciliario al recibir (el encargado lo registra al marcarlo entregado)
+-- "pago_valor" es lo que el paciente transfirió (el total que vio al pedir).
+ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS forma_pago VARCHAR(15) NOT NULL DEFAULT 'contraentrega';
+ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS pago_referencia VARCHAR(40);
+ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS pago_valor INTEGER;
+ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS pago_verificado_en TIMESTAMPTZ;
+ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS pago_verificado_por INTEGER REFERENCES usuarios_farmacia(id);
+ALTER TABLE domicilios DROP CONSTRAINT IF EXISTS domicilio_forma_pago;
+ALTER TABLE domicilios ADD CONSTRAINT domicilio_forma_pago CHECK (
+  forma_pago = 'contraentrega'
+  OR (forma_pago = 'transferencia' AND pago_referencia IS NOT NULL AND pago_valor > 0));
+
+-- Domiciliario que lleva el pedido: se asigna al despacharlo ("en camino")
+ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS domiciliario_id INTEGER REFERENCES usuarios_farmacia(id);
+CREATE INDEX IF NOT EXISTS idx_domicilios_domiciliario ON domicilios (domiciliario_id, estado);
+
+-- Hora en que salió el pedido con el domiciliario (para "en ruta desde hace X min")
+ALTER TABLE domicilios ADD COLUMN IF NOT EXISTS despachado_en TIMESTAMPTZ;

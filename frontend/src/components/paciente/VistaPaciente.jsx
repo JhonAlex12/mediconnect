@@ -428,7 +428,7 @@ function OpcionDomicilio({ codigo }) {
         <Truck className="w-5 h-5" /> Pedir a domicilio
       </button>
       <p className="text-xs text-slate-500 text-center mt-2">
-        {envio != null ? `Envío ${pesos(envio)}, se paga al recibir. ` : ''}
+        {envio != null ? `Envío ${pesos(envio)}: lo pagas por transferencia al pedir o contraentrega. ` : ''}
         {cuenta ? 'Lo terminas en tu cuenta.' : 'Necesitas una cuenta de Mediconnect: ingresa o créala en un minuto.'}
       </p>
     </div>

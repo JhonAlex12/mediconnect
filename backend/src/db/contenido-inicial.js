@@ -168,13 +168,13 @@ export const PREGUNTAS_BOT = [
   {
     pregunta: '¿Cómo puedo pagar?',
     variantes: 'medios de pago\nreciben tarjeta\npuedo pagar con transferencia\naceptan nequi\npago en efectivo',
-    respuesta: 'En la ventanilla puedes pagar en **efectivo, transferencia o tarjeta**. En los domicilios pagas al recibir, en efectivo, transferencia o datáfono.',
+    respuesta: 'En la ventanilla puedes pagar en **efectivo, transferencia o tarjeta**. Los domicilios los pagas de dos formas, la que elijas al pedirlo: **transferencia**, de una vez, o **contraentrega**, al domiciliario cuando te llegue el pedido.',
     enlace: '/informacion#cuotas', sugerida: false,
   },
   {
     pregunta: '¿Hacen domicilios?',
     variantes: 'quiero un domicilio\nme llevan los medicamentos a la casa\ncuánto cuesta el domicilio\nvalor del envío\nmandan a domicilio\ncómo pido un domicilio',
-    respuesta: 'Sí, **solo en Cúcuta**. El envío cuesta **{costo_envio}**.\n\n- Crea tu cuenta y confirma tu correo.\n- En **Mi cuenta**, agrega tu fórmula con el código que te dio la IPS.\n- Toca **Pedir domicilio**. Te llamamos para confirmar y pagas el envío y la cuota al recibir.',
+    respuesta: 'Sí, **solo en Cúcuta**. El envío cuesta **{costo_envio}**.\n\n- Crea tu cuenta y confirma tu correo.\n- Las fórmulas que te formule el médico aparecen solas en **Mi cuenta** (una anterior la agregas con su código).\n- Toca **Pedir domicilio**. Ahí ves el total y eliges si lo pagas de una vez por transferencia o contraentrega, al recibir.',
     enlace: '/#domicilio', sugerida: true,
   },
   {
@@ -246,6 +246,17 @@ export const PREGUNTAS_BOT = [
 ];
 
 // Inserta el contenido inicial en las tablas que estén vacías (se puede correr varias veces)
+const RESPUESTAS_ACTUALIZADAS = [
+  // 2026-11-18: los domicilios se pueden pagar por transferencia al pedirlos o contraentrega
+  ['En la ventanilla puedes pagar en **efectivo, transferencia o tarjeta**. En los domicilios pagas al recibir, en efectivo, transferencia o datáfono.', 'En la ventanilla puedes pagar en **efectivo, transferencia o tarjeta**. Los domicilios los pagas de dos formas, la que elijas al pedirlo: **transferencia**, de una vez, o **contraentrega**, al domiciliario cuando te llegue el pedido.'],
+  ['En la ventanilla puedes pagar en **efectivo, transferencia o tarjeta**. En los domicilios eliges al pedirlo: pagar de una vez **por transferencia** o **contraentrega**, al domiciliario, en efectivo, transferencia o datáfono.', 'En la ventanilla puedes pagar en **efectivo, transferencia o tarjeta**. Los domicilios los pagas de dos formas, la que elijas al pedirlo: **transferencia**, de una vez, o **contraentrega**, al domiciliario cuando te llegue el pedido.'],
+  ['Sí, **solo en Cúcuta**. El envío cuesta **{costo_envio}**.\n\n- Crea tu cuenta y confirma tu correo.\n- En **Mi cuenta**, agrega tu fórmula con el código que te dio la IPS.\n- Toca **Pedir domicilio**. Te llamamos para confirmar y pagas el envío y la cuota al recibir.',
+   'Sí, **solo en Cúcuta**. El envío cuesta **{costo_envio}**.\n\n- Crea tu cuenta y confirma tu correo.\n- Las fórmulas que te formule el médico aparecen solas en **Mi cuenta** (una anterior la agregas con su código).\n- Toca **Pedir domicilio**. Ahí ves el total y eliges si lo pagas de una vez por transferencia o contraentrega, al recibir.'],
+  // 2026-11-18: las fórmulas nuevas llegan solas a la cuenta
+  ['Sí, **solo en Cúcuta**. El envío cuesta **{costo_envio}**.\n\n- Crea tu cuenta y confirma tu correo.\n- En **Mi cuenta**, agrega tu fórmula con el código que te dio la IPS.\n- Toca **Pedir domicilio**. Ahí ves el total y eliges si lo pagas de una vez por transferencia o contraentrega, al recibir.',
+   'Sí, **solo en Cúcuta**. El envío cuesta **{costo_envio}**.\n\n- Crea tu cuenta y confirma tu correo.\n- Las fórmulas que te formule el médico aparecen solas en **Mi cuenta** (una anterior la agregas con su código).\n- Toca **Pedir domicilio**. Ahí ves el total y eliges si lo pagas de una vez por transferencia o contraentrega, al recibir.'],
+];
+
 export async function sembrarContenido(cliente) {
   const vacia = async (tabla) => (await cliente.query(`SELECT NOT EXISTS (SELECT 1 FROM ${tabla}) AS v`)).rows[0].v;
 
@@ -277,6 +288,10 @@ export async function sembrarContenido(cliente) {
     `INSERT INTO ajustes_sitio (clave, datos) VALUES ('contacto', $1) ON CONFLICT (clave) DO NOTHING`,
     [CONTACTO]
   );
+  // Respuestas cuyo texto cambió en una versión nueva: se actualizan solo si nadie las editó en el panel
+  for (const [anterior, actual] of RESPUESTAS_ACTUALIZADAS) {
+    await cliente.query('UPDATE preguntas_bot SET respuesta = $2 WHERE respuesta = $1', [anterior, actual]);
+  }
   if (await vacia('preguntas_bot')) {
     for (const [i, p] of PREGUNTAS_BOT.entries()) {
       await cliente.query(

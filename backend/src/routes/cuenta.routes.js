@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { exigirCuenta, exigirCorreoVerificado } from '../middleware/cuentaPaciente.js';
+import { publicarDomicilio } from '../services/tiempoReal.service.js';
 import {
   registrarCuenta, iniciarSesionCuenta, verCuenta, actualizarCuenta,
-  agregarFormula, listarFormulas, confirmarCorreo, reenviarConfirmacion, solicitarRestablecer, restablecerClave, listarDomicilios, solicitarDomicilio, cancelarDomicilio, historial,
+  agregarFormula, listarFormulas, confirmarCorreo, reenviarConfirmacion, solicitarRestablecer, restablecerClave, listarDomicilios, solicitarDomicilio, cancelarDomicilio, pagarDomicilioEnLinea, historial,
 } from '../services/cuentas.service.js';
 
 const router = Router();
@@ -59,9 +60,19 @@ router.get('/formulas', responder(async (req) => ({ formulas: await listarFormul
 router.post('/formulas', limitadorFormulas,
   responder(async (req) => ({ formula: await agregarFormula(req.cuentaId, req.body?.codigo) })));
 router.get('/domicilios', responder(async (req) => ({ domicilios: await listarDomicilios(req.cuentaId) })));
-router.post('/domicilios', responder(async (req) => ({ domicilio: await solicitarDomicilio(req.cuentaId, req.body ?? {}) })));
+router.post('/domicilios', responder(async (req) => {
+  const domicilio = await solicitarDomicilio(req.cuentaId, req.body ?? {});
+  publicarDomicilio(req.cuentaId);   // el pedido nuevo aparece en el panel de pedidos al instante
+  return { domicilio };
+}));
+router.post('/domicilios/:id/pagar', responder(async (req) => {
+  await pagarDomicilioEnLinea(req.cuentaId, Number(req.params.id) || 0, req.body ?? {});
+  publicarDomicilio(req.cuentaId);   // la farmacia y el domiciliario lo ven al instante
+  return {};
+}));
 router.post('/domicilios/:id/cancelar', responder(async (req) => {
   await cancelarDomicilio(req.cuentaId, Number(req.params.id) || 0);
+  publicarDomicilio(req.cuentaId);
   return {};
 }));
 router.get('/historial', responder(async (req) => ({ historial: await historial(req.cuentaId) })));

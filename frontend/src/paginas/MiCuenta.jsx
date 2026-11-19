@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import {
-  BadgeCheck, Bike, CalendarClock, CheckCircle2, ClipboardList, FilePlus2, History, LogOut, MailWarning, MapPin, Package, Save, Ticket, Truck,
+  BadgeCheck, Banknote, Bike, CalendarClock, CheckCircle2, ClipboardList, FilePlus2, History, LogOut, MailWarning, MapPin, Package, Save, Ticket, Truck,
   UserRound, XCircle,
 } from 'lucide-react';
 import SitioPublico from '../components/SitioPublico';
@@ -11,7 +12,7 @@ import { CobroFormula, ESTADO_MEDICAMENTO, fechaLarga, pesos } from '../componen
 import CamposPersonales, { Campo, Seccion, claseInput, datosDesdeCuenta } from '../components/cuenta/CamposPersonales';
 import { useCuenta } from '../lib/cuenta';
 import CampoClave from '../components/CampoClave';
-import { totalDomicilio, useCostoEnvio } from '../lib/costoEnvio';
+import { totalDomicilio, useDatosDomicilio } from '../lib/costoEnvio';
 import { tomarDomicilioPendiente } from '../lib/domicilioPendiente';
 
 const PESTANAS = [
@@ -41,7 +42,7 @@ const fechaHora = (iso) =>
 
 export default function MiCuenta() {
   useTitulo('Mi cuenta');
-  const { cuenta, verificando, cerrarSesion, apiCuenta, recargarCuenta } = useCuenta();
+  const { token, cuenta, verificando, cerrarSesion, apiCuenta, recargarCuenta } = useCuenta();
   const { hash, state } = useLocation();
   const navegar = useNavigate();
   const pestana = PESTANAS.some(([id]) => `#${id}` === hash) ? hash.slice(1) : 'formulas';
@@ -68,6 +69,21 @@ export default function MiCuenta() {
   useEffect(() => {
     if (idCuenta && verificado) cargar();
   }, [idCuenta, verificado, cargar]);
+
+  // En vivo: cuando la farmacia cambia un domicilio o el médico emite una fórmula nueva, el servidor avisa
+  // y se recargan las fórmulas y los domicilios. Al reconectar (p. ej., el celular vuelve de segundo plano) se pone al día.
+  useEffect(() => {
+    if (!token || !verificado) return undefined;
+    const s = io({ auth: { token } });
+    let primeraConexion = true;
+    s.on('domicilios_actualizados', cargar);
+    s.on('formulas_actualizadas', cargar);
+    s.on('connect', () => {
+      if (!primeraConexion) cargar();
+      primeraConexion = false;
+    });
+    return () => s.disconnect();
+  }, [token, verificado, cargar]);
 
   // Si confirmó el correo en otra pestaña o en el celular, al volver a esta se actualiza sola
   const sinVerificar = cuenta && !cuenta.correo_verificado;
@@ -203,7 +219,7 @@ function ConfirmaTuCorreo({ correo }) {
 }
 
 // ============================================================
-// Mis fórmulas: agregar con el código, ver disponibilidad y pedir domicilio
+// Mis fórmulas: las que emite el médico llegan solas; las anteriores se agregan con el código
 // ============================================================
 function MisFormulas({ formulas, domicilios, recargar }) {
   const { apiCuenta } = useCuenta();
@@ -241,10 +257,11 @@ function MisFormulas({ formulas, domicilios, recargar }) {
     <>
       <form onSubmit={agregar} className="bg-white border border-slate-200 rounded-lg p-5 shadow-sm">
         <h2 className="font-titulo text-xl font-extrabold text-marca-noche flex items-center gap-2">
-          <FilePlus2 className="w-5 h-5 text-marca-verde" /> Agregar una fórmula
+          <FilePlus2 className="w-5 h-5 text-marca-verde" /> Agregar una fórmula anterior
         </h2>
         <p className="text-slate-600 text-sm mt-1">
-          Escribe el código que te entregó la IPS. Solo se pueden agregar fórmulas a nombre de tu documento.
+          Las fórmulas nuevas que te formule el médico aparecen aquí solas. Si tienes una de antes, escribe el código
+          que te entregó la IPS. Solo se pueden agregar fórmulas a nombre de tu documento.
         </p>
         <div className="mt-4 flex flex-col sm:flex-row gap-3">
           <input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="F-2026-0001" required
@@ -367,12 +384,24 @@ function FormularioDomicilio({ formula, alTerminar }) {
   const { ocupado, aviso, ejecutar } = useAccion();
   const cambiar = (k) => (e) => setD((v) => ({ ...v, [k]: e.target.value }));
   const cuota = formula.cobro?.valor > 0 && !formula.cobro?.pagado ? formula.cobro.valor : 0;
-  const envio = useCostoEnvio();
+  const config = useDatosDomicilio();
+  const envio = config?.envio ?? null;
+  const total = cuota + (envio ?? 0);
+  // Cómo paga: por transferencia al pedirlo o contraentrega, al domiciliario. Las dos se muestran
+  // siempre; la transferencia se puede elegir cuando la farmacia registró la cuenta donde la recibe.
+  const [formaPago, setFormaPago] = useState('contraentrega');
+  const recibeTransferencias = Boolean(config?.transferencia);
+  const [referencia, setReferencia] = useState('');
+  const prepago = formaPago === 'transferencia' && total > 0 && recibeTransferencias;
 
   const enviar = async (e) => {
     e.preventDefault();
     const ok = await ejecutar(
-      () => apiCuenta('/domicilios', { metodo: 'POST', cuerpo: { codigo: formula.codigo, ...d } }),
+      () => apiCuenta('/domicilios', { metodo: 'POST', cuerpo: {
+        codigo: formula.codigo, ...d,
+        forma_pago: prepago ? 'transferencia' : 'contraentrega',
+        ...(prepago ? { referencia: referencia.trim(), total } : {}),
+      } }),
       'Solicitud enviada'
     );
     if (ok) await alTerminar();
@@ -407,18 +436,50 @@ function FormularioDomicilio({ formula, alTerminar }) {
         </Campo>
       </div>
       {envio !== null && (
-        <div className="bg-slate-50 border border-slate-200 rounded p-4 text-sm">
-          <p className="font-bold text-marca-noche mb-2">Pagas al recibir</p>
-          <dl className="space-y-1">
-            {cuota > 0 && (
-              <div className="flex justify-between"><dt className="text-slate-600">Cuota moderadora</dt><dd>{pesos(cuota)}</dd></div>
-            )}
-            <div className="flex justify-between"><dt className="text-slate-600">Costo de envío</dt><dd>{pesos(envio)}</dd></div>
-            <div className="flex justify-between border-t border-slate-200 pt-1 mt-1 font-bold text-marca-noche">
-              <dt>Total</dt><dd>{pesos(cuota + envio)}</dd>
-            </div>
-          </dl>
-          <p className="text-slate-500 mt-2">En efectivo, transferencia o datáfono.</p>
+        <div className="bg-slate-50 border border-slate-200 rounded p-4 text-sm space-y-3">
+          <div>
+            <p className="font-bold text-marca-noche mb-2">Valor del domicilio</p>
+            <dl className="space-y-1">
+              {cuota > 0 && (
+                <div className="flex justify-between"><dt className="text-slate-600">Cuota moderadora</dt><dd>{pesos(cuota)}</dd></div>
+              )}
+              <div className="flex justify-between"><dt className="text-slate-600">Costo de envío</dt><dd>{pesos(envio)}</dd></div>
+              <div className="flex justify-between border-t border-slate-200 pt-1 mt-1 font-bold text-marca-noche">
+                <dt>Total</dt><dd>{pesos(total)}</dd>
+              </div>
+            </dl>
+          </div>
+          {total > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="font-bold text-marca-noche mb-1">¿Cómo vas a pagar?</legend>
+              <label className={`flex items-start gap-2 rounded border p-3 ${
+                !recibeTransferencias ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
+                  : prepago ? 'border-marca-azul bg-white cursor-pointer' : 'border-slate-200 cursor-pointer'}`}>
+                <input type="radio" name="forma-pago" value="transferencia" checked={prepago} disabled={!recibeTransferencias}
+                  onChange={() => setFormaPago('transferencia')} className="mt-1" />
+                <span><strong>Transferencia</strong>
+                  <span className="block">{recibeTransferencias
+                    ? 'Pagas ahora y el pedido sale apenas la farmacia confirme que llegó el pago.'
+                    : 'Todavía no está disponible: la farmacia está registrando la cuenta donde recibe los pagos.'}</span></span>
+              </label>
+              <label className={`flex items-start gap-2 rounded border p-3 cursor-pointer ${!prepago ? 'border-marca-azul bg-white' : 'border-slate-200'}`}>
+                <input type="radio" name="forma-pago" value="contraentrega" checked={!prepago}
+                  onChange={() => setFormaPago('contraentrega')} className="mt-1" />
+                <span><strong>Contraentrega</strong>
+                  <span className="block text-slate-600">Le pagas al domiciliario cuando recibas el pedido.</span></span>
+              </label>
+              {prepago && (
+                <div className="bg-white border border-marca-azul/40 rounded p-3 space-y-2">
+                  <p>Transfiere exactamente <strong>{pesos(total)}</strong> a:</p>
+                  <p className="font-semibold text-marca-noche whitespace-pre-line">{config.transferencia}</p>
+                  <Campo etiqueta="Número del comprobante" id="dom-comprobante" ayuda="Aparece en la confirmación de tu banco o billetera">
+                    <input id="dom-comprobante" value={referencia} onChange={(e) => setReferencia(e.target.value)}
+                      required minLength={3} maxLength={40} className={claseInput} />
+                  </Campo>
+                </div>
+              )}
+            </fieldset>
+          )}
         </div>
       )}
       <p className="text-sm text-slate-600">La farmacia te llamará para confirmar la hora de entrega.</p>
@@ -437,6 +498,7 @@ function FormularioDomicilio({ formula, alTerminar }) {
 function MisDomicilios({ domicilios, recargar }) {
   const { apiCuenta } = useCuenta();
   const { ocupado, aviso, ejecutar } = useAccion(recargar);
+  const transferencia = useDatosDomicilio()?.transferencia ?? null;   // datos de la farmacia para pagar en línea
 
   if (domicilios === null) return <p className="text-slate-500">Cargando…</p>;
   if (domicilios.length === 0) {
@@ -477,14 +539,16 @@ function MisDomicilios({ domicilios, recargar }) {
               </ol>
             )}
 
-            {!['entregado', 'cancelado'].includes(d.estado) && (
-              <p className="text-sm text-slate-700">
-                Pagas al recibir: <strong>{pesos(totalDomicilio(d).total)}</strong>
-                <span className="text-slate-500">
-                  {' '}({totalDomicilio(d).cuota > 0 ? `cuota ${pesos(totalDomicilio(d).cuota)} + ` : ''}envío {pesos(d.costo_envio)})
-                </span>
+            {d.esperando_domiciliario && (
+              <p className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 text-amber-900 rounded p-3">
+                <Bike className="w-4 h-4 mt-0.5 shrink-0" />
+                Tu pedido sale cuando regrese un domiciliario: en este momento están entregando otros pedidos.
               </p>
             )}
+            {d.estado === 'en_camino' && d.domiciliario && (
+              <p className="text-sm text-slate-700 flex items-center gap-1.5"><Bike className="w-4 h-4 text-marca-azul" /> Lo lleva: <strong>{d.domiciliario}</strong></p>
+            )}
+            <PagoDelDomicilio d={d} transferencia={transferencia} recargar={recargar} />
 
             {d.nota_farmacia && (
               <p className="flex items-start gap-2 bg-marca-hielo rounded p-3 text-sm text-slate-700">
@@ -508,6 +572,83 @@ function MisDomicilios({ domicilios, recargar }) {
         );
       })}
     </>
+  );
+}
+
+// Cómo va el pago del domicilio, según la forma que eligió el paciente
+function PagoDelDomicilio({ d, transferencia, recargar }) {
+  const { cuota, total } = totalDomicilio(d);
+  if (d.forma_pago === 'transferencia') {
+    const comprobante = <span className="text-slate-500"> (comprobante {d.pago_referencia})</span>;
+    if (d.estado === 'cancelado') {
+      return (
+        <p className="text-sm text-amber-900 bg-amber-50 rounded p-3">
+          Pagaste {pesos(d.pago_valor)} por transferencia{comprobante}. {d.pago_verificado_en
+            ? 'La farmacia te devolverá ese dinero.'
+            : 'Si tu transferencia llegó, la farmacia te devolverá ese dinero.'}
+        </p>
+      );
+    }
+    return (
+      <p className="text-sm text-slate-700">
+        {d.pago_verificado_en
+          ? <><CheckCircle2 className="inline w-4 h-4 text-emerald-700 -mt-0.5" /> Pago recibido: <strong>{pesos(d.pago_valor)}</strong> por transferencia</>
+          : <>Pagaste <strong>{pesos(d.pago_valor)}</strong> por transferencia: la farmacia está confirmando que llegó</>}
+        {comprobante}
+      </p>
+    );
+  }
+  if (['entregado', 'cancelado'].includes(d.estado) || total === 0) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-slate-700">
+        Contraentrega: le pagas al domiciliario <strong>{pesos(total)}</strong>
+        <span className="text-slate-500"> ({cuota > 0 ? `cuota ${pesos(cuota)} + ` : ''}envío {pesos(d.costo_envio)})</span>
+      </p>
+      {transferencia && <PagarEnLinea d={d} total={total} transferencia={transferencia} recargar={recargar} />}
+    </div>
+  );
+}
+
+// Mientras no le llegue el pedido, el paciente puede pagarlo en línea (por transferencia)
+// y el domiciliario ya no le cobra
+function PagarEnLinea({ d, total, transferencia, recargar }) {
+  const { apiCuenta } = useCuenta();
+  const [abierto, setAbierto] = useState(false);
+  const [referencia, setReferencia] = useState('');
+  const { ocupado, aviso, ejecutar } = useAccion(recargar);
+  if (!abierto) {
+    return (
+      <button type="button" onClick={() => setAbierto(true)}
+        className="flex items-center gap-2 text-sm font-bold text-marca-azul border-2 border-marca-azul hover:bg-marca-hielo px-3 py-2 rounded cursor-pointer">
+        <Banknote className="w-4 h-4" /> Pagar en línea ahora
+      </button>
+    );
+  }
+  const pagar = (e) => {
+    e.preventDefault();
+    ejecutar(() => apiCuenta(`/domicilios/${d.id}/pagar`, { metodo: 'POST', cuerpo: { referencia: referencia.trim(), total } }),
+      'Pago enviado: la farmacia lo confirmará');
+  };
+  return (
+    <form onSubmit={pagar} className="bg-marca-hielo rounded p-3 space-y-2 text-sm">
+      <p>Transfiere exactamente <strong>{pesos(total)}</strong> a:</p>
+      <p className="font-semibold text-marca-noche whitespace-pre-line">{transferencia}</p>
+      <Campo etiqueta="Número del comprobante" id={`pago-${d.id}`} ayuda="Aparece en la confirmación de tu banco o billetera">
+        <input id={`pago-${d.id}`} value={referencia} onChange={(e) => setReferencia(e.target.value)}
+          required minLength={3} maxLength={40} className={claseInput} />
+      </Campo>
+      <Aviso aviso={aviso} />
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" disabled={ocupado}
+          className="flex items-center gap-2 bg-marca-verde hover:bg-marca-verde-oscuro disabled:opacity-60 text-white font-bold px-4 py-2 rounded cursor-pointer">
+          <CheckCircle2 className="w-4 h-4" /> {ocupado ? 'Enviando…' : 'Ya transferí'}
+        </button>
+        <button type="button" onClick={() => setAbierto(false)} className="px-3 py-2 rounded font-semibold text-slate-600 hover:underline cursor-pointer">
+          Ahora no
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -564,6 +705,8 @@ const ACCIONES = {
   crear_cuenta: 'Creaste tu cuenta',
   iniciar_sesion: 'Iniciaste sesión',
   agregar_formula: 'Agregaste la fórmula',
+  formula_recibida: 'El médico te envió la fórmula',
+  pagar_domicilio: 'Pagaste en línea el domicilio',
   solicitar_domicilio: 'Pediste domicilio de la fórmula',
   cancelar_domicilio: 'Cancelaste un domicilio',
   cambiar_datos: 'Actualizaste tus datos',

@@ -34,16 +34,19 @@ test('entregas y permisos en tiempo real', { timeout: 30000 }, async (t) => {
   await pool.query(schema);
   // Las migraciones deben poder repetirse durante el arranque.
   await pool.query(schema);
-  const { cambiarEstadoDomicilio, domiciliosFarmacia, solicitarDomicilio } = await import('../src/services/cuentas.service.js');
+  const { cambiarEstadoDomicilio, domiciliosFarmacia, solicitarDomicilio, verificarPagoDomicilio, guardarDatosTransferencia,
+    rutaDomiciliario, pagarDomicilioEnLinea, listarDomiciliarios, reasignarDomiciliario, listarDomicilios } =
+    await import('../src/services/cuentas.service.js');
   const { dispensar } = await import('../src/services/dispensacion.service.js');
   const { iniciarSockets } = await import('../src/sockets/index.js');
   const { emitir } = await import('../src/sockets/emisor.js');
+  const { publicarDomicilio } = await import('../src/services/tiempoReal.service.js');
   const { editarUsuario } = await import('../src/services/usuarios.service.js');
   const { accionFila, llamarSiguiente } = await import('../src/services/fila.service.js');
   const { verParaDispensar } = await import('../src/services/dispensacion.service.js');
   const { obtenerMiTurno } = await import('../src/services/turnos.service.js');
   const { ejecutarMantenimiento } = await import('../src/jobs/mantenimiento.job.js');
-  const { fechaValida } = await import('../src/services/formulas.service.js');
+  const { fechaValida, crearFormula } = await import('../src/services/formulas.service.js');
   const { generarReporte } = await import('../src/services/reportes.service.js');
   const { guardarSuscripcion, limpiarSuscripcionesVencidas } = await import('../src/services/push.service.js');
   const { iniciarSesion, cerrarSesionEmpleado } = await import('../src/services/auth.service.js');
@@ -51,6 +54,7 @@ test('entregas y permisos en tiempo real', { timeout: 30000 }, async (t) => {
   const { default: bcrypt } = await import('bcrypt');
   const HOY = "(now() AT TIME ZONE 'America/Bogota')::date";
   const EQUIPO = 'equipo-de-las-pruebas';
+  const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
   async function preparar() {
     await pool.query(`TRUNCATE pacientes, cuentas_pacientes, usuarios_farmacia, medicamentos RESTART IDENTITY CASCADE`);
@@ -384,7 +388,7 @@ test('entregas y permisos en tiempo real', { timeout: 30000 }, async (t) => {
     const p = await conectar({ token: token(undefined, { tipo: 'paciente_turno', turno_id: 7 }) });
     try {
       const conexiones = [...sockets.of('/').sockets.values()];
-      assert.deepEqual(conexiones.find((s) => s.data.empleadoId === 3).data.salas, []);
+      assert.deepEqual(conexiones.find((s) => s.data.empleadoId === 3).data.salas, ['domicilios']);
       assert.deepEqual(conexiones.find((s) => !s.data.empleadoId).data.salas, ['turno:7','fila_publica']);
     } finally { d.disconnect(); p.disconnect(); }
   });
@@ -521,5 +525,178 @@ test('entregas y permisos en tiempo real', { timeout: 30000 }, async (t) => {
       await desconectado;
       await conectar({ token: tokA }, true);
     } finally { a.disconnect(); }
+  });
+
+  await t.test('domicilios en vivo: el paciente dueño y el panel de pedidos reciben el aviso; nadie más', async () => {
+    await preparar();
+    const tokenCuenta = (id) => jwt.sign({ tipo: 'paciente_cuenta', id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const paciente = await conectar({ token: tokenCuenta(1) });
+    const pedidos = await conectar({ token: token(3) });
+    const auxiliar = await conectar({ token: token(2) });
+    let alAuxiliar = 0;
+    auxiliar.on('domicilios_actualizados', () => alAuxiliar++);
+    try {
+      const avisos = [paciente, pedidos].map((s) => once(s, 'domicilios_actualizados', { signal: AbortSignal.timeout(3000) }));
+      const { cuentaId } = await cambiarEstadoDomicilio(3, 1, despacho());
+      assert.equal(cuentaId, 1);
+      publicarDomicilio(cuentaId);
+      await Promise.all(avisos);
+      await espera(100);
+      assert.equal(alAuxiliar, 0);
+    } finally { paciente.disconnect(); pedidos.disconnect(); auxiliar.disconnect(); }
+    // Cuenta desactivada o sin correo confirmado: no se conecta
+    await pool.query(`UPDATE cuentas_pacientes SET correo_verificado_en = NULL WHERE id = 1`);
+    await conectar({ token: tokenCuenta(1) }, true);
+  });
+
+  await t.test('domicilio pagado por transferencia: se confirma antes de despachar y al entregar se cobra con el comprobante', async () => {
+    await preparar();
+    await pool.query(`UPDATE domicilios SET estado = 'cancelado'`);   // libera la fórmula para un pedido nuevo
+    await pool.query(`INSERT INTO configuracion (clave, valor) VALUES ('costo_envio_domicilio', 3000)
+                      ON CONFLICT (clave) DO UPDATE SET valor = 3000`);
+    const pedir = (extra) => solicitarDomicilio(1, { codigo: 'F-2026-0001', direccion: 'Calle 10', barrio: 'Centro',
+      ciudad: 'Cúcuta', telefono: '3001234567', ...extra });
+    const transferencia = (extra = {}) => pedir({ forma_pago: 'transferencia', referencia: 'NEQ-12345', total: 8000, ...extra });
+    await assert.rejects(transferencia(), /no recibe transferencias/);
+    await guardarDatosTransferencia(1, 'Nequi 300 000 0000 a nombre de Farmacia de prueba');
+    await assert.rejects(transferencia({ referencia: 'x' }), (e) => e.estado === 400);
+    await assert.rejects(transferencia({ total: 7000 }), /total cambió/);   // cuota 5.000 + envío 3.000
+    const { id } = await transferencia();
+    const pedido = (await pool.query('SELECT * FROM domicilios WHERE id = $1', [id])).rows[0];
+    assert.equal(pedido.forma_pago, 'transferencia');
+    assert.equal(pedido.pago_valor, 8000);
+
+    await cambiarEstadoDomicilio(3, id, { estado: 'en_preparacion' });
+    await assert.rejects(cambiarEstadoDomicilio(3, id, despacho()), /transferencia del paciente llegó/);
+    await verificarPagoDomicilio(3, id);
+    await assert.rejects(verificarPagoDomicilio(3, id), (e) => e.estado === 409);
+    await cambiarEstadoDomicilio(3, id, despacho());
+    // Al entregar no se pide pago: queda con el comprobante del paciente
+    await cambiarEstadoDomicilio(3, id, { estado: 'entregado', items: [{ formula_item_id: 1, cantidad: 10 }] });
+    const pago = (await pool.query('SELECT * FROM pagos WHERE domicilio_id = $1', [id])).rows[0];
+    assert.equal(pago.medio, 'transferencia');
+    assert.equal(pago.referencia, 'NEQ-12345');
+    assert.equal(pago.valor, 5000);
+    const cobro = (await pool.query('SELECT * FROM cobros_domicilio WHERE domicilio_id = $1', [id])).rows[0];
+    assert.deepEqual([cobro.cuota, cobro.envio, cobro.medio, cobro.referencia], [5000, 3000, 'transferencia', 'NEQ-12345']);
+  });
+
+  await t.test('contraentrega sigue pidiendo el pago al entregar', async () => {
+    await preparar();
+    await pool.query(`UPDATE domicilios SET estado = 'cancelado'`);
+    const { id, forma_pago } = await solicitarDomicilio(1, { codigo: 'F-2026-0001', direccion: 'Calle 10', barrio: 'Centro',
+      ciudad: 'Cúcuta', telefono: '3001234567', forma_pago: 'contraentrega' });
+    assert.equal(forma_pago, 'contraentrega');
+    await cambiarEstadoDomicilio(3, id, { estado: 'en_preparacion' });
+    await cambiarEstadoDomicilio(3, id, despacho());
+    await assert.rejects(cambiarEstadoDomicilio(3, id, { estado: 'entregado', items: [{ formula_item_id: 1, cantidad: 10 }] }),
+      /pago/);
+  });
+
+  await t.test('domiciliario: lo asignan al despachar, solo ve y entrega lo suyo, y registra el efectivo', async () => {
+    await preparar();
+    await pool.query(`INSERT INTO usuarios_farmacia (nombre, usuario, clave_hash, rol) VALUES
+      ('Domiciliario 1','domicilio1','hash','domiciliario'), ('Domiciliario 2','domicilio2','hash','domiciliario')`);   // ids 4 y 5
+    await assert.rejects(cambiarEstadoDomicilio(3, 1, despacho()), /domiciliario lleva/);
+    await assert.rejects(cambiarEstadoDomicilio(3, 1, { ...despacho(), domiciliario_id: 2 }), /domiciliario activo/);   // un auxiliar
+    await cambiarEstadoDomicilio(3, 1, { ...despacho(), domiciliario_id: 4 });
+    assert.equal((await rutaDomiciliario(4)).pendientes.length, 1);
+    assert.equal((await rutaDomiciliario(4)).pendientes[0].domiciliario, 'Domiciliario 1');
+    assert.equal((await rutaDomiciliario(5)).pendientes.length, 0);
+    // Otro domiciliario no puede entregarlo, y el suyo solo puede marcarlo entregado
+    await assert.rejects(cambiarEstadoDomicilio(5, 1, entrega(), { soloDomiciliario: true }), (e) => e.estado === 403);
+    await assert.rejects(cambiarEstadoDomicilio(4, 1, { estado: 'cancelado' }, { soloDomiciliario: true }), (e) => e.estado === 403);
+    await cambiarEstadoDomicilio(4, 1, { ...entrega(), nota: 'no debe quedar' }, { soloDomiciliario: true });
+    const ruta = await rutaDomiciliario(4);
+    assert.equal(ruta.pendientes.length, 0);
+    assert.equal(ruta.entregados_hoy.length, 1);
+    assert.equal(ruta.efectivo_hoy, 8000);   // cuota 5.000 + envío 3.000 en efectivo
+    const d = await fila('domicilios');
+    assert.equal(d.estado, 'entregado');
+    assert.equal(d.nota_farmacia, null);
+    assert.equal(d.actualizado_por, 4);
+  });
+
+  await t.test('pagar en línea con el pedido en camino: no se entrega hasta confirmar la transferencia', async () => {
+    await preparar();
+    await pool.query(`INSERT INTO usuarios_farmacia (nombre, usuario, clave_hash, rol) VALUES ('Domiciliario 1','domicilio1','hash','domiciliario')`);
+    await cambiarEstadoDomicilio(3, 1, { ...despacho(), domiciliario_id: 4 });   // contraentrega, en camino
+    const pagar = (extra = {}) => pagarDomicilioEnLinea(1, 1, { referencia: 'NEQ-777', total: 8000, ...extra });
+    await assert.rejects(pagar(), /no recibe transferencias/);
+    await guardarDatosTransferencia(1, 'Nequi 300 000 0000');
+    await assert.rejects(pagarDomicilioEnLinea(2, 1, { referencia: 'NEQ-777', total: 8000 }), (e) => e.estado === 404);   // otra cuenta
+    await assert.rejects(pagar({ total: 5000 }), /total cambió/);
+    await pagar();
+    await assert.rejects(pagar(), /ya está pagado/);
+    // El domiciliario no puede cerrarlo hasta que la farmacia confirme
+    await assert.rejects(cambiarEstadoDomicilio(4, 1, { estado: 'entregado', items: [{ formula_item_id: 1, cantidad: 10 }] },
+      { soloDomiciliario: true }), /llama a la farmacia/);
+    await verificarPagoDomicilio(3, 1);
+    await cambiarEstadoDomicilio(4, 1, { estado: 'entregado', items: [{ formula_item_id: 1, cantidad: 10 }] }, { soloDomiciliario: true });
+    const cobro = await fila('cobros_domicilio');
+    assert.deepEqual([cobro.medio, cobro.referencia, cobro.cuota + cobro.envio], ['transferencia', 'NEQ-777', 8000]);
+    assert.equal((await rutaDomiciliario(4)).efectivo_hoy, 0);   // no cobró efectivo
+  });
+
+  await t.test('la fórmula que emite el médico aparece sola en la cuenta del paciente (y en ninguna otra)', async () => {
+    await preparar();
+    const formula = (codigo, documento) => crearFormula({ codigo, documento, nombre: 'Paciente prueba',
+      fecha_emision: '2026-11-18', fecha_limite: '2026-11-30', regimen: 'subsidiado',
+      medicamentos: [{ medicamento_id: 1, cantidad: 2 }] });
+    const nueva = await formula('F-2026-0100', '123456');   // documento con cuenta (id 1)
+    assert.deepEqual(nueva.cuentas, [1]);
+    const vinculadas = async () => (await pool.query(
+      `SELECT f.codigo FROM cuenta_formulas cf JOIN formulas f ON f.id = cf.formula_id WHERE cf.cuenta_id = 1 ORDER BY f.codigo`)).rows.map((r) => r.codigo);
+    assert.deepEqual(await vinculadas(), ['F-2026-0001', 'F-2026-0100']);
+    assert.equal((await pool.query(`SELECT 1 FROM registro_accesos WHERE cuenta_id = 1 AND accion = 'cuenta:formula_recibida' AND detalle = 'F-2026-0100'`)).rowCount, 1);
+    // Sin cuenta, o con la cuenta desactivada, no se vincula a nadie
+    assert.deepEqual((await formula('F-2026-0101', '999888')).cuentas, []);
+    await pool.query('UPDATE cuentas_pacientes SET activa = FALSE WHERE id = 1');
+    assert.deepEqual((await formula('F-2026-0102', '123456')).cuentas, []);
+    assert.deepEqual(await vinculadas(), ['F-2026-0001', 'F-2026-0100']);
+  });
+
+  await t.test('domiciliarios ocupados: estado automático, aviso al paciente, pedidos en espera y cambio de domiciliario', async () => {
+    await preparar();
+    await pool.query(`INSERT INTO usuarios_farmacia (nombre, usuario, clave_hash, rol) VALUES
+      ('Domiciliario 1','domicilio1','hash','domiciliario'), ('Domiciliario 2','domicilio2','hash','domiciliario')`);   // ids 4 y 5
+    // Un segundo pedido de otra fórmula del mismo paciente, listo para salir
+    await pool.query(`INSERT INTO formulas (codigo, paciente_id, fecha_emision, fecha_limite, regimen, cuota_moderadora)
+                        VALUES ('F-2026-0002', 1, CURRENT_DATE, CURRENT_DATE + 5, 'subsidiado', 0);
+                      INSERT INTO formula_items (formula_id, medicamento_id, cantidad_formulada) VALUES (2, 1, 2);
+                      INSERT INTO cuenta_formulas (cuenta_id, formula_id) VALUES (1, 2);
+                      INSERT INTO domicilios (cuenta_id, formula_id, direccion, ciudad, telefono, estado)
+                        VALUES (1, 2, 'Calle 20', 'Cúcuta', '3001234567', 'en_preparacion')`);
+    const esperando = async () => (await listarDomicilios(1)).find((d) => d.id === 2).esperando_domiciliario;
+    assert.equal(await esperando(), false);   // los dos están disponibles
+
+    await cambiarEstadoDomicilio(3, 1, { ...despacho(), domiciliario_id: 4 });
+    let lista = await listarDomiciliarios();
+    assert.equal(lista[0].en_camino, 1);
+    assert.ok(lista[0].en_ruta_desde);
+    assert.equal(lista[1].en_camino, 0);
+    assert.equal(await esperando(), false);   // queda uno libre
+    assert.equal((await rutaDomiciliario(5)).en_espera, 1);   // el libre ve que hay un pedido esperando
+
+    await pool.query(`INSERT INTO domicilios (cuenta_id, formula_id, direccion, ciudad, telefono, estado, domiciliario_id, despachado_en)
+                        SELECT 1, 2, 'Calle 30', 'Cúcuta', '3001234567', 'cancelado', 5, now()`);   // no cuenta: cancelado
+    assert.equal(await esperando(), false);
+    // Si el único domiciliario activo está en ruta, el pedido listo queda "esperando domiciliario"
+    await pool.query(`UPDATE usuarios_farmacia SET activo = FALSE WHERE id = 5`);
+    assert.equal(await esperando(), true);
+    await pool.query(`UPDATE usuarios_farmacia SET activo = TRUE WHERE id = 5`);
+
+    await assert.rejects(reasignarDomiciliario(3, 1, 4), /ya lleva/);
+    await assert.rejects(reasignarDomiciliario(3, 1, 2), /domiciliario activo/);   // un auxiliar
+    await assert.rejects(reasignarDomiciliario(3, 2, 5), /en camino/);             // aún no sale
+    await reasignarDomiciliario(3, 1, 5);
+    lista = await listarDomiciliarios();
+    assert.deepEqual(lista.map((u) => u.en_camino), [0, 1]);
+    assert.equal((await rutaDomiciliario(4)).pendientes.length, 0);
+    assert.equal((await rutaDomiciliario(5)).pendientes.length, 1);
+    await assert.rejects(cambiarEstadoDomicilio(4, 1, entrega(), { soloDomiciliario: true }), (e) => e.estado === 403);
+    await cambiarEstadoDomicilio(5, 1, entrega(), { soloDomiciliario: true });
+    lista = await listarDomiciliarios();
+    assert.ok(lista[1].ultima_entrega_en);   // terminó su ruta: disponible, de regreso
   });
 });

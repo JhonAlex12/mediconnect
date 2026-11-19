@@ -1,4 +1,5 @@
 import { listarCatalogo, formulasRecientes, siguienteCodigo, emitirFormula, buscarPaciente } from '../services/simulador.service.js';
+import { publicarFormulaNueva } from '../services/tiempoReal.service.js';
 
 // GET /api/simulador/medicamentos
 export async function catalogo(req, res, next) {
@@ -21,9 +22,10 @@ export async function recientes(req, res, next) {
 // POST /api/simulador/formulas
 export async function emitir(req, res, next) {
   try {
-    const formula = await emitirFormula(req.body ?? {}, {
+    const { cuentas, ...formula } = await emitirFormula(req.body ?? {}, {
       puedeCorregirAfiliacion: req.empleado?.rol === 'administrador',
     });
+    publicarFormulaNueva(cuentas);   // aparece al instante en la cuenta del paciente
     res.status(201).json({ ok: true, formula, siguiente_codigo: await siguienteCodigo() });
   } catch (error) {
     next(error);
