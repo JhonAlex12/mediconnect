@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { pool } from '../db/pool.js';
-import { ErrorNegocio } from './formulas.service.js';
+import { ErrorNegocio, fechaValida } from './formulas.service.js';
 
 // Contenido del sitio editable por el administrador:
 // carrusel, artículos de "Salud al día", información al paciente, contacto e imágenes
@@ -8,7 +8,6 @@ import { ErrorNegocio } from './formulas.service.js';
 const texto = (v) => (typeof v === 'string' ? v.trim() : '');
 const opcional = (v) => texto(v) || null;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 // Rutas de imagen permitidas: las del sitio (/img/...) o las subidas (/api/contenido/imagenes/N)
 const RUTA_IMAGEN = /^\/(img\/[\w.-]+|api\/contenido\/imagenes\/\d+)$/;
 // Enlaces internos (/ruta, /ruta#ancla) o externos https
@@ -187,7 +186,7 @@ function validarArticulo(d) {
   largo(errores, 'Resumen', a.resumen, 10, 300);
   largo(errores, 'Contenido', a.contenido, 20, 50000);
   if (a.imagen && !RUTA_IMAGEN.test(a.imagen)) errores.push('Imagen: no es válida');
-  if (!FECHA.test(a.fecha) || Number.isNaN(Date.parse(a.fecha))) errores.push('Fecha: no es válida');
+  if (!fechaValida(a.fecha)) errores.push('Fecha: no es válida');
   if (errores.length) throw new ErrorNegocio('Revisa los datos del artículo', 400, errores);
   return a;
 }

@@ -36,8 +36,8 @@ function AvisoError({ texto }) {
   );
 }
 
-export default function VentanaIngreso({ alCerrar }) {
-  const [tipo, setTipo] = useState('paciente');
+export default function VentanaIngreso({ alCerrar, tipoInicial = 'paciente' }) {
+  const [tipo, setTipo] = useState(tipoInicial);
   const [olvido, setOlvido] = useState(false);
   const navegar = useNavigate();
 
@@ -170,7 +170,7 @@ function IngresoPaciente({ alEntrar, alRegistrar, alOlvidar }) {
 }
 
 function IngresoEmpleado({ alEntrar }) {
-  const { iniciarSesion } = useSesion();
+  const { iniciarSesion, avisoSesion } = useSesion();
   const [usuario, setUsuario] = useState('');
   const [clave, setClave] = useState('');
   const [error, setError] = useState('');
@@ -192,7 +192,7 @@ function IngresoEmpleado({ alEntrar }) {
 
   return (
     <form onSubmit={enviar} className="space-y-4">
-      <AvisoError texto={error} />
+      <AvisoError texto={error || avisoSesion} />
       <div>
         <label htmlFor="empleado-usuario" className={claseEtiqueta}>Usuario</label>
         <input id="empleado-usuario" autoFocus autoComplete="username" required value={usuario}

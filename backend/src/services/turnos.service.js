@@ -198,16 +198,20 @@ export async function obtenerMiTurno(turnoId) {
     [t.fecha]
   );
 
-  // Posición aproximada: turnos activos del día tomados antes que el mío.
-  // Se afinará con la prioridad y la fila efectiva en el paso de la fila.
+  // Posición: personas en la sala que serán llamadas antes, con la misma regla de las cajas
+  // (ver fila.service.js): los turnos con prioridad y los sin prioridad van en filas separadas,
+  // cada una en su orden. Es la misma cuenta del aviso "ya casi es tu turno" (mantenimiento.job.js).
+  // Solo se llama a quien está en la sala, así que los turnos que aún no llegan no cuentan.
   let posicion = null;
   let minutosEstimados = null;
   if (['reservado', 'en_camino', 'presente'].includes(t.estado)) {
     const { rows: [delante] } = await pool.query(
-      `SELECT COUNT(*)::int AS total FROM turnos
-        WHERE fecha = $1 AND hora_toma < $2
-          AND estado IN ('reservado', 'en_camino', 'presente')`,
-      [t.fecha, t.hora_toma]
+      `SELECT COUNT(*)::int AS total
+         FROM turnos o JOIN turnos yo ON yo.id = $1
+        WHERE o.fecha = yo.fecha AND o.estado = 'presente' AND o.id <> yo.id
+          AND (o.prioridad <> 'ninguna') = (yo.prioridad <> 'ninguna')
+          AND o.orden < yo.orden`,
+      [t.id]
     );
     posicion = delante.total + 1;
     minutosEstimados = delante.total * MINUTOS_POR_TURNO;

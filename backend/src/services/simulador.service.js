@@ -46,7 +46,7 @@ export async function formulasRecientes() {
 // Datos registrados del paciente (nombre y afiliación), para llenar la fórmula sola
 export async function buscarPaciente(documento) {
   const doc = typeof documento === 'string' ? documento.trim() : '';
-  if (!/^\d{5,15}$/.test(doc)) return null;
+  if (!/^\d{5,20}$/.test(doc)) return null;
   // También encuentra a quien solo tiene cuenta (se registró pero aún no tiene fórmulas)
   const { rows: [p] } = await pool.query(
     `SELECT COALESCE(p.documento, c.documento) AS documento,

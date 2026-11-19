@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useSesion } from './sesion';
+import { api } from './api';
 
 // Una sola conexión en vivo para todo el panel de la farmacia
 const ContextoTiempoReal = createContext({ socket: null, conectado: false });
@@ -13,7 +14,12 @@ export function TiempoRealProvider({ children }) {
   useEffect(() => {
     const s = io({ auth: { token } });
     s.on('connect', () => setConectado(true));
-    s.on('disconnect', () => setConectado(false));
+    s.on('disconnect', (motivo) => {
+      setConectado(false);
+      // El servidor cortó la conexión (p. ej., se salió en otra pestaña): si la sesión
+      // sigue vigente se reconecta; si no, la respuesta 401 cierra la sesión con su aviso
+      if (motivo === 'io server disconnect') api('/auth/yo').then(() => s.connect()).catch(() => {});
+    });
     s.on('connect_error', () => setConectado(false));
     setSocket(s);
     return () => {
@@ -28,6 +34,11 @@ export function TiempoRealProvider({ children }) {
       {children}
     </ContextoTiempoReal.Provider>
   );
+}
+
+// La conexión en vivo, para escuchar eventos sueltos (sin recargar al conectar)
+export function useSocketEnVivo() {
+  return useContext(ContextoTiempoReal).socket;
 }
 
 export function useConexionEnVivo() {

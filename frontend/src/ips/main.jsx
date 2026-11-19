@@ -3,13 +3,22 @@ import ReactDOM from 'react-dom/client';
 import { ShieldCheck, LogOut } from 'lucide-react';
 import FormulaMedica from './FormulaMedica';
 import IngresoIps, { LogoIps } from './IngresoIps';
-import { api } from '../lib/api.js';
+import { api, idEquipo, LATIDO_SESION_MS } from '../lib/api.js';
 import { leerTokenIps, guardarTokenIps } from './sesionIps';
 import LimiteError from '../components/LimiteError';
 import '../index.css';
 
 // Quién puede emitir fórmulas de prueba (el backend también lo exige)
 const PUEDEN_ENTRAR = ['medico', 'administrador'];
+
+// Por qué el servidor cerró la sesión (mismos códigos que el panel, con el trato de la IPS)
+const SESION_CERRADA = {
+  cerrada: 'Su sesión se cerró. Ingrese de nuevo.',
+  clave_cambiada: 'La contraseña de esta cuenta cambió. Ingrese de nuevo.',
+  otro_equipo: 'Esta página estuvo cerrada o inactiva y la cuenta se abrió en otro equipo. Si no fue usted, avise al administrador.',
+};
+const SESION_ABIERTA = 'Esta cuenta ya tiene una sesión abierta en otro equipo. Ciérrela allá con «Salir» para ingresar aquí. '
+  + 'Si esa página ya se cerró, espere 5 minutos e intente de nuevo.';
 
 const iniciales = (nombre = '') =>
   nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || 'MD';
@@ -34,12 +43,18 @@ function SistemaIps() {
         if (PUEDEN_ENTRAR.includes(d.usuario?.rol)) setUsuario(d.usuario);
         else setAviso('Su cuenta no tiene acceso al sistema de la IPS. Ingrese con la cuenta del médico.');
       })
-      .catch(() => {})
+      .catch((e) => {
+        if (SESION_CERRADA[e.sesionCerrada]) {
+          guardarTokenIps(null);
+          setAviso(SESION_CERRADA[e.sesionCerrada]);
+        }
+      })
       .finally(() => setCargando(false));
   }, []);
 
   const ingresar = async (nombreUsuario, clave) => {
-    const d = await api('/auth/login', { metodo: 'POST', cuerpo: { usuario: nombreUsuario, clave }, token: null });
+    const d = await api('/auth/login', { metodo: 'POST', cuerpo: { usuario: nombreUsuario, clave, equipo: idEquipo() }, token: null })
+      .catch((e) => { throw e.estado === 409 ? new Error(SESION_ABIERTA) : e; });
     if (!PUEDEN_ENTRAR.includes(d.usuario?.rol)) {
       throw new Error('Esta cuenta no tiene acceso al sistema de la IPS. Ingrese con la cuenta del médico.');
     }
@@ -48,17 +63,30 @@ function SistemaIps() {
     setUsuario(d.usuario);
   };
 
+  // «Salir» libera la cuenta en el servidor para que pueda entrar desde otro equipo de inmediato
   const salir = () => {
+    api('/auth/salir', { metodo: 'POST', token: leerTokenIps() }).catch(() => {});
     guardarTokenIps(null);
     setUsuario(null);
   };
 
-  // El servidor rechazó la sesión (venció o se cerró en otra pestaña)
-  const sesionVencida = useCallback(() => {
+  // El servidor rechazó la sesión (venció, se cerró en otra pestaña o la cuenta entró en otro equipo)
+  const sesionVencida = useCallback((respuesta) => {
     guardarTokenIps(null);
-    setAviso('Su sesión terminó. Ingrese de nuevo.');
+    setAviso(SESION_CERRADA[respuesta?.sesion_cerrada] ?? 'Su sesión terminó. Ingrese de nuevo.');
     setUsuario(null);
   }, []);
+
+  // Mientras la página esté abierta, la sesión se marca como en uso (nadie más entra con la cuenta)
+  useEffect(() => {
+    if (!usuario) return undefined;
+    const latido = setInterval(() => {
+      api('/auth/yo', { token: leerTokenIps() }).catch((e) => {
+        if (e.estado === 401) sesionVencida({ sesion_cerrada: e.sesionCerrada });
+      });
+    }, LATIDO_SESION_MS);
+    return () => clearInterval(latido);
+  }, [usuario, sesionVencida]);
 
   // Abre Mediconnect, en otra pestaña, con la fórmula lista para consultar
   const verEnMediconnect = (codigo, documento) =>

@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { pool } from '../db/pool.js';
 import { CIUDADES_DOMICILIO, HORAS_ENLACE_CORREO } from '../config/negocio.js';
-import { ErrorNegocio } from './formulas.service.js';
+import { ErrorNegocio, fechaValida } from './formulas.service.js';
 import { consultarFormula } from './disponibilidad.service.js';
 import { despacharDomicilio, devolverDespacho, entregarDomicilio } from './entregaDomicilio.service.js';
 import { urlSitio, correoConfirmacion, correoRestablecer, enviarCorreo } from './correo.service.js';
@@ -20,7 +20,6 @@ const HASH_RELLENO = await bcrypt.hash('relleno-sin-uso', 10);
 const texto = (v) => (typeof v === 'string' ? v.trim() : '');
 const opcional = (v) => texto(v) || null;
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 // Datos personales que se pueden editar (sin documento ni contraseña)
 function validarDatosPersonales(d, errores) {
@@ -31,7 +30,7 @@ function validarDatosPersonales(d, errores) {
 
   const nacimiento = texto(d.fecha_nacimiento);
   const hoy = new Date().toISOString().slice(0, 10);
-  if (!FECHA.test(nacimiento) || Number.isNaN(Date.parse(nacimiento)) || nacimiento > hoy || nacimiento < '1900-01-01') {
+  if (!fechaValida(nacimiento) || nacimiento > hoy) {
     errores.push('Fecha de nacimiento: no es válida');
   }
 

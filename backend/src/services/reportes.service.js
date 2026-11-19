@@ -1,10 +1,9 @@
 import { pool } from '../db/pool.js';
-import { ErrorNegocio } from './formulas.service.js';
+import { ErrorNegocio, fechaValida } from './formulas.service.js';
 import { registrarAcceso } from './auditoria.service.js';
 import { ZONA_HORARIA, FALTAS_CONFIRMACION } from '../config/negocio.js';
 
 const HOY = `(now() AT TIME ZONE '${ZONA_HORARIA}')::date`;
-const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 // Cada reporte recibe el rango [$1, $2] y devuelve filas
 const REPORTES = {
@@ -79,7 +78,7 @@ export async function generarReporte(tipo, { desde, hasta } = {}, empleado) {
     throw new ErrorNegocio(`Reporte no válido. Opciones: ${Object.keys(REPORTES).join(', ')}`, 400);
   }
   for (const [nombre, valor] of [['desde', desde], ['hasta', hasta]]) {
-    if (valor !== undefined && (!FORMATO_FECHA.test(valor) || Number.isNaN(Date.parse(valor)))) {
+    if (valor !== undefined && !fechaValida(valor)) {
       throw new ErrorNegocio(`${nombre}: formato AAAA-MM-DD`, 400);
     }
   }

@@ -1,5 +1,7 @@
-import React, { useCallback, useState } from 'react';
-import { CheckCircle2, ClipboardList, Megaphone, PauseCircle, SkipForward, Undo2, UserPlus, Users } from 'lucide-react';
+import React, { useCallback, useRef, useState } from 'react';
+import {
+  CheckCircle2, ClipboardList, Megaphone, PauseCircle, SkipForward, Undo2, UserCheck, UserPlus, Users,
+} from 'lucide-react';
 import { api } from '../../lib/api';
 import { useSesion } from '../../lib/sesion';
 import { useEventoEnVivo } from '../../lib/tiempoReal';
@@ -87,6 +89,19 @@ export default function FilaFarmacia() {
   const accionTurno = (turno, accion, texto) =>
     ejecutar(() => api(`/fila/${turno.id}/${accion}`, { metodo: 'POST' }), `Turno ${turno.numero}: ${texto}`);
 
+  // El paciente llamado llegó a la ventanilla: desde ahí el turno ya no se pausa solo, aunque la entrega tarde.
+  // Se marca con el botón o, sin avisar, en cuanto el auxiliar empieza a llenar la entrega.
+  const enVentanilla = useRef(new Set()); // turnos ya marcados desde este equipo
+  const marcarEnVentanilla = (turno, { silencioso = false } = {}) => {
+    if (turno.hora_atencion || enVentanilla.current.has(turno.id)) return;
+    if (!silencioso) return accionTurno(turno, 'en_ventanilla', 'en la ventanilla');
+    enVentanilla.current.add(turno.id);
+    api(`/fila/${turno.id}/en_ventanilla`, { metodo: 'POST' }).catch((err) => {
+      enVentanilla.current.delete(turno.id);
+      setAviso({ tipo: 'error', texto: err.message });
+    });
+  };
+
   // Lo que se atiende en MI caja; los llamados de las otras cajas se ven aparte
   const llamado = datos.fila.find((t) => t.estado === 'llamado' && t.caja === caja);
   const otrasCajas = datos.fila.filter((t) => t.estado === 'llamado' && t.caja !== caja);
@@ -95,6 +110,9 @@ export default function FilaFarmacia() {
   const presentes = datos.fila.filter((t) => t.estado === 'presente');
   const enPausa = datos.fila.filter((t) => t.estado === 'en_pausa');
   const porLlegar = datos.fila.filter((t) => t.estado === 'reservado' || t.estado === 'en_camino');
+  // Hora en que el turno llamado se pausa solo si el paciente no llega
+  const pausaSola = llamado?.hora_llamado
+    && new Date(new Date(llamado.hora_llamado).getTime() + (datos.minutos_gracia ?? 4) * 60_000);
 
   return (
     <div className="space-y-6">
@@ -148,10 +166,21 @@ export default function FilaFarmacia() {
                       {llamado.formula ? `Fórmula ${llamado.formula}` : 'Sin fórmula vinculada'} · llamado a las{' '}
                       {hora(llamado.hora_llamado)}
                     </p>
+                    <p className="text-sm text-slate-600">
+                      {llamado.hora_atencion
+                        ? `En la ventanilla desde las ${hora(llamado.hora_atencion)}`
+                        : `Si no llega, se pausa solo a las ${hora(pausaSola)}`}
+                    </p>
                   </div>
                   <EtiquetaPrioridad prioridad={llamado.prioridad} />
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {!llamado.hora_atencion && (
+                    <BotonAccion color="azul" icono={UserCheck} ocupado={ocupado}
+                      onClick={() => marcarEnVentanilla(llamado)}>
+                      Llegó a la ventanilla
+                    </BotonAccion>
+                  )}
                   {llamado.formula && !entregaAbierta && (
                     <BotonAccion color="verde" icono={ClipboardList} ocupado={ocupado}
                       onClick={() => setDispensando(llamado.id)}>
@@ -177,6 +206,7 @@ export default function FilaFarmacia() {
                     turno={llamado}
                     ocupado={ocupado}
                     ejecutar={ejecutar}
+                    alTrabajar={() => marcarEnVentanilla(llamado, { silencioso: true })}
                     alCerrar={() => setDispensando(null)}
                   />
                 )}

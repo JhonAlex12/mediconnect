@@ -172,7 +172,7 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
         fetch('/api/simulador/formulas', { headers: conSesion() }),
       ]);
       if ([401, 403].includes(resMeds.status)) {
-        onSesionVencida?.();
+        onSesionVencida?.(await resMeds.json().catch(() => null));
         return;
       }
       const dataMeds = (await resMeds.json()).medicamentos ?? [];
@@ -213,7 +213,7 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
       try {
         const r = await fetch(`/api/simulador/pacientes/${encodeURIComponent(doc)}`, { headers: conSesion() });
         if ([401, 403].includes(r.status)) {
-          onSesionVencida?.();
+          onSesionVencida?.(await r.json().catch(() => null));
           return;
         }
         const p = (await r.json()).paciente ?? null;
@@ -374,7 +374,7 @@ export default function FormulaMedica({ onIrAPaciente, onSesionVencida, medico }
 
       const data = await respuesta.json();
       if ([401, 403].includes(respuesta.status)) {
-        onSesionVencida?.();
+        onSesionVencida?.(data);
       } else if (!respuesta.ok || !data.ok) {
         const detalles = Array.isArray(data.detalles) && data.detalles.length ? `: ${data.detalles.join('; ')}` : '';
         setError((data.mensaje || 'Error al guardar y enviar la fórmula.') + detalles);

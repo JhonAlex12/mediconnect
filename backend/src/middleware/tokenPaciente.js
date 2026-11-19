@@ -13,6 +13,7 @@ export function exigirTokenPaciente(req, res, next) {
     const datos = jwt.verify(token, process.env.JWT_SECRET);
     if (datos.tipo !== 'paciente_turno') throw new Error('tipo inválido');
     req.turnoId = datos.turno_id;
+    req.turnoVence = datos.exp;   // segundos desde 1970: hasta cuándo sirve esta sesión del turno
     next();
   } catch {
     res.status(401).json({ ok: false, mensaje: 'Sesión de turno no válida o vencida' });

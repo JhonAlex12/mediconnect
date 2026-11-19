@@ -14,8 +14,13 @@ const FORMATO_CODIGO = /^F-\d{4}-\d{4}$/;      // F-2026-0001
 const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;   // 2026-10-30
 const ORIGENES = ['ips', 'simulador'];
 
-const fechaValida = (valor) =>
-  typeof valor === 'string' && FORMATO_FECHA.test(valor) && !Number.isNaN(Date.parse(valor));
+// Fecha AAAA-MM-DD que existe en el calendario. Date.parse no basta: acepta "2026-02-30"
+// (lo corre al 2 de marzo) y luego PostgreSQL la rechaza con un error interno.
+export function fechaValida(valor) {
+  if (typeof valor !== 'string' || !FORMATO_FECHA.test(valor) || valor < '1900-01-01') return false;
+  const fecha = new Date(`${valor}T00:00:00Z`);
+  return !Number.isNaN(fecha.getTime()) && fecha.toISOString().slice(0, 10) === valor;
+}
 
 // Revisa los datos recibidos y devuelve la lista de problemas (vacía si todo está bien)
 function validar(datos) {

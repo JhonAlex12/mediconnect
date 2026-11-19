@@ -1,7 +1,9 @@
 import { pool } from '../db/pool.js';
 import { ErrorNegocio } from './formulas.service.js';
 import { registrarAcceso } from './auditoria.service.js';
-import { ZONA_HORARIA, ESTADOS_ACTIVOS, PRIORIDADES, CAJAS, CAJA_PREFERENCIAL } from '../config/negocio.js';
+import {
+  ZONA_HORARIA, ESTADOS_ACTIVOS, PRIORIDADES, CAJAS, CAJA_PREFERENCIAL, MINUTOS_GRACIA,
+} from '../config/negocio.js';
 
 const HOY = `(now() AT TIME ZONE '${ZONA_HORARIA}')::date`;
 
@@ -32,7 +34,7 @@ async function notificar(cliente, pacienteId, tipo, mensaje) {
 export async function verFila() {
   const { rows } = await pool.query(
     `SELECT t.id, t.numero, t.tipo, t.prioridad, t.estado, t.veces_pausado, t.caja,
-            t.hora_toma, t.hora_llegada, t.hora_llamado,
+            t.hora_toma, t.hora_llegada, t.hora_llamado, t.hora_atencion,
             COALESCE(p.nombre, t.nombre_visitante) AS paciente,
             f.codigo AS formula
        FROM turnos t
@@ -53,6 +55,8 @@ export async function verFila() {
   return {
     turno_actual: rows.find((t) => t.estado === 'llamado')?.numero ?? null,
     presentes: rows.filter((t) => t.estado === 'presente').length,
+    // Minutos que espera un turno llamado antes de pausarse solo (el panel muestra la hora)
+    minutos_gracia: MINUTOS_GRACIA,
     fila: rows,
   };
 }
@@ -89,12 +93,13 @@ export async function registrarFisico({ nombre, codigo, documento, prioridad = '
         throw new ErrorNegocio('Para vincular la fórmula ingresa el código y el documento', 400);
       }
       const { rows: [f] } = await cliente.query(
-        `SELECT f.id AS formula_id, p.id AS paciente_id
+        `SELECT f.id AS formula_id, p.id AS paciente_id, f.fecha_limite < ${HOY} AS vencida
            FROM formulas f JOIN pacientes p ON p.id = f.paciente_id
           WHERE f.codigo = $1 AND p.documento = $2`,
         [String(codigo).trim().toUpperCase(), String(documento).trim()]
       );
       if (!f) throw new ErrorNegocio('Código o documento incorrectos', 404);
+      if (f.vencida) throw new ErrorNegocio('La fórmula superó su fecha límite de reclamo', 400);
       pacienteId = f.paciente_id;
       formulaId = f.formula_id;
     } else if (typeof nombre !== 'string' || nombre.trim().length < 2) {
@@ -169,7 +174,7 @@ export async function llamarSiguiente(empleado, caja) {
     }
 
     const { rows: [turno] } = await cliente.query(
-      `UPDATE turnos SET estado = 'llamado', hora_llamado = now(), caja = $2
+      `UPDATE turnos SET estado = 'llamado', hora_llamado = now(), hora_atencion = NULL, caja = $2
         WHERE id = $1
         RETURNING id, numero, estado, prioridad, caja, paciente_id`,
       [siguiente.id, caja]
@@ -195,8 +200,10 @@ export async function llamarSiguiente(empleado, caja) {
 
 // ============================================================
 // PAUSAR, REUBICAR, SALTAR Y ATENDER (RF-22)
+// en_ventanilla: el paciente llamado llegó a la caja; desde ahí no se pausa solo (RN-07)
 // ============================================================
 const ACCIONES = {
+  en_ventanilla: ['llamado'],
   pausar:   ['llamado', 'presente'],
   reubicar: ['en_pausa'],
   saltar:   ['llamado', 'presente'],
@@ -221,10 +228,20 @@ export async function accionFila(turnoId, accion, empleado) {
     }
 
     switch (accion) {
-      case 'pausar':
-        // El paciente no apareció: sale de la fila efectiva hasta que vuelva
+      case 'en_ventanilla':
+        // Se guarda solo la primera vez (es la hora en que empezó la atención)
         await cliente.query(
-          `UPDATE turnos SET estado = 'en_pausa', veces_pausado = veces_pausado + 1 WHERE id = $1`,
+          `UPDATE turnos SET hora_atencion = COALESCE(hora_atencion, now()) WHERE id = $1`,
+          [t.id]
+        );
+        break;
+
+      case 'pausar':
+        // El paciente no apareció: sale de la fila efectiva hasta que vuelva.
+        // La pausa vence MINUTOS_VENCE_PAUSA después de esta hora (RN-09)
+        await cliente.query(
+          `UPDATE turnos SET estado = 'en_pausa', veces_pausado = veces_pausado + 1, hora_pausa = now()
+            WHERE id = $1`,
           [t.id]
         );
         await notificar(cliente, t.paciente_id, 'turno_pausado',

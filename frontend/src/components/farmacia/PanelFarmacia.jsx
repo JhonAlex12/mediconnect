@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
-import { BarChart3, Bike, Contact, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet, TabletSmartphone } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bike, Contact, LayoutTemplate, ListOrdered, LogOut, MonitorPlay, Package, UserCircle2, Users, Wallet, TabletSmartphone, X } from 'lucide-react';
 import { useSesion } from '../../lib/sesion';
-import { TiempoRealProvider } from '../../lib/tiempoReal';
+import { VENTANA_PANTALLA } from '../../lib/api';
+import { TiempoRealProvider, useSocketEnVivo } from '../../lib/tiempoReal';
 import Encabezado, { useTitulo } from '../Encabezado';
 import FilaFarmacia from './FilaFarmacia';
 import InventarioFarmacia from './InventarioFarmacia';
@@ -39,12 +40,12 @@ function Seccion({ titulo, componente: Componente }) {
 }
 
 export default function PanelFarmacia() {
-  const { usuario, verificando, cerrarSesion } = useSesion();
+  const { usuario, verificando, cerrarSesion, salir: cerrarYLiberar } = useSesion();
   const navegar = useNavigate();
-  // Al salir se vuelve a la página principal (no al formulario de ingreso)
+  // Al salir se vuelve a la página principal (no al formulario de ingreso) y la cuenta queda libre
   const salir = () => {
     navegar('/', { replace: true });
-    cerrarSesion();
+    cerrarYLiberar();
   };
   useTitulo('Farmacia');
 
@@ -78,7 +79,7 @@ export default function PanelFarmacia() {
             {atiendeFila && (
             <button
               type="button"
-              onClick={() => window.open('/pantalla', 'pantalla-sala')}
+              onClick={() => window.open('/pantalla', VENTANA_PANTALLA)}
               className="flex items-center gap-2 text-sm font-semibold bg-marca-verde hover:bg-marca-verde-oscuro px-3 py-2 rounded-lg transition cursor-pointer"
             >
               <MonitorPlay className="w-4 h-4" />
@@ -128,6 +129,7 @@ export default function PanelFarmacia() {
           </nav>
         }
       >
+        <AvisoIntentoIngreso puedeCambiarClave={usuario.rol === 'administrador'} />
         <Routes>
           <Route index element={<Navigate to={inicio} replace />} />
           {permitidas.map((s) => (
@@ -138,6 +140,36 @@ export default function PanelFarmacia() {
         </Routes>
       </Pagina>
     </TiempoRealProvider>
+  );
+}
+
+// Alguien escribió la contraseña correcta de esta cuenta en otro equipo y no lo dejó entrar
+// porque esta sesión está abierta: se avisa aquí para que se cambie la contraseña si no fue uno mismo
+function AvisoIntentoIngreso({ puedeCambiarClave }) {
+  const socket = useSocketEnVivo();
+  const [hora, setHora] = useState(null);
+  useEffect(() => {
+    if (!socket) return undefined;
+    const recibir = (d) => setHora(new Date(d?.hora ?? Date.now()));
+    socket.on('intento_ingreso', recibir);
+    return () => socket.off('intento_ingreso', recibir);
+  }, [socket]);
+  if (!hora) return null;
+  return (
+    <div role="alert" className="mb-4 bg-amber-50 border border-amber-300 text-amber-900 rounded-lg p-3 flex items-start gap-3 text-sm">
+      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+      <p className="flex-1">
+        <strong>A las {hora.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })} alguien intentó entrar con tu cuenta
+        desde otro equipo</strong> y el sistema no lo dejó, porque tu sesión está abierta aquí. Usó la contraseña correcta:
+        si no fuiste tú, otra persona la conoce. {puedeCambiarClave
+          ? 'Cámbiala en Usuarios.'
+          : 'Pídele al administrador que la cambie.'}
+      </p>
+      <button type="button" onClick={() => setHora(null)} aria-label="Cerrar aviso"
+        className="p-1 rounded hover:bg-amber-100 cursor-pointer">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
 

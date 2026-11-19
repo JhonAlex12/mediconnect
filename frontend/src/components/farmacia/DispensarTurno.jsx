@@ -20,7 +20,8 @@ const MEDIOS = [
 ];
 
 // Entrega de los medicamentos de un turno en ventanilla (CU-07)
-export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
+// alTrabajar: se llama al tocar cualquier campo (el paciente está en la ventanilla y no debe pausarse solo)
+export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar, alTrabajar }) {
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
   const [cantidades, setCantidades] = useState({}); // formula_item_id → texto del campo
@@ -143,10 +144,14 @@ export default function DispensarTurno({ turno, ocupado, ejecutar, alCerrar }) {
       )}
 
       {!datos.puede_dispensar && (
-        <p className="text-red-700 font-semibold">Este turno ya no se puede dispensar (estado: {t.estado}).</p>
+        <p className="text-red-700 font-semibold">
+          {t.vencida
+            ? `La fórmula superó su fecha límite de reclamo (${fechaLarga(t.fecha_limite)}): ya no se puede entregar.`
+            : `Este turno ya no se puede dispensar (estado: ${t.estado}).`}
+        </p>
       )}
 
-      <form onSubmit={enviar} className="space-y-4">
+      <form onSubmit={enviar} onChange={alTrabajar} className="space-y-4">
         <div className="overflow-x-auto border border-slate-200 rounded-lg">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 text-slate-600">

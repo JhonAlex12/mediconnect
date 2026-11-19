@@ -22,7 +22,7 @@ router.post('/mio/notificaciones/leidas', exigirTokenPaciente, leidas);
 router.get('/push/clave', (req, res) => res.json({ ok: true, clave: clavePublica() }));
 router.post('/mio/push', exigirTokenPaciente, async (req, res, next) => {
   try {
-    await guardarSuscripcion(req.turnoId, req.body?.suscripcion);
+    await guardarSuscripcion(req.turnoId, req.body?.suscripcion, req.turnoVence);
     res.json({ ok: true });
   } catch (error) {
     next(error);

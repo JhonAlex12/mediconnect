@@ -526,3 +526,22 @@ CREATE TRIGGER notificacion_push AFTER INSERT ON notificaciones
 
 -- Aviso "ya casi es tu turno" al turno virtual que aún no llega: se envía una sola vez
 ALTER TABLE turnos ADD COLUMN IF NOT EXISTS aviso_cerca BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Hora en que el turno entró en pausa: los minutos para vencer (RN-09) se cuentan desde aquí,
+-- no desde que llegó ni desde el primer llamado
+ALTER TABLE turnos ADD COLUMN IF NOT EXISTS hora_pausa TIMESTAMPTZ;
+
+-- El auxiliar confirmó que el paciente llamado ya está en la ventanilla: desde ese momento
+-- el turno no se pausa solo por "no se presentó" (RN-07), aunque la entrega tarde
+ALTER TABLE turnos ADD COLUMN IF NOT EXISTS hora_atencion TIMESTAMPTZ;
+
+-- Los avisos al celular duran lo mismo que la sesión del turno con que se activaron:
+-- después ese celular ya no recibe los avisos del paciente (al tomar otro turno se renueva)
+ALTER TABLE suscripciones_push ADD COLUMN IF NOT EXISTS vence_en TIMESTAMPTZ NOT NULL DEFAULT now() + interval '12 hours';
+
+-- Una sola sesión por cuenta del personal (ver services/sesionEmpleado.js). El token lleva el equipo
+-- (navegador) donde se abrió y la versión de la sesión. Mientras la sesión está en uso nadie más entra
+-- con la cuenta; "ultima_actividad" la marca la página abierta. Al cambiar la contraseña sube la versión.
+ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS equipo_sesion TEXT;
+ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS version_sesion INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE usuarios_farmacia ADD COLUMN IF NOT EXISTS ultima_actividad TIMESTAMPTZ;

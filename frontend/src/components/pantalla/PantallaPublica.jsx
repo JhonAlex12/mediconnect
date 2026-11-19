@@ -22,7 +22,7 @@ export default function PantallaPublica() {
   const [token] = useState(leerToken);
   const [estado, setEstado] = useState(ESTADO_INICIAL);
   const [conectado, setConectado] = useState(false);
-  const [sinSesion, setSinSesion] = useState(!token);
+  const [sinSesion, setSinSesion] = useState(!token);   // true, o el motivo si el servidor cerró la sesión
   const [ahora, setAhora] = useState(() => new Date());
   const [iniciada, setIniciada] = useState(false);   // el navegador solo permite sonido tras un toque
   const [conSonido, setConSonido] = useState(true);
@@ -48,11 +48,10 @@ export default function PantallaPublica() {
     if (!token) return undefined;
     const cargar = () =>
       fetch('/api/pantalla', { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => {
-          if (r.status === 401) setSinSesion(true);
-          return r.json();
-        })
-        .then((d) => d.ok && setEstado(d))
+        .then((r) => r.json().then((d) => {
+          if (r.status === 401) setSinSesion(d.sesion_cerrada ? d.mensaje : true);
+          else if (d.ok) setEstado(d);
+        }))
         .catch(() => {});
     cargar();
     const socket = io({ auth: { tipo: 'pantalla', token } });
@@ -60,10 +59,18 @@ export default function PantallaPublica() {
       setConectado(true);
       cargar();
     });
-    socket.on('disconnect', () => setConectado(false));
+    socket.on('disconnect', (motivo) => {
+      setConectado(false);
+      // El servidor cortó la conexión (la cuenta entró en otro equipo, cambió la contraseña…):
+      // se comprueba la sesión y se intenta volver a conectar
+      if (motivo === 'io server disconnect') {
+        cargar();
+        socket.connect();
+      }
+    });
     socket.on('connect_error', (e) => {
       setConectado(false);
-      if (e.message === 'No autorizado') setSinSesion(true);
+      if (e.message === 'No autorizado') setSinSesion((antes) => antes || true);
     });
     socket.on('turno_actual', setEstado);
     return () => socket.disconnect();
@@ -132,6 +139,11 @@ export default function PantallaPublica() {
           Esta pantalla la abre un empleado desde el panel de la farmacia, con su sesión iniciada.
           Si la sesión venció, vuelve a abrirla desde el panel.
         </p>
+        {typeof sinSesion === 'string' && (
+          <p role="alert" className="text-amber-200 text-lg max-w-lg">
+            {sinSesion} Para esta pantalla conviene una cuenta que no se use en otro equipo.
+          </p>
+        )}
         <a href="/farmacia" className="bg-marca-verde hover:bg-marca-verde-oscuro font-bold px-6 py-3 rounded-lg">Ir al panel de la farmacia</a>
       </div>
     );

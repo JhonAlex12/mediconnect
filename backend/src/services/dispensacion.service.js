@@ -3,6 +3,9 @@ import { ErrorNegocio } from './formulas.service.js';
 import { registrarAcceso } from './auditoria.service.js';
 import { conAvisoDeCambios } from './inventario.service.js';
 import { describirCobro, validarPago, registrarPago } from './cobros.service.js';
+import { ZONA_HORARIA } from '../config/negocio.js';
+
+const HOY = `(now() AT TIME ZONE '${ZONA_HORARIA}')::date`;
 
 const ESTADOS_DISPENSABLES = ['llamado', 'presente'];
 
@@ -26,6 +29,7 @@ export async function verParaDispensar(turnoId) {
   const { rows: [t] } = await pool.query(
     `SELECT t.id, t.numero, t.estado, t.formula_id,
             p.nombre AS paciente, p.documento, f.codigo AS formula, f.fecha_limite,
+            f.fecha_limite < ${HOY} AS vencida,
             f.regimen, f.rango_ingreso, f.eps, f.exencion, f.cuota_moderadora, f.indicaciones,
             (SELECT json_build_object('valor', pg.valor, 'medio', pg.medio, 'fecha', pg.fecha)
                FROM pagos pg WHERE pg.formula_id = f.id) AS pago
@@ -55,7 +59,7 @@ export async function verParaDispensar(turnoId) {
   return {
     turno,
     cobro: describirCobro(t, pago),
-    puede_dispensar: ESTADOS_DISPENSABLES.includes(t.estado),
+    puede_dispensar: ESTADOS_DISPENSABLES.includes(t.estado) && !t.vencida,
     medicamentos: items.map((i) => ({
       ...i,
       // Máximo que se puede entregar ahora: lo pendiente, sin tocar lo apartado por otros
@@ -98,7 +102,8 @@ export async function dispensar(turnoId, { items, delegado, pago } = {}, emplead
 
     // Bloquea el turno
     const { rows: [t] } = await cliente.query(
-      `SELECT t.id, t.numero, t.estado, t.paciente_id, t.formula_id, f.codigo, f.fecha_limite
+      `SELECT t.id, t.numero, t.estado, t.paciente_id, t.formula_id, f.codigo, f.fecha_limite,
+              f.fecha_limite < ${HOY} AS vencida
          FROM turnos t LEFT JOIN formulas f ON f.id = t.formula_id
         WHERE t.id = $1
           FOR UPDATE OF t`,
@@ -109,6 +114,9 @@ export async function dispensar(turnoId, { items, delegado, pago } = {}, emplead
       throw new ErrorNegocio(`No se puede dispensar un turno en estado "${t.estado}"`, 409);
     }
     if (!t.formula_id) throw new ErrorNegocio('Este turno no tiene una fórmula vinculada', 400);
+    if (t.vencida) {
+      throw new ErrorNegocio(`La fórmula ${t.codigo} superó su fecha límite de reclamo (${t.fecha_limite})`, 409);
+    }
 
     // Cuota moderadora: no se entrega sin pago. Se cobra una sola vez por fórmula;
     // la fila de la fórmula se bloquea para que dos ventanillas no cobren dos veces.

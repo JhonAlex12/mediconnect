@@ -27,8 +27,19 @@ export async function emitir(sala, evento, datos) {
   }));
 }
 
-export function desconectarEmpleado(id) {
+// Envía un evento a las conexiones en vivo de un empleado (p. ej., alguien intentó entrar con su cuenta)
+export function avisarEmpleado(id, evento, datos) {
   for (const socket of io?.of('/').sockets.values() ?? []) {
-    if (socket.data.empleadoId === id) socket.disconnect(true);
+    if (socket.data.empleadoId === id) socket.emit(evento, datos);
+  }
+}
+
+// Cierra las conexiones en vivo de un empleado; "exceptoEquipo": deja las del navegador
+// que acaba de iniciar sesión (las de otro equipo se cierran: una sola sesión por cuenta)
+export function desconectarEmpleado(id, { exceptoEquipo } = {}) {
+  for (const socket of io?.of('/').sockets.values() ?? []) {
+    if (socket.data.empleadoId === id && (!exceptoEquipo || socket.data.equipo !== exceptoEquipo)) {
+      socket.disconnect(true);
+    }
   }
 }

@@ -138,6 +138,9 @@ export async function editarUsuario(id, cambios = {}, admin) {
               rol        = COALESCE($3, rol),
               activo     = COALESCE($4, activo),
               clave_hash = COALESCE($5, clave_hash),
+              -- Contraseña nueva: se cierran todas las sesiones abiertas y la cuenta queda libre para entrar
+              version_sesion = CASE WHEN $5::text IS NULL THEN version_sesion ELSE version_sesion + 1 END,
+              equipo_sesion  = CASE WHEN $5::text IS NULL THEN equipo_sesion ELSE NULL END,
               caja       = CASE WHEN $6 THEN $7::smallint ELSE caja END
         WHERE id = $1
         RETURNING ${CAMPOS}`,

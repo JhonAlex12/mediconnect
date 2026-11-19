@@ -11,7 +11,7 @@ import { TiqueteImpresion, imprimirTiquete } from '../TiqueteImpresion';
 // abrir la página para registrar un turno a mano (/turno-manual) si la pantalla falla
 export default function KioscoAdmin() {
   const navegar = useNavigate();
-  const { cerrarSesion } = useSesion();
+  const { salir } = useSesion();
   const { ocupado, aviso, ejecutar } = useAccion();
 
   const activarAqui = async () => {
@@ -21,7 +21,7 @@ export default function KioscoAdmin() {
     await ejecutar(async () => {
       const r = await api('/kiosco/activar', { metodo: 'POST' });
       guardarTokenKiosco(r.token);
-      cerrarSesion(); // en un equipo público no puede quedar abierta la sesión del administrador
+      salir(); // en un equipo público no puede quedar abierta la sesión del administrador
       navegar('/kiosco', { replace: true });
     }, 'Pantalla activada');
   };

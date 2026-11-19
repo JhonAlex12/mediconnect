@@ -57,15 +57,20 @@ function validarSuscripcion(s) {
   return { endpoint, p256dh, auth };
 }
 
-// Guarda el celular para el paciente dueño del turno
-export async function guardarSuscripcion(turnoId, suscripcion) {
+// Guarda el celular para el paciente dueño del turno. Recibe avisos solo mientras sirva la sesión
+// del turno con que se activó (venceEn, en segundos): quien tuvo esa sesión una vez no sigue
+// recibiendo para siempre los avisos del paciente. Al tomar otro turno, el celular se vincula de nuevo.
+export async function guardarSuscripcion(turnoId, suscripcion, venceEn) {
   if (!pushActivo) throw new ErrorNegocio('Los avisos al celular no están activados en el servidor', 503);
   const { endpoint, p256dh, auth } = validarSuscripcion(suscripcion);
+  if (!Number.isFinite(venceEn)) throw new ErrorNegocio('Sesión de turno no válida', 401);
   const { rowCount } = await pool.query(
-    `INSERT INTO suscripciones_push (paciente_id, endpoint, p256dh, auth)
-     SELECT paciente_id, $2, $3, $4 FROM turnos WHERE id = $1 AND paciente_id IS NOT NULL
-     ON CONFLICT (paciente_id, endpoint) DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth`,
-    [turnoId, endpoint, p256dh, auth]
+    `INSERT INTO suscripciones_push (paciente_id, endpoint, p256dh, auth, vence_en)
+     SELECT paciente_id, $2, $3, $4, to_timestamp($5) FROM turnos WHERE id = $1 AND paciente_id IS NOT NULL
+     ON CONFLICT (paciente_id, endpoint) DO UPDATE
+       SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth,
+           vence_en = GREATEST(suscripciones_push.vence_en, EXCLUDED.vence_en)`,
+    [turnoId, endpoint, p256dh, auth, venceEn]
   );
   if (rowCount === 0) throw new ErrorNegocio('Turno no encontrado', 404);
 }
@@ -89,7 +94,7 @@ export async function enviarNotificacion(notificacionId) {
   );
   if (!n) return;
   const { rows: suscripciones } = await pool.query(
-    'SELECT id, endpoint, p256dh, auth FROM suscripciones_push WHERE paciente_id = $1',
+    'SELECT id, endpoint, p256dh, auth FROM suscripciones_push WHERE paciente_id = $1 AND vence_en > now()',
     [n.paciente_id]
   );
   const carga = JSON.stringify({ titulo: 'Mediconnect', cuerpo: n.mensaje, tipo: n.tipo, id: n.id, url: '/paciente' });
@@ -111,6 +116,11 @@ export async function enviarNotificacion(notificacionId) {
       }
     }
   }));
+}
+
+// Borra los celulares cuyo aviso ya venció (lo llama una tarea automática cada hora)
+export async function limpiarSuscripcionesVencidas() {
+  await pool.query('DELETE FROM suscripciones_push WHERE vence_en <= now()');
 }
 
 // Escucha el canal de la base de datos y envía cada notificación nueva.

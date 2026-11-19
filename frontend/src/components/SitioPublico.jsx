@@ -44,7 +44,7 @@ export default function SitioPublico({ children }) {
   const [abierto, setAbierto] = useState(false);
   const [ingresando, setIngresando] = useState(false);
   const { pathname } = useLocation();
-  const { usuario } = useSesion();
+  const { usuario, avisoSesion, quitarAvisoSesion } = useSesion();
   const { cuenta } = useCuenta();
   const CONTACTO = useContacto();
   useDesplazarAAncla();
@@ -142,7 +142,11 @@ export default function SitioPublico({ children }) {
         <ContextoIngreso.Provider value={() => setIngresando(true)}>{children}</ContextoIngreso.Provider>
       </main>
 
-      {ingresando && <VentanaIngreso alCerrar={() => setIngresando(false)} />}
+      {/* Si el servidor cerró la sesión del empleado, la ventana se abre sola con el aviso */}
+      {(ingresando || avisoSesion) && (
+        <VentanaIngreso tipoInicial={avisoSesion ? 'empleado' : 'paciente'}
+          alCerrar={() => { setIngresando(false); quitarAvisoSesion(); }} />
+      )}
       <ChatBot />
 
       {/* Pie de página */}
