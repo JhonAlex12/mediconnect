@@ -42,21 +42,27 @@ PARA EMPEZAR DE CERO: cierre el programa y borre la carpeta  iniciar\datos
 
 3. USUARIOS DE PRUEBA (todos los datos son ficticios)
 -----------------------------------------------------
-Personal (contraseña de todos: Mediconnect2026)
-  Dirección                         Usuario         Qué ve
-  http://localhost:3000/farmacia    admin           Administrador: inventario, pacientes, reportes,
-                                                    usuarios, tarifas, contenido, pantalla de turnos
-  http://localhost:3000/farmacia    caja1, caja2    Auxiliares de farmacia (cajas 1 y 2): fila de turnos,
-                                                    entrega de medicamentos y cobro
-  http://localhost:3000/farmacia    preferencial    Auxiliar de la caja preferencial (caja 6)
-  http://localhost:3000/farmacia    domicilios      Encargado de domicilios
-  http://localhost:3000/farmacia    domiciliario    Domiciliario: "Mis entregas"
-  http://localhost:3000/ips/        doctor          Médico de la IPS (emite fórmulas)
+CÓMO ENTRAR: en la página principal (http://localhost:3000), botón "Iniciar sesión"
+(arriba a la derecha). Ahí se elige "Soy empleado" o "Soy paciente".
+El médico no entra por ahí: tiene su propio sistema en http://localhost:3000/ips/
+
+Personal de la farmacia: "Iniciar sesión" > "Soy empleado" (contraseña de todos: Mediconnect2026)
+  Usuario         Qué ve
+  admin           Administrador: inventario, pacientes, reportes, usuarios, tarifas,
+                  contenido del sitio y pantalla de turnos
+  caja1, caja2    Auxiliares de farmacia (cajas 1 y 2): fila de turnos, entrega de
+                  medicamentos y cobro
+  preferencial    Auxiliar de la caja preferencial (caja 6)
+  domicilios      Encargado de domicilios
+  domiciliario    Domiciliario: "Mis entregas"
+
+Médico de la IPS: http://localhost:3000/ips/   usuario doctor, contraseña Mediconnect2026
 
 Pacientes
-  Cuenta de paciente:   http://localhost:3000/mi-cuenta   documento 1090000001, clave Paciente2026
-  Pacientes con fórmula (consulta sin cuenta en http://localhost:3000/paciente):
-    1090000001 a 1090000008
+  Cuenta de paciente: "Iniciar sesión" > "Soy paciente", documento 1090000001,
+  contraseña Paciente2026
+  Consulta sin cuenta: botón "Pedir turno" o http://localhost:3000/paciente, con las cédulas
+  1090000001 a 1090000008
     - 1090000006 tiene un medicamento agotado (muestra el aviso de no disponible)
     - 1090000007 tiene una fórmula que vence en 2 días (muestra la alerta)
 
@@ -70,14 +76,16 @@ tener varios perfiles abiertos a la vez (por ejemplo admin en una pestaña y caj
     (por ejemplo 1090000009).
  2. Paciente: en /paciente escriba esa cédula. Verá la fórmula y si los medicamentos están
     disponibles. Presione "Pedir turno virtual" y luego "Ya llegué".
- 3. Auxiliar: en otra pestaña, /farmacia con "caja1". En "Fila" presione "Llamar siguiente"
-    y luego "Dispensar" para entregar los medicamentos y registrar el cobro de la cuota.
+ 3. Auxiliar: abra http://localhost:3000 en otra pestaña, "Iniciar sesión" > "Soy empleado"
+    con caja1. En "Fila" presione "Llamar siguiente" y luego "Dispensar" para entregar los
+    medicamentos y registrar el cobro de la cuota.
  4. Pantalla de la sala: en el panel, el botón "Pantalla de la sala" la abre en otra ventana
     y muestra (y anuncia en voz alta) los turnos llamados.
- 5. Kiosco de la entrada: con "admin", en "Pantalla de turnos", active la pantalla y abra
-    /kiosco en esa misma ventana para sacar un turno con la cédula.
- 6. Domicilio: en /mi-cuenta (1090000001 / Paciente2026) pida el domicilio de una fórmula.
-    Luego, en /farmacia, "domicilios" lo gestiona y "domiciliario" lo entrega en "Mis entregas".
+ 5. Kiosco de la entrada: entre como admin; en "Pantalla de turnos" active el equipo y luego
+    abra http://localhost:3000/kiosco en el mismo navegador para sacar un turno con la cédula.
+ 6. Domicilio: "Iniciar sesión" > "Soy paciente" (1090000001 / Paciente2026) y pida el
+    domicilio de una fórmula. Luego, como empleado, "domicilios" lo gestiona y
+    "domiciliario" lo entrega en "Mis entregas".
  7. Administrador: revise Inventario, Reportes, Usuarios, Tarifas y Contenido del sitio.
 
 Correos: este equipo no tiene servidor de correo, así que los correos (confirmar la cuenta,

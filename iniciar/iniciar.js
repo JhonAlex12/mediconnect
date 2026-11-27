@@ -250,21 +250,19 @@ async function esperarServidor(segundos = 60) {
 }
 if (!(await esperarServidor())) salirConError('El servidor no respondió en 60 segundos (mensajes de arriba).');
 
-const fila = (a, b, c = '') => `  ${a.padEnd(30)} ${b.padEnd(34)} ${c}`;
 console.log(`
 ==============================================================================
   MEDICONNECT ESTÁ FUNCIONANDO  ->  ${URL}
 ==============================================================================
-${fila('Qué', 'Dirección', 'Usuario / contraseña')}
-${fila('Sitio del paciente', `${URL}/`)}
-${fila('Consultar fórmula y turno', `${URL}/paciente`, 'cédula 1090000001')}
-${fila('Cuenta de paciente', `${URL}/mi-cuenta`, `1090000001 / Paciente2026`)}
-${fila('Panel de la farmacia', `${URL}/farmacia`, `admin / ${CLAVE}`)}
-${fila('  (cajas y domicilios)', '', `caja1, caja2, preferencial,`)}
-${fila('', '', `domicilios, domiciliario / ${CLAVE}`)}
-${fila('Sistema de la IPS (médico)', `${URL}/ips/`, `doctor / ${CLAVE}`)}
-${fila('Pantalla de la sala', `${URL}/pantalla`)}
-${fila('Kiosco de turnos', `${URL}/kiosco`, '(se activa desde el panel)')}
+  Abra ${URL} y use el botón "Iniciar sesión" (arriba a la derecha):
+
+  "Soy empleado"   admin, caja1, caja2, preferencial, domicilios, domiciliario
+                   contraseña de todos: ${CLAVE}
+  "Soy paciente"   documento 1090000001, contraseña Paciente2026
+
+  Consultar una fórmula sin cuenta:  ${URL}/paciente   (cédulas 1090000001 a 1090000008)
+  Médico de la IPS:                  ${URL}/ips/        (doctor / ${CLAVE})
+  Pantalla de la sala y kiosco:      se abren desde el panel del administrador
 
   Para cerrar Mediconnect: presione Ctrl+C en esta ventana (o ciérrela).
 ==============================================================================
