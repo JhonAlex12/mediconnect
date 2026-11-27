@@ -1,0 +1,4 @@
+# Finales de línea fijos para los lanzadores, sin importar el sistema de quien clone el repositorio
+*.sh text eol=lf
+*.command text eol=lf
+*.bat text eol=crlf

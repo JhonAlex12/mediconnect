@@ -1,0 +1,9 @@
+{
+  "name": "mediconnect-iniciar",
+  "private": true,
+  "description": "Arranca Mediconnect en un equipo sin PostgreSQL instalado (trae su propio PostgreSQL)",
+  "type": "module",
+  "dependencies": {
+    "embedded-postgres": "18.7.0-beta.19"
+  }
+}

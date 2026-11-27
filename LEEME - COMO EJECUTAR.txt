@@ -1,0 +1,102 @@
+MEDICONNECT - CÓMO EJECUTAR EL PROYECTO
+=======================================
+
+Sistema de una farmacia conectada a una IPS: el médico emite la fórmula, el paciente la
+consulta y toma un turno virtual o pide el domicilio, y la farmacia atiende la fila, entrega
+los medicamentos, cobra la cuota moderadora y lleva el inventario.
+
+
+1. LO ÚNICO QUE SE NECESITA
+---------------------------
+- Node.js versión 22 o superior (la versión "LTS"): https://nodejs.org/es/download
+  Se instala con "Siguiente, Siguiente, Finalizar".
+- Conexión a internet la PRIMERA vez (descarga unos 100 MB de componentes).
+
+NO hay que instalar PostgreSQL ni configurar nada: el proyecto trae su propia base de datos
+PostgreSQL, que se crea y se llena con datos de prueba sola.
+
+
+2. PASOS
+--------
+WINDOWS
+  1. Extraiga el .zip: clic derecho > "Extraer todo...". Mejor en una carpeta sencilla,
+     por ejemplo C:\Mediconnect (sin tildes en la ruta).
+  2. Abra la carpeta extraída y haga doble clic en  INICIAR-Windows.bat
+     - Si aparece "Windows protegió su PC": "Más información" > "Ejecutar de todas formas".
+     - Si el Firewall pregunta por Node.js: puede "Permitir" o "Cancelar" (funciona igual).
+  3. La primera vez tarda de 1 a 3 minutos. Cuando termina, se abre el navegador en
+     http://localhost:3000  (si no se abre, escriba esa dirección en el navegador).
+  4. Deje abierta la ventana negra mientras usa el sistema.
+
+MAC
+  Extraiga el .zip y haga doble clic en  INICIAR-Mac.command
+  (si el Mac no lo deja abrir: clic derecho sobre el archivo > Abrir > Abrir).
+
+LINUX
+  En una terminal, dentro de la carpeta:   ./iniciar.sh
+
+PARA CERRAR: presione Ctrl+C en la ventana negra, o ciérrela.
+PARA VOLVER A ABRIR: el mismo archivo. Ya no descarga nada y los datos se conservan.
+PARA EMPEZAR DE CERO: cierre el programa y borre la carpeta  iniciar\datos
+
+
+3. USUARIOS DE PRUEBA (todos los datos son ficticios)
+-----------------------------------------------------
+Personal (contraseña de todos: Mediconnect2026)
+  Dirección                         Usuario         Qué ve
+  http://localhost:3000/farmacia    admin           Administrador: inventario, pacientes, reportes,
+                                                    usuarios, tarifas, contenido, pantalla de turnos
+  http://localhost:3000/farmacia    caja1, caja2    Auxiliares de farmacia (cajas 1 y 2): fila de turnos,
+                                                    entrega de medicamentos y cobro
+  http://localhost:3000/farmacia    preferencial    Auxiliar de la caja preferencial (caja 6)
+  http://localhost:3000/farmacia    domicilios      Encargado de domicilios
+  http://localhost:3000/farmacia    domiciliario    Domiciliario: "Mis entregas"
+  http://localhost:3000/ips/        doctor          Médico de la IPS (emite fórmulas)
+
+Pacientes
+  Cuenta de paciente:   http://localhost:3000/mi-cuenta   documento 1090000001, clave Paciente2026
+  Pacientes con fórmula (consulta sin cuenta en http://localhost:3000/paciente):
+    1090000001 a 1090000008
+    - 1090000006 tiene un medicamento agotado (muestra el aviso de no disponible)
+    - 1090000007 tiene una fórmula que vence en 2 días (muestra la alerta)
+
+Nota: la sesión del personal vale solo para la pestaña donde se inició, así que se pueden
+tener varios perfiles abiertos a la vez (por ejemplo admin en una pestaña y caja1 en otra).
+
+
+4. RECORRIDO SUGERIDO (unos 10 minutos)
+---------------------------------------
+ 1. Médico: entre a /ips/ con "doctor" y emita una fórmula para una cédula nueva
+    (por ejemplo 1090000009).
+ 2. Paciente: en /paciente escriba esa cédula. Verá la fórmula y si los medicamentos están
+    disponibles. Presione "Pedir turno virtual" y luego "Ya llegué".
+ 3. Auxiliar: en otra pestaña, /farmacia con "caja1". En "Fila" presione "Llamar siguiente"
+    y luego "Dispensar" para entregar los medicamentos y registrar el cobro de la cuota.
+ 4. Pantalla de la sala: en el panel, el botón "Pantalla de la sala" la abre en otra ventana
+    y muestra (y anuncia en voz alta) los turnos llamados.
+ 5. Kiosco de la entrada: con "admin", en "Pantalla de turnos", active la pantalla y abra
+    /kiosco en esa misma ventana para sacar un turno con la cédula.
+ 6. Domicilio: en /mi-cuenta (1090000001 / Paciente2026) pida el domicilio de una fórmula.
+    Luego, en /farmacia, "domicilios" lo gestiona y "domiciliario" lo entrega en "Mis entregas".
+ 7. Administrador: revise Inventario, Reportes, Usuarios, Tarifas y Contenido del sitio.
+
+Correos: este equipo no tiene servidor de correo, así que los correos (confirmar la cuenta,
+recuperar la contraseña) se muestran en la ventana negra en lugar de enviarse.
+
+
+5. SI ALGO FALLA
+----------------
+- "No se encontró Node.js": instale Node.js (punto 1) y vuelva a abrir el archivo.
+- "Falta Microsoft Visual C++ Redistributable": se abre su descarga; instálelo y vuelva a abrir.
+- La base de datos no arranca: mueva la carpeta a una ruta sin tildes (C:\Mediconnect).
+- Si el puerto 3000 está ocupado, el sistema usa el 3001, 3002...: la ventana negra muestra
+  la dirección correcta.
+- El registro de la base de datos queda en  iniciar\datos\postgres.log
+
+
+6. QUÉ HAY EN LA CARPETA
+------------------------
+  backend\      API: Node.js, Express, PostgreSQL y Socket.IO (avisos en vivo)
+  frontend\     Sitio y panel: React, Vite y Tailwind (dist\ = sitio ya construido)
+  iniciar\      Arranque automático con su propia base de datos PostgreSQL
+  README.md     Instalación con un PostgreSQL propio, pruebas y publicación en Render

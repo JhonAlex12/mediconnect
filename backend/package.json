@@ -9,6 +9,7 @@
     "test:integration": "node --test test/integracion.test.js",
     "db:migrate": "node src/db/migrate.js",
     "db:seed": "node src/db/seed.js",
+    "db:demo": "node src/db/demo.js",
     "sesion:liberar": "node src/db/liberarSesion.js",
     "correo:prueba": "node scripts/probar-correo.js"
   },

@@ -48,6 +48,14 @@ npm run dev                 # sitio en http://localhost:5173
 
 El frontend reenvía `/api` y `/socket.io` al backend, así que basta abrir la dirección de Vite.
 
+## Ejecutarlo sin instalar PostgreSQL
+
+Solo necesita Node 22.12 o superior. `INICIAR-Windows.bat` (Windows), `./iniciar.sh` (Mac o Linux)
+o `node iniciar/iniciar.js` instala las dependencias, arranca un PostgreSQL propio (paquete
+`embedded-postgres`, datos en `iniciar/datos/`), crea las tablas, carga datos de prueba ficticios
+(`npm run db:demo`) y abre el sitio en http://localhost:3000. Usuarios y recorrido sugerido:
+`LEEME - COMO EJECUTAR.txt`.
+
 ## Pruebas
 
 Las pruebas de integración usan PostgreSQL, en un esquema aparte que se borra al terminar
@@ -70,6 +78,7 @@ plan con base de datos permanente (el plan gratis es solo para pruebas).
 
 | Comando | Dónde | Qué hace |
 |---|---|---|
+| `npm run db:demo` | `backend/` | Carga personal, una cuenta de paciente y fórmulas de prueba (solo con `MODO_DEMO=true`) |
 | `npm run correo:prueba` | `backend/` | Envía un correo de prueba con los datos SMTP |
 | `npm run imagenes` | `frontend/` | Optimiza las imágenes de `imagenes-originales/` |
 | `npm run build` | `frontend/` | Construye el sitio en `frontend/dist/` |

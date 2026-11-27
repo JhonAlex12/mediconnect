@@ -6,3 +6,5 @@ dist/
 # Copias de respaldo locales y ajustes del editor
 respaldo-ui-*/
 .vscode/
+# Base de datos y claves locales del lanzador (iniciar/)
+iniciar/datos/
